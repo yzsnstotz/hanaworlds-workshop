@@ -38,8 +38,9 @@ a state change. The Session header uses the installed Core
 `0.2.0-rc.2`. A world switch verifies the world through Canvas inventory and
 clears old selection and placement. A turn sends user-selected text and
 authorized, digest-checked image attachments through the host model route.
-Ambiguous output requests clarification; a concrete proposal still requires
-explicit confirmation. A first new structure calls Canvas
+Ambiguous output requests clarification; later user corrections are sent
+through the model again with the accumulated answers, and a concrete proposal
+still requires explicit confirmation. A first new structure calls Canvas
 `InspectPlacementRegion` with `DEFAULT_PLAYER` and the confirmed node
 footprint. It offers only Canvas candidate players or typed in-game point
 picking. Its recorded `RegionInspection` is passed to Exterior unchanged and

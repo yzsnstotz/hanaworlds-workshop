@@ -180,7 +180,7 @@ export class WorkshopV1 {
           ...priorTurns.map(turn => ({ id: `hw-${turn.turnRef}`, role: 'user',
             source: { kind: 'user' }, content: [{ type: 'text', text: turn.text }] })),
           message], sessionId: body.sessionRef,
-        system: 'You are HanaWorlds Workshop. Never guess a world, target, dimension, or placement. When the user has supplied a concrete structure and all three node dimensions, respond with only JSON matching {"kind":"BUILD_STRUCTURE","text":"<structure>","purpose":"<purpose>","dimensions":{"width":1,"depth":1,"height":1,"unit":"node"},"entrancePortalRefs":[]}. Use the supplied integer dimensions; do not invent values. If any required fact is missing, ask one concise clarification question in Chinese instead of JSON.' })) {
+        system: 'You are HanaWorlds Workshop. Never guess a world, target, dimension, or placement. If the user refers to another or an unclear world, ask them to select or clarify it in the Shell. Later user corrections override earlier details. When the user has supplied a concrete structure and all three node dimensions, respond with only JSON matching {"kind":"BUILD_STRUCTURE","text":"<structure>","purpose":"<purpose>","dimensions":{"width":1,"depth":1,"height":1,"unit":"node"},"entrancePortalRefs":[]}. Use the supplied integer dimensions; do not invent values. If any required fact is missing, ask one concise clarification question in Chinese instead of JSON.' })) {
         if (chunk.type === 'text-delta') result += chunk.text;
         if (chunk.type === 'finish') finished = chunk.reason !== 'error' && chunk.reason !== 'aborted';
       }
@@ -709,7 +709,8 @@ export class WorkshopV1 {
         media, referenceBriefDigest: null, intentDigest: null, actionReceiptDigest: null });
       state.turnWorldRefs ??= Object.create(null);
       state.turnWorldRefs[body.turnRef] = state.context.activeWorldRef;
-      state.pendingClarification = { ...clarification, proposal, turnRef: body.turnRef };
+      state.pendingClarification = { ...clarification, proposal, turnRef: body.turnRef,
+        answers: [] };
       state.turnControls[body.turnRef] = body.controls;
       await this.#save(body.sessionRef, log, state);
       return { sessionRef: body.sessionRef, turnRef: body.turnRef, turnRevision,
@@ -722,28 +723,25 @@ export class WorkshopV1 {
       if (!pending || pending.clarificationId !== body.clarificationId ||
           pending.turnRef !== body.turnRef)
         failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
-      if (!pending.proposal) {
+      const confirmed = ['确认', 'yes', 'YES'].includes(body.answer.trim());
+      if (!pending.proposal || !confirmed) {
         const original = state.turns.find(value => value.turnRef === body.turnRef);
         if (!original) failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
-        const { imageBlocks } = await this.#mediaForModel({ ...body, media: original.media });
-        const answer = await this.#modelTurn({ ...body,
-          text: `${original.text}\n用户补充：${body.answer}` }, imageBlocks);
-        const proposal = parseStructureProposal(answer);
-        const next = { ...pending, proposal, clarificationId: `clarify-${randomUUID()}`,
+        const answers = confirmed ? (pending.answers ?? []) :
+          [...(pending.answers ?? []), body.answer];
+        let answer = '请补充明确的建造意图和节点尺寸。';
+        let proposal = null;
+        if (!confirmed) {
+          const { imageBlocks } = await this.#mediaForModel({ ...body, media: original.media });
+          answer = await this.#modelTurn({ ...body,
+            text: `${original.text}\n${answers.map((value, index) =>
+              `用户补充${index + 1}：${value}`).join('\n')}` }, imageBlocks);
+          proposal = parseStructureProposal(answer);
+        }
+        const next = { ...pending, proposal, answers,
+          clarificationId: `clarify-${randomUUID()}`,
           question: proposal ?
             `请确认在当前世界建造${proposal.text}，尺寸为${proposal.dimensions.width}×${proposal.dimensions.depth}×${proposal.dimensions.height}个节点。回复“确认”或说明修改。` : answer };
-        state.pendingClarification = next;
-        await this.#save(body.sessionRef, log, state);
-        return { sessionRef: body.sessionRef, turnRef: body.turnRef,
-          turnRevision: pending.turnRevision, briefDigest: null, model: 'gpt-5.6-luna',
-          resultText: next.question, clarification: {
-            sessionRef: next.sessionRef, turnRevision: next.turnRevision,
-            invocationId: next.invocationId, clarificationId: next.clarificationId,
-            code: 'AMBIGUOUS_INTENT', question: next.question } };
-      }
-      if (!['确认', 'yes', 'YES'].includes(body.answer.trim())) {
-        const next = { ...pending, clarificationId: `clarify-${randomUUID()}`,
-          question: '请补充明确的建造意图和节点尺寸。' };
         state.pendingClarification = next;
         await this.#save(body.sessionRef, log, state);
         return { sessionRef: body.sessionRef, turnRef: body.turnRef,

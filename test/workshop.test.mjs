@@ -172,6 +172,45 @@ test('an answer to a clarification returns to the model, then requires explicit 
   assert.equal(confirmed.result.clarification, null);
 });
 
+test('a user correction replaces the pending proposal before confirmation', async () => {
+  const contracts = await import('hanaworlds-contracts/v4');
+  let modelCalls = 0;
+  const { workshop, sessions } = setup({
+    canvas: { contractHandshake: contracts.contractHandshake,
+      async call(_operation, request) { return { contractVersion: 'canvas/v4',
+        requestId: request.requestId, error: null,
+        result: { worldRef: request.worldRef, registryRevision: 'r1', objects: [] } }; } },
+    modelRoute: { provider: 'host-oauth', model: 'gpt-5.6-luna' },
+    llm: { async *stream() { modelCalls++;
+      yield { type: 'text-delta', index: 0, text: JSON.stringify({
+        kind: 'BUILD_STRUCTURE', text: '石屋', purpose: 'first building',
+        dimensions: { width: modelCalls === 1 ? 3 : 6, depth: 4, height: 5, unit: 'node' },
+        entrancePortalRefs: [] }) };
+      yield { type: 'finish', reason: 'stop' }; } },
+  });
+  const first = await workshop.call('StartOrResumeSession', start());
+  const switched = await workshop.call('SwitchWorldContext', { contractVersion: 'session/v2',
+    actorRef: 'user', sessionRef: 's1', requestId: 'switch', authorizationRef: 'grant',
+    expectedRevision: first.result.context.sessionRevision, worldRef: 'world-a', selectionRevision: 'sel-1' });
+  const turn = await workshop.call('AppendMultimodalTurn', append(switched.result.context.sessionRevision));
+  const current = await workshop.call('StartOrResumeSession', { ...start(), requestId: 'resume' });
+  const corrected = await workshop.call('AnswerClarification', { contractVersion: 'session/v2',
+    actorRef: 'user', sessionRef: 's1', requestId: 'correct', authorizationRef: 'grant',
+    turnRef: 'turn-1', expectedRevision: current.result.context.sessionRevision,
+    clarificationId: turn.result.clarification.clarificationId, answer: '改为宽6个节点' });
+  assert.equal(corrected.error, null);
+  assert.equal(modelCalls, 2);
+  assert.match(corrected.result.clarification.question, /6×4×5/);
+  const current2 = await workshop.call('StartOrResumeSession', { ...start(), requestId: 'resume-2' });
+  const confirmed = await workshop.call('AnswerClarification', { contractVersion: 'session/v2',
+    actorRef: 'user', sessionRef: 's1', requestId: 'confirm', authorizationRef: 'grant',
+    turnRef: 'turn-1', expectedRevision: current2.result.context.sessionRevision,
+    clarificationId: corrected.result.clarification.clarificationId, answer: '确认' });
+  assert.equal(confirmed.error, null);
+  assert.equal(sessions.logs.get('s1').events.at(-1).data.confirmedIntents['turn-1']
+    .intent.confirmedIntent.dimensions.width, 6);
+});
+
 test('world switch preserves the same Core Session while clearing old-world selection', async () => {
   const contracts = await import('hanaworlds-contracts/v4');
   const { workshop } = setup({ canvas: { contractHandshake: contracts.contractHandshake,
