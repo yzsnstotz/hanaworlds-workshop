@@ -8,7 +8,8 @@ Product composition and user acceptance remain unproven.
 ## Install and public ports
 
 The DSH bundle applies `cordis.patch.yml` and provides
-`hanaworldsWorkshopV1`. The public service exports `contractHandshake`,
+`hanaworldsWorkshopV1` and the Adapter-facing `hanaworldsWorkshop` alias.
+The public service exports `contractHandshake`,
 `call(operation, request)` for the `session/v2` and `interaction-surface/v3`
 operations, and the component orchestration methods:
 
@@ -16,12 +17,25 @@ operations, and the component orchestration methods:
   `compileCurrentBuild`, `analyzeCurrentBuild`, `applyCurrentBuild`;
 - `listObjects`, `selectObjects`.
 
+The Adapter-facing alias also exposes `invokeAction(request, relayPrincipal)`
+as a raw `InvokeActionReceipt` and `verifyFrameDelivery(...)`. Both recheck
+the current authority and durable pending frame. Luanti relay delivery still
+requires the Adapter to resolve this alias when Workshop becomes available;
+the Adapter's current startup capture happens before Workshop installation in
+the approved composition order.
+
+The package contributes a DSH web-client `./client` entry. It registers the
+Workshop sidebar/main panel and contains a typed Shell `SELECT_CHOICE`
+presenter. The panel reports unavailable until the composition supplies a
+trusted client Session, actor and authorization context. It never asks a user
+to enter internal refs and does not claim a live model or world path.
+
 The service resolves peer ports through the host at call time. Required host
 ports are `sessionPersistence` (create/open and per-Session read/append/flush/close handles), `attachments` (readImage,
 readImageRequest), `llm` (stream), `hanaworldsAuthority` (verify),
 `hanaworldsMediaAuthority` (verify), `hanaworldsModelRoute` (provider,
 gpt-5.6-luna, imagePolicy), `hanaworldsCanvasV4`,
-`hanaworldsExteriorPainterV3`, `hanaworldsBrushV4`,
+`hanaworldsPainterV2PictureBlocks`, `hanaworldsBrushV2`,
 `hanaworldsCatalogue`, `hanaworldsSafetyProfile`,
 `hanaworldsCompilerConfig`, `hanaworldsApplyAuthority`, and
 `hanaworldsRequiredResources`. Missing ports fail closed at the operation

@@ -210,6 +210,10 @@ export class WorkshopV1 {
   }
 
   async call(operation, raw) {
+    return this.#call(operation, raw, null);
+  }
+
+  async #call(operation, raw, relayPrincipal) {
     const version = operation === 'InvokeAction' ? ACTION_VERSION : VERSION;
     let body;
     try {
@@ -217,6 +221,10 @@ export class WorkshopV1 {
         admitRequest(version, operation, Buffer.from(raw)) :
         validateRequest(version, operation, raw);
       const proof = await this.#authorized(body, operation);
+      if (relayPrincipal && (operation !== 'InvokeAction' ||
+          proof.surface !== 'LUANTI' || proof.worldRef !== relayPrincipal.worldRef ||
+          proof.engineActorName !== relayPrincipal.engineActorName))
+        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
       validateBoundRequest(version, operation, body);
       const result = await this.#withLock(body.sessionRef, async () => this.#dispatch(operation, body, proof));
       const response = packet(version, body.requestId, result);
@@ -224,6 +232,46 @@ export class WorkshopV1 {
     } catch (error) {
       return packet(version, body?.requestId ?? null, null, toPublic(error));
     }
+  }
+
+  /** The Adapter expects a raw InvokeActionReceipt and supplies its verified relay principal. */
+  async invokeAction(request, principal) {
+    if (!principal || typeof principal.worldRef !== 'string' || !principal.worldRef ||
+        typeof principal.engineActorName !== 'string' || !principal.engineActorName)
+      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    const response = await this.#call('InvokeAction', request, principal);
+    if (response.error) {
+      const error = new Error(response.error.code);
+      error.code = response.error.code;
+      error.publicError = response.error;
+      throw error;
+    }
+    return response.result;
+  }
+
+  /** Reauthorize the exact pending durable frame before Adapter shows it in Luanti. */
+  async verifyFrameDelivery({ worldRef, engineActorName, frame, authorizationRef } = {}) {
+    if (typeof worldRef !== 'string' || !worldRef ||
+        typeof engineActorName !== 'string' || !engineActorName ||
+        typeof authorizationRef !== 'string' || !authorizationRef)
+      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    validateType('InteractionFrame', frame);
+    const { state } = await this.#load(frame.sessionRef);
+    const pending = state.pendingPlacement;
+    if (!pending?.frame || state.context.activeWorldRef !== worldRef ||
+        pending.worldRef !== worldRef ||
+        JSON.stringify(pending.frame) !== JSON.stringify(frame))
+      failure('INVALID_FRAME', 'validate', 'REVISION_CHANGED');
+    if (pending.authorizationRef !== authorizationRef || !pending.actorRef)
+      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    const proof = await this.#authorized({ actorRef: pending.actorRef,
+      sessionRef: frame.sessionRef, authorizationRef }, 'BeginFirstBuilding');
+    if (proof.surface !== 'LUANTI' && proof.surface !== 'SHELL')
+      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    if (proof.worldRef !== worldRef || proof.engineActorName !== engineActorName)
+      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    return { current: true, worldRef, engineActorName, sessionRef: frame.sessionRef,
+      authorizationRef, actorRef: pending.actorRef };
   }
 
   async beginFirstBuilding(body) {
@@ -299,6 +347,7 @@ export class WorkshopV1 {
       content: choice.options.includes('NAME_PLAYER') ?
         '请选择在线玩家，或在游戏中选点。' : '请在游戏中选点。', actions });
     state.pendingPlacement = { choice, frame, projections, footprint,
+      actorRef: body.actorRef, authorizationRef: body.authorizationRef,
       worldRef: state.context.activeWorldRef, turnRef: body.turnRef,
       intentDigest: digestValue('intent', intent).sha256 };
     state.lastPlacement = { outcome: 'PLACEMENT_CHOICE_REQUIRED', choice, frame };
@@ -624,6 +673,9 @@ export class WorkshopV1 {
       if (!pending || !pending.frame ||
           state.context.activeWorldRef !== pending.worldRef)
         failure('INVALID_FRAME', 'validate', 'REVISION_CHANGED');
+      if (pending.actorRef !== body.actorRef ||
+          pending.authorizationRef !== body.authorizationRef)
+        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
       validateChoiceSelection(pending.frame, body);
       const descriptor = pending.frame.actions.find(action => action.actionId === body.actionId);
       const projection = pending.projections[body.actionId];
@@ -816,7 +868,7 @@ export function apply(ctx) {
     sessionPersistence: 'sessionPersistence', attachments: 'attachments',
     llm: 'llm', authority: 'hanaworldsAuthority',
     capabilities: 'hanaworldsCapabilities', canvas: 'hanaworldsCanvasV4',
-    painter: 'hanaworldsExteriorPainterV3', brush: 'hanaworldsBrushV4',
+    painter: 'hanaworldsPainterV2PictureBlocks', brush: 'hanaworldsBrushV2',
     resources: 'hanaworldsRequiredResources', catalogue: 'hanaworldsCatalogue',
     safety: 'hanaworldsSafetyProfile', compilerConfig: 'hanaworldsCompilerConfig',
     applyAuthority: 'hanaworldsApplyAuthority',
@@ -826,5 +878,6 @@ export function apply(ctx) {
     Object.defineProperty(service, field, { enumerable: true,
       get: () => ctx.get?.(port) });
   ctx.provide?.('hanaworldsWorkshopV1', service);
+  ctx.provide?.('hanaworldsWorkshop', service);
 }
 export default { name, inject, apply };

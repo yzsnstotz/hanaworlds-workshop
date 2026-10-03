@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
 import { WorkshopV1, apply } from '../src/index.mjs';
 
@@ -69,20 +70,64 @@ test('uses Core SessionPersistence for a durable session across Workshop instanc
 
 test('DSH plugin resolves late host ports and rejects stale Session revision', async () => {
   const ports = new Map();
-  let service;
+  const services = new Map();
   apply({ get(name) { return ports.get(name); }, provide(name, value) {
-    assert.equal(name, 'hanaworldsWorkshopV1'); service = value; } });
+    services.set(name, value); } });
+  assert.deepEqual([...services.keys()], ['hanaworldsWorkshopV1', 'hanaworldsWorkshop']);
+  const service = services.get('hanaworldsWorkshop');
+  assert.equal(service, services.get('hanaworldsWorkshopV1'));
+  assert.equal(typeof service.invokeAction, 'function');
+  assert.equal(typeof service.verifyFrameDelivery, 'function');
   const missing = await service.call('StartOrResumeSession', start());
   assert.equal(missing.error.code, 'CAPABILITY_UNAVAILABLE');
   const fixture = setup();
   ports.set('sessionPersistence', fixture.sessions);
   ports.set('hanaworldsAuthority', fixture.workshop.authority);
   ports.set('hanaworldsCapabilities', fixture.workshop.capabilities);
+  ports.set('hanaworldsBrushV2', { compile() {} });
+  ports.set('hanaworldsPainterV2PictureBlocks', { call() {} });
+  assert.equal(typeof service.brush.compile, 'function');
+  assert.equal(typeof service.painter.call, 'function');
   const created = await service.call('StartOrResumeSession', start());
   assert.equal(created.error, null);
   const stale = await service.call('StartOrResumeSession', { ...start(),
     requestId: 'stale', expectedRevision: 'old-revision' });
   assert.equal(stale.error.code, 'STALE_REVISION');
+});
+
+test('DSH client contributes a Workshop panel and only typed offered Shell choices', () => {
+  let definition;
+  runInNewContext(readFileSync(new URL('../client.cjs', import.meta.url), 'utf8'), {
+    window: { __ModuleLoader__: { load(value) { definition = value; } } },
+  });
+  assert.equal(definition.id, 'hanaworlds-workshop');
+  const client = definition.factory(name => {
+    assert.equal(name, 'react');
+    return { createElement(type, props, ...children) { return { type, props, children }; } };
+  });
+  const seats = [];
+  client.apply({ slots: { inject(name, register) {
+    seats.push(name); register();
+  }, register(meta, component) { seats.push({ meta, component }); } } });
+  assert.deepEqual(seats.filter(x => typeof x === 'string'),
+    ['main', 'sidebar.panellist']);
+  assert.equal(seats[1].meta.key, 'hanaworlds-workshop');
+  assert.equal(seats[3].meta.id, 'hanaworlds-workshop');
+  const offered = [];
+  const frame = { content: '选择玩家', actions: [
+    { actionId: 'choose', inputKinds: ['SELECT_CHOICE'], choices: [
+      { value: 'alice', label: 'alice' }, { value: 'bob', label: 'bob' }] },
+    { actionId: 'pick', inputKinds: ['PICK_WORLD_POINT'], choices: null },
+  ] };
+  const view = client.WorkshopChoiceFrame({ frame, onSelect: value => offered.push(value) });
+  const buttons = view.children.filter(item => item?.type === 'button');
+  assert.deepEqual(buttons.map(button => button.children[0]), ['alice', 'bob']);
+  buttons[1].props.onClick();
+  assert.deepEqual(JSON.parse(JSON.stringify(offered)), [{ actionId: 'choose',
+    input: { kind: 'SELECT_CHOICE', value: 'bob' } }]);
+  assert.equal(view.children.at(-1).children[0], '也可以在游戏中选点。');
+  const panel = seats[1].component();
+  assert.equal(panel.children[1].props.role, 'status');
 });
 
 const sha = data => createHash('sha256').update(data).digest('hex');
@@ -304,7 +349,13 @@ test('first confirmed structure sends DEFAULT_PLAYER and exact node footprint to
       error: null, unavailableSettings: null }; } };
   const proposal = { kind: 'BUILD_STRUCTURE', text: '小石屋', purpose: 'first building',
     dimensions: { width: 3, depth: 4, height: 5, unit: 'node' }, entrancePortalRefs: [] };
-  const { workshop, sessions } = setup({ canvas, modelRoute: { provider: 'host-oauth', model: 'gpt-5.6-luna' },
+  const { workshop, sessions } = setup({ canvas,
+    authority: { async verify(request) { return { current: true,
+      actorRef: request.actorRef, sessionRef: request.sessionRef,
+      authorizationRef: request.authorizationRef, worldRef: 'world-a',
+      engineActorName: 'initiator', surface: 'SHELL',
+      allowedActions: ['READ', 'APPEND', 'INSPECT', 'SELECT'] }; } },
+    modelRoute: { provider: 'host-oauth', model: 'gpt-5.6-luna' },
     llm: { async *stream() { yield { type: 'text-delta', index: 0, text: JSON.stringify(proposal) }; yield { type: 'finish', reason: 'stop' }; } } });
   const first = await workshop.call('StartOrResumeSession', start());
   const switched = await workshop.call('SwitchWorldContext', { contractVersion: 'session/v2',
@@ -327,6 +378,17 @@ test('first confirmed structure sends DEFAULT_PLAYER and exact node footprint to
   assert.deepEqual(JSON.parse(JSON.stringify(select.choices)), [{ value: 'alice', label: 'alice' }, { value: 'bob', label: 'bob' }]);
   assert.equal(placement.frame.actions.some(action => action.inputKinds.includes('PICK_WORLD_POINT')), true);
   assert.equal(canvasCalls.length, 1);
+  const delivery = { worldRef: 'world-a', engineActorName: 'initiator',
+    frame: placement.frame, authorizationRef: 'grant' };
+  assert.deepEqual(await workshop.verifyFrameDelivery(delivery), { current: true,
+    worldRef: 'world-a', engineActorName: 'initiator', sessionRef: 's1',
+    authorizationRef: 'grant', actorRef: 'user' });
+  await assert.rejects(() => workshop.verifyFrameDelivery({ ...delivery,
+    engineActorName: 'other' }), { code: 'PERMISSION_DENIED' });
+  await assert.rejects(() => workshop.verifyFrameDelivery({ ...delivery,
+    frame: { ...placement.frame, content: 'stale or forged' } }),
+  { code: 'INVALID_FRAME' });
+  assert.equal(canvasCalls.length, 1);
   const actionProjection = placement.actionProjections[select.actionId];
   const choose = (value, requestId) => ({ contractVersion: 'interaction-surface/v3', actorRef: 'user',
     sessionRef: 's1', requestId, authorizationRef: 'grant', turnRevision: placement.frame.turnRevision,
@@ -340,6 +402,32 @@ test('first confirmed structure sends DEFAULT_PLAYER and exact node footprint to
   const picked = await workshop.call('InvokeAction', choose('alice', 'good-choice'));
   assert.equal(picked.error, null);
   assert.deepEqual(canvasCalls[1].request.anchor, { kind: 'NAMED_PLAYER', engineActorName: 'alice' });
+  await assert.rejects(() => workshop.verifyFrameDelivery(delivery),
+    { code: 'INVALID_FRAME' });
+  workshop.authority = { async verify(request) { return { current: true,
+    actorRef: request.actorRef, sessionRef: request.sessionRef,
+    authorizationRef: request.authorizationRef, worldRef: 'world-a',
+    engineActorName: 'initiator', surface: 'LUANTI',
+    allowedActions: ['INSPECT'] }; } };
+  const pending = sessions.logs.get('s1').events.at(-1).data.pendingPlacement;
+  const pick = pending.frame.actions.find(action => action.inputKinds.includes('PICK_WORLD_POINT'));
+  const relay = { contractVersion: 'interaction-surface/v3', actorRef: 'user',
+    sessionRef: 's1', requestId: 'relay-pick', invocationId: 'relay-pick',
+    authorizationRef: 'grant', turnRevision: pending.frame.turnRevision,
+    frameRevision: pending.frame.frameRevision, frameRef: pending.frame.frameRef,
+    actionId: pick.actionId, surfaceAction: pending.projections[pick.actionId],
+    surfaceActionDigest: pick.surfaceActionDigest,
+    input: { kind: 'PICK_WORLD_POINT', pickRef: 'adapter-pick-1' } };
+  await assert.rejects(() => workshop.invokeAction(relay,
+    { worldRef: 'world-a', engineActorName: 'another-player' }),
+  { code: 'PERMISSION_DENIED' });
+  assert.equal(canvasCalls.length, 2);
+  const receipt = await workshop.invokeAction(relay,
+    { worldRef: 'world-a', engineActorName: 'initiator' });
+  assert.equal(receipt.invocationId, 'relay-pick');
+  assert.equal(receipt.accepted, true);
+  assert.deepEqual(canvasCalls[2].request.anchor,
+    { kind: 'PICKED_POINT', pickRef: 'adapter-pick-1' });
 });
 
 test('first building rejects a different same-Session relay before Canvas', async () => {
