@@ -1,5 +1,5 @@
 # hanaworlds-workshop
 
-HanaWorlds Stage 1 Workshop runtime plugin. Implementation is developed on the `codex/s1-02-workshop` task branch.
-
-The public `main` branch is the initial repository baseline for review. Component and product readiness follow the approved Stage 1 BlueMap and independent validation receipts.
+HanaWorlds Stage 1 Workshop 0.1.0 component candidate. See [GADGET.md](GADGET.md)
+for its host ports, Session flow, installation and recovery boundary. Product
+composition and human acceptance remain unproven.

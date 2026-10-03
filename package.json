@@ -1,0 +1,21 @@
+{
+  "name": "hanaworlds-workshop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "HanaWorlds Stage 1 Workshop Session and orchestration gadget",
+  "repository": {"type": "git", "url": "https://github.com/yzsnstotz/hanaworlds-workshop.git"},
+  "engines": {"node": ">=24.13.1 <25"},
+  "exports": {".": "./src/index.mjs", "./client": "./client.cjs"},
+  "files": ["src/", "client.cjs", "vendor/contracts/", "cordis.patch.yml", "GADGET.md", "NOTICE", "LICENSE"],
+  "dsh": {"client": {"inject": ["@deepseek-ai/dsh-client-ui-layout", "@deepseek-ai/dsh-client-ui-sidebar"], "platform": "web"}, "bundle": {"patch": "./cordis.patch.yml"}},
+  "scripts": {"build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs", "test": "node --test test/*.test.mjs"},
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-invariants": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-scope": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-session": "0.2.0-rc.2",
+    "canonicalize": "5.1.0"
+  }
+}
