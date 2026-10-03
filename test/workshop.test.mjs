@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
 import { WorkshopV1, apply } from '../src/index.mjs';
+import * as contractsV4 from '../vendor/contracts/dist/v4/index.mjs';
 
 class CoreSessions {
   logs = new Map();
@@ -192,7 +193,7 @@ test('an answer to a clarification returns to the model, then requires explicit 
     dimensions: { width: 3, depth: 4, height: 5, unit: 'node' }, entrancePortalRefs: [] };
   const prompts = [];
   const { workshop, sessions } = setup({
-    canvas: { contractHandshake: (await import('hanaworlds-contracts/v4')).contractHandshake,
+    canvas: { contractHandshake: contractsV4.contractHandshake,
       async call(_operation, request) { return { contractVersion: 'canvas/v4',
         requestId: request.requestId, error: null,
         result: { worldRef: request.worldRef, registryRevision: 'r1', objects: [] } }; } },
@@ -228,7 +229,7 @@ test('an answer to a clarification returns to the model, then requires explicit 
 });
 
 test('a user correction replaces the pending proposal before confirmation', async () => {
-  const contracts = await import('hanaworlds-contracts/v4');
+  const contracts = contractsV4;
   let modelCalls = 0;
   const { workshop, sessions } = setup({
     canvas: { contractHandshake: contracts.contractHandshake,
@@ -269,7 +270,7 @@ test('a user correction replaces the pending proposal before confirmation', asyn
 });
 
 test('world switch preserves the same Core Session while clearing old-world selection', async () => {
-  const contracts = await import('hanaworlds-contracts/v4');
+  const contracts = contractsV4;
   const { workshop } = setup({ canvas: { contractHandshake: contracts.contractHandshake,
     async call(operation, request) { assert.equal(operation, 'ListObjects'); return {
       contractVersion: 'canvas/v4', requestId: request.requestId, error: null,
@@ -297,7 +298,7 @@ test('world switch refuses a caller supplied world without Canvas bound-world pr
 
 test('model receives earlier turns from the active world without old-world turn leakage', async () => {
   const prompts = [];
-  const contracts = await import('hanaworlds-contracts/v4');
+  const contracts = contractsV4;
   const { workshop } = setup({
     canvas: { contractHandshake: contracts.contractHandshake,
       async call(_operation, request) { return { contractVersion: 'canvas/v4',
@@ -335,7 +336,7 @@ test('model receives earlier turns from the active world without old-world turn 
 
 test('first confirmed structure sends DEFAULT_PLAYER and exact node footprint to Canvas, then offers only typed player choices', async () => {
   const canvasCalls = [];
-  const canvas = { contractHandshake: (await import('hanaworlds-contracts/v4')).contractHandshake,
+  const canvas = { contractHandshake: contractsV4.contractHandshake,
     async call(operation, request) { if (operation === 'ListObjects') return {
       contractVersion: 'canvas/v4', requestId: request.requestId, error: null,
       result: { worldRef: request.worldRef, registryRevision: 'registry-1', objects: [] } };
@@ -431,7 +432,7 @@ test('first confirmed structure sends DEFAULT_PLAYER and exact node footprint to
 });
 
 test('first building rejects a different same-Session relay before Canvas', async () => {
-  const contracts = await import('hanaworlds-contracts/v4');
+  const contracts = contractsV4;
   const canvasCalls = [];
   const proposal = { kind: 'BUILD_STRUCTURE', text: '石屋', purpose: 'first building',
     dimensions: { width: 3, depth: 4, height: 5, unit: 'node' }, entrancePortalRefs: [] };
@@ -501,9 +502,9 @@ test('first building rejects a different same-Session relay before Canvas', asyn
 });
 
 test('passes the recorded RegionInspection unchanged into painter/v3 and rejects image-free structure planning', async () => {
-  const fixtures = JSON.parse(readFileSync(new URL(import.meta.resolve('hanaworlds-contracts/v4/fixtures/placement-region-chain-v4'))));
+  const fixtures = JSON.parse(readFileSync(new URL('../vendor/contracts/fixtures/v4/candidate/placement-region-chain-v4.json', import.meta.url)));
   const chain = fixtures.validCases[0].materializedChain;
-  const contracts = await import('hanaworlds-contracts/v4');
+  const contracts = contractsV4;
   const bytes = Buffer.from('image bytes');
   const painterCalls = [];
   const canvasCalls = [];
@@ -608,7 +609,7 @@ test('passes the recorded RegionInspection unchanged into painter/v3 and rejects
 });
 
 test('uses fresh Canvas inventory names for object selection and refuses an unoffered ref', async () => {
-  const contracts = await import('hanaworlds-contracts/v4');
+  const contracts = contractsV4;
   const operations = [];
   const canvas = { contractHandshake: contracts.contractHandshake,
     async call(operation, request) { operations.push(operation); if (operation === 'ListObjects') return {
@@ -637,9 +638,9 @@ test('uses fresh Canvas inventory names for object selection and refuses an unof
 });
 
 test('an uncertain Apply reuses its durable Canvas request after Workshop restart', async () => {
-  const fixtures = JSON.parse(readFileSync(new URL(import.meta.resolve('hanaworlds-contracts/v4/fixtures/placement-region-chain-v4'))));
+  const fixtures = JSON.parse(readFileSync(new URL('../vendor/contracts/fixtures/v4/candidate/placement-region-chain-v4.json', import.meta.url)));
   const request = fixtures.validCases[0].materializedChain.applyRequest;
-  const contracts = await import('hanaworlds-contracts/v4');
+  const contracts = contractsV4;
   const calls = [];
   const canvas = { contractHandshake: contracts.contractHandshake,
     async call(operation, actual) {
@@ -677,7 +678,7 @@ test('an uncertain Apply reuses its durable Canvas request after Workshop restar
 });
 
 test('fixed Core delete seam fails honestly and resource reopen does not depend on old Session log', async () => {
-  const contracts = await import('hanaworlds-contracts/v4');
+  const contracts = contractsV4;
   const stored = new Map();
   const resources = { async persist(request) { stored.set(request.artifactRef, request.manifest); return {
     manifest: request.manifest, resourceManifestDigest: request.resourceManifestDigest, durable: true }; },

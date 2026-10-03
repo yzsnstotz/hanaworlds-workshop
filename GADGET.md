@@ -84,8 +84,13 @@ independent of the old Session log.
 
 Use Node 24.13.1, isolated HOME, npm cache and DSH profile. `npm ci`,
 `npm run build`, `npm test`, and `npm pack --ignore-scripts` operate from a
-fresh public clone. The contracts dependency is pinned to its public commit;
-there is no sibling path, `file:` dependency or local tarball requirement.
+fresh public clone. The 17-module v4 runtime closure and placement fixture
+under `vendor/contracts/` are byte-identical to the admitted Contracts 0.3.0
+public pack at revision `e82735780bdfd4ea8e662781455040a6e5306121`.
+`npm run build` verifies the pinned source/artifact, every file digest,
+runtime import closure and permitted external imports. `canonicalize@5.1.0`
+is an ordinary registry dependency. No sibling path, `file:` dependency,
+exotic transitive URL or local tarball is needed for default pnpm 11 install.
 For a real DSH installation, preserve the Core Session and required resource
 stores across uninstall/reinstall; package rollback requires the compatible
 contracts consumer set and must preserve any unresolved Canvas transaction.

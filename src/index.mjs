@@ -4,7 +4,7 @@ import {
   admitRequest, validateRequest, validateBoundRequest, validateResponse,
   ContractError, contractHandshake, checkContractHandshake, digestValue, validateType,
   validateChoiceSelection, validateRegionInspection,
-} from 'hanaworlds-contracts/v4';
+} from '../vendor/contracts/dist/v4/index.mjs';
 
 const VERSION = 'session/v2';
 const ACTION_VERSION = 'interaction-surface/v3';
