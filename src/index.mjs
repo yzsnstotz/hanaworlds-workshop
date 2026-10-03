@@ -51,6 +51,26 @@ function parseStructureProposal(text) {
   return value;
 }
 
+function confirmingSessionInputId(log, pending, body) {
+  // Core's durable user/message ID identifies the actual Session input. A
+  // caller's requestId alone is not evidence that an Adapter relay issued it.
+  const after = pending.afterSessionEventSeq;
+  if (!Number.isSafeInteger(after) || after < 0)
+    failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+  const inputs = log.events.slice(after + 1).filter(event =>
+    event.type === 'user/message');
+  if (inputs.length !== 1)
+    failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+  const message = inputs[0].data;
+  if (inputs[0].surfaceOp !== 'append' ||
+      message?.role !== 'user' || message?.source?.kind !== 'user' ||
+      message.id !== body.requestId || !Array.isArray(message.content) ||
+      message.content.length !== 1 || message.content[0]?.type !== 'text' ||
+      message.content[0].text !== body.answer)
+    failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+  return message.id;
+}
+
 /** Session state is carried in Core SessionPersistence's public append-only event log. */
 export class WorkshopV1 {
   constructor({ sessionPersistence, attachments, llm, authority, capabilities,
@@ -214,6 +234,12 @@ export class WorkshopV1 {
       const intent = saved?.intent;
       if (!intent || intent.confirmedIntent.kind !== 'BUILD_STRUCTURE')
         failure('INTENT_UNCONFIRMED', 'validate', 'REQUIRED_FACT_UNKNOWN');
+      if (typeof saved.confirmationInputId !== 'string' ||
+          !saved.confirmationInputId)
+        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+      if (body.invocationId !== undefined &&
+          body.invocationId !== saved.confirmationInputId)
+        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
       if (!state.context.activeWorldRef ||
           intent.intendedWorldRef !== state.context.activeWorldRef)
         failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
@@ -230,7 +256,7 @@ export class WorkshopV1 {
       const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
         sessionRef: body.sessionRef, requestId: body.requestId,
         authorizationRef: body.authorizationRef, worldRef: state.context.activeWorldRef,
-        anchor: { kind: 'DEFAULT_PLAYER', invocationId: body.invocationId }, footprint };
+        anchor: { kind: 'DEFAULT_PLAYER', invocationId: saved.confirmationInputId }, footprint };
       validateBoundRequest('canvas/v4', 'InspectPlacementRegion', request);
       const response = validateResponse('canvas/v4', 'InspectPlacementRegion',
         await this.canvas.call('InspectPlacementRegion', request));
@@ -710,7 +736,7 @@ export class WorkshopV1 {
       state.turnWorldRefs ??= Object.create(null);
       state.turnWorldRefs[body.turnRef] = state.context.activeWorldRef;
       state.pendingClarification = { ...clarification, proposal, turnRef: body.turnRef,
-        answers: [] };
+        answers: [], afterSessionEventSeq: log.events.length };
       state.turnControls[body.turnRef] = body.controls;
       await this.#save(body.sessionRef, log, state);
       return { sessionRef: body.sessionRef, turnRef: body.turnRef, turnRevision,
@@ -723,6 +749,7 @@ export class WorkshopV1 {
       if (!pending || pending.clarificationId !== body.clarificationId ||
           pending.turnRef !== body.turnRef)
         failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
+      const confirmationInputId = confirmingSessionInputId(log, pending, body);
       const confirmed = ['确认', 'yes', 'YES'].includes(body.answer.trim());
       if (!pending.proposal || !confirmed) {
         const original = state.turns.find(value => value.turnRef === body.turnRef);
@@ -739,6 +766,7 @@ export class WorkshopV1 {
           proposal = parseStructureProposal(answer);
         }
         const next = { ...pending, proposal, answers,
+          afterSessionEventSeq: log.events.length,
           clarificationId: `clarify-${randomUUID()}`,
           question: proposal ?
             `请确认在当前世界建造${proposal.text}，尺寸为${proposal.dimensions.width}×${proposal.dimensions.depth}×${proposal.dimensions.height}个节点。回复“确认”或说明修改。` : answer };
@@ -768,7 +796,8 @@ export class WorkshopV1 {
         intendedWorldRef: state.context.activeWorldRef, orderedTargetRefs: [] });
       turn.referenceBriefDigest = briefDigest;
       turn.intentDigest = digestValue('intent', intent).sha256;
-      state.confirmedIntents[body.turnRef] = { brief, intent };
+      state.confirmedIntents[body.turnRef] = { brief, intent,
+        confirmationInputId };
       state.pendingClarification = null;
       await this.#save(body.sessionRef, log, state);
       return { sessionRef: body.sessionRef, turnRef: body.turnRef,

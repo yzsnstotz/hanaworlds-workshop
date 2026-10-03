@@ -47,6 +47,14 @@ function setup(overrides = {}) {
 
 const start = (sessionRef = 's1') => ({ contractVersion: 'session/v2', actorRef: 'user', sessionRef, requestId: `start-${sessionRef}`, authorizationRef: 'grant', expectedRevision: null });
 
+function recordUserInput(sessions, requestId, text, sessionRef = 's1') {
+  const events = sessions.logs.get(sessionRef).events;
+  events.push({ type: 'user/message', seq: events.length, time: Date.now(),
+    surfaceOp: 'append',
+    data: { id: requestId, role: 'user', source: { kind: 'user' },
+      content: [{ type: 'text', text }] } });
+}
+
 test('uses Core SessionPersistence for a durable session across Workshop instances', async () => {
   const { workshop, sessions } = setup();
   const created = await workshop.call('StartOrResumeSession', start());
@@ -138,7 +146,7 @@ test('an answer to a clarification returns to the model, then requires explicit 
   const proposal = { kind: 'BUILD_STRUCTURE', text: '石屋', purpose: 'first building',
     dimensions: { width: 3, depth: 4, height: 5, unit: 'node' }, entrancePortalRefs: [] };
   const prompts = [];
-  const { workshop } = setup({
+  const { workshop, sessions } = setup({
     canvas: { contractHandshake: (await import('hanaworlds-contracts/v4')).contractHandshake,
       async call(_operation, request) { return { contractVersion: 'canvas/v4',
         requestId: request.requestId, error: null,
@@ -156,6 +164,7 @@ test('an answer to a clarification returns to the model, then requires explicit 
   const turn = await workshop.call('AppendMultimodalTurn', append(switched.result.context.sessionRevision));
   assert.equal(turn.result.clarification.question, '屋子要多大？');
   const current = await workshop.call('StartOrResumeSession', { ...start(), requestId: 'resume' });
+  recordUserInput(sessions, 'followup', '宽3、深4、高5个节点');
   const followup = await workshop.call('AnswerClarification', { contractVersion: 'session/v2',
     actorRef: 'user', sessionRef: 's1', requestId: 'followup', authorizationRef: 'grant',
     turnRef: 'turn-1', expectedRevision: current.result.context.sessionRevision,
@@ -164,6 +173,7 @@ test('an answer to a clarification returns to the model, then requires explicit 
   assert.match(prompts[1], /宽3、深4、高5个节点/);
   assert.match(followup.result.clarification.question, /3×4×5/);
   const current2 = await workshop.call('StartOrResumeSession', { ...start(), requestId: 'resume-2' });
+  recordUserInput(sessions, 'confirm', '确认');
   const confirmed = await workshop.call('AnswerClarification', { contractVersion: 'session/v2',
     actorRef: 'user', sessionRef: 's1', requestId: 'confirm', authorizationRef: 'grant',
     turnRef: 'turn-1', expectedRevision: current2.result.context.sessionRevision,
@@ -194,6 +204,7 @@ test('a user correction replaces the pending proposal before confirmation', asyn
     expectedRevision: first.result.context.sessionRevision, worldRef: 'world-a', selectionRevision: 'sel-1' });
   const turn = await workshop.call('AppendMultimodalTurn', append(switched.result.context.sessionRevision));
   const current = await workshop.call('StartOrResumeSession', { ...start(), requestId: 'resume' });
+  recordUserInput(sessions, 'correct', '改为宽6个节点');
   const corrected = await workshop.call('AnswerClarification', { contractVersion: 'session/v2',
     actorRef: 'user', sessionRef: 's1', requestId: 'correct', authorizationRef: 'grant',
     turnRef: 'turn-1', expectedRevision: current.result.context.sessionRevision,
@@ -202,6 +213,7 @@ test('a user correction replaces the pending proposal before confirmation', asyn
   assert.equal(modelCalls, 2);
   assert.match(corrected.result.clarification.question, /6×4×5/);
   const current2 = await workshop.call('StartOrResumeSession', { ...start(), requestId: 'resume-2' });
+  recordUserInput(sessions, 'confirm', '确认');
   const confirmed = await workshop.call('AnswerClarification', { contractVersion: 'session/v2',
     actorRef: 'user', sessionRef: 's1', requestId: 'confirm', authorizationRef: 'grant',
     turnRef: 'turn-1', expectedRevision: current2.result.context.sessionRevision,
@@ -292,7 +304,7 @@ test('first confirmed structure sends DEFAULT_PLAYER and exact node footprint to
       error: null, unavailableSettings: null }; } };
   const proposal = { kind: 'BUILD_STRUCTURE', text: '小石屋', purpose: 'first building',
     dimensions: { width: 3, depth: 4, height: 5, unit: 'node' }, entrancePortalRefs: [] };
-  const { workshop } = setup({ canvas, modelRoute: { provider: 'host-oauth', model: 'gpt-5.6-luna' },
+  const { workshop, sessions } = setup({ canvas, modelRoute: { provider: 'host-oauth', model: 'gpt-5.6-luna' },
     llm: { async *stream() { yield { type: 'text-delta', index: 0, text: JSON.stringify(proposal) }; yield { type: 'finish', reason: 'stop' }; } } });
   const first = await workshop.call('StartOrResumeSession', start());
   const switched = await workshop.call('SwitchWorldContext', { contractVersion: 'session/v2',
@@ -300,8 +312,9 @@ test('first confirmed structure sends DEFAULT_PLAYER and exact node footprint to
     expectedRevision: first.result.context.sessionRevision, worldRef: 'world-a', selectionRevision: 'sel-1' });
   const turn = await workshop.call('AppendMultimodalTurn', append(switched.result.context.sessionRevision));
   assert.equal(turn.error, null);
+  recordUserInput(sessions, 'invoke-1', '确认');
   const answer = await workshop.call('AnswerClarification', { contractVersion: 'session/v2',
-    actorRef: 'user', sessionRef: 's1', requestId: 'answer', authorizationRef: 'grant',
+    actorRef: 'user', sessionRef: 's1', requestId: 'invoke-1', authorizationRef: 'grant',
     turnRef: 'turn-1', expectedRevision: (await workshop.call('StartOrResumeSession', { ...start(), requestId: 'resume' })).result.context.sessionRevision,
     clarificationId: turn.result.clarification.clarificationId, answer: '确认' });
   assert.equal(answer.error, null);
@@ -327,6 +340,76 @@ test('first confirmed structure sends DEFAULT_PLAYER and exact node footprint to
   const picked = await workshop.call('InvokeAction', choose('alice', 'good-choice'));
   assert.equal(picked.error, null);
   assert.deepEqual(canvasCalls[1].request.anchor, { kind: 'NAMED_PLAYER', engineActorName: 'alice' });
+});
+
+test('first building rejects a different same-Session relay before Canvas', async () => {
+  const contracts = await import('hanaworlds-contracts/v4');
+  const canvasCalls = [];
+  const proposal = { kind: 'BUILD_STRUCTURE', text: '石屋', purpose: 'first building',
+    dimensions: { width: 3, depth: 4, height: 5, unit: 'node' }, entrancePortalRefs: [] };
+  const { workshop, sessions } = setup({
+    canvas: { contractHandshake: contracts.contractHandshake,
+      async call(operation, request) {
+        if (operation === 'ListObjects') return { contractVersion: 'canvas/v4',
+          requestId: request.requestId, error: null,
+          result: { worldRef: request.worldRef, registryRevision: 'r1', objects: [] } };
+        canvasCalls.push(request);
+        return { contractVersion: 'canvas/v4', requestId: request.requestId,
+          result: { outcome: 'PLACEMENT_CHOICE_REQUIRED', choice: {
+            anchorKind: 'DEFAULT_PLAYER', reasons: ['MULTIPLE_ONLINE_PLAYERS'],
+            options: ['NAME_PLAYER', 'PICK_WORLD_POINT'], candidatePlayerNames: ['alice', 'bob'],
+            placementSettings: { frontGapCells: 2, forwardSearchCells: 16,
+              lateralSearchCells: 8, verticalSearchCells: 4, settingsRevision: 's1' },
+            observedWorldRevision: 'w1' } }, error: null, unavailableSettings: null };
+      } },
+    modelRoute: { provider: 'host-oauth', model: 'gpt-5.6-luna' },
+    llm: { async *stream() { yield { type: 'text-delta', index: 0,
+      text: JSON.stringify(proposal) }; yield { type: 'finish', reason: 'stop' }; } },
+  });
+  const first = await workshop.call('StartOrResumeSession', start());
+  const switched = await workshop.call('SwitchWorldContext', {
+    contractVersion: 'session/v2', actorRef: 'user', sessionRef: 's1',
+    requestId: 'switch', authorizationRef: 'grant',
+    expectedRevision: first.result.context.sessionRevision,
+    worldRef: 'world-a', selectionRevision: 'sel-1' });
+  const turn = await workshop.call('AppendMultimodalTurn',
+    append(switched.result.context.sessionRevision));
+  const current = await workshop.call('StartOrResumeSession',
+    { ...start(), requestId: 'resume' });
+  const unlogged = await workshop.call('AnswerClarification', {
+    contractVersion: 'session/v2', actorRef: 'user', sessionRef: 's1',
+    requestId: 'relay-alice', authorizationRef: 'grant', turnRef: 'turn-1',
+    expectedRevision: current.result.context.sessionRevision,
+    clarificationId: turn.result.clarification.clarificationId, answer: '确认' });
+  assert.equal(unlogged.error.code, 'CAPABILITY_UNAVAILABLE');
+  assert.equal(canvasCalls.length, 0);
+  recordUserInput(sessions, 'relay-alice', '确认');
+  const spoofed = await workshop.call('AnswerClarification', {
+    contractVersion: 'session/v2', actorRef: 'user', sessionRef: 's1',
+    requestId: 'relay-bob', authorizationRef: 'grant', turnRef: 'turn-1',
+    expectedRevision: current.result.context.sessionRevision,
+    clarificationId: turn.result.clarification.clarificationId, answer: '确认' });
+  assert.equal(spoofed.error.code, 'PERMISSION_DENIED');
+  assert.equal(canvasCalls.length, 0);
+  const confirmed = await workshop.call('AnswerClarification', {
+    contractVersion: 'session/v2', actorRef: 'user', sessionRef: 's1',
+    requestId: 'relay-alice', authorizationRef: 'grant', turnRef: 'turn-1',
+    expectedRevision: current.result.context.sessionRevision,
+    clarificationId: turn.result.clarification.clarificationId, answer: '确认' });
+  assert.equal(confirmed.error, null);
+  const restarted = new WorkshopV1({ sessionPersistence: sessions,
+    authority: workshop.authority, canvas: workshop.canvas });
+  await assert.rejects(() => restarted.beginFirstBuilding({ actorRef: 'user',
+    sessionRef: 's1', authorizationRef: 'grant', turnRef: 'turn-1',
+    requestId: 'place-bob', invocationId: 'relay-bob' }),
+  { code: 'PERMISSION_DENIED' });
+  assert.equal(canvasCalls.length, 0);
+  const placement = await restarted.beginFirstBuilding({ actorRef: 'user',
+    sessionRef: 's1', authorizationRef: 'grant', turnRef: 'turn-1',
+    requestId: 'place-alice', invocationId: 'relay-alice' });
+  assert.equal(placement.outcome, 'PLACEMENT_CHOICE_REQUIRED');
+  assert.deepEqual(canvasCalls[0].anchor,
+    { kind: 'DEFAULT_PLAYER', invocationId: 'relay-alice' });
 });
 
 test('passes the recorded RegionInspection unchanged into painter/v3 and rejects image-free structure planning', async () => {
@@ -384,15 +467,16 @@ test('passes the recorded RegionInspection unchanged into painter/v3 and rejects
     modelRoute: { provider: 'host-oauth', model: 'gpt-5.6-luna', imagePolicy: { maxPixels: 1024, maxBytes: 1024 } },
     llm: { async *stream() { yield { type: 'text-delta', index: 0, text: JSON.stringify(proposal) }; yield { type: 'finish', reason: 'stop' }; } } };
   async function ready(media) {
-    const { workshop } = setup(base);
+    const { workshop, sessions } = setup(base);
     const first = await workshop.call('StartOrResumeSession', start());
     const switched = await workshop.call('SwitchWorldContext', { contractVersion: 'session/v2', actorRef: 'user',
       sessionRef: 's1', requestId: 'switch', authorizationRef: 'grant', expectedRevision: first.result.context.sessionRevision,
       worldRef: 'fixture-world', selectionRevision: 'sel-1' });
     const turn = await workshop.call('AppendMultimodalTurn', append(switched.result.context.sessionRevision, media));
     const current = await workshop.call('StartOrResumeSession', { ...start(), requestId: 'resume' });
+    recordUserInput(sessions, 'invoke-1', '确认');
     const confirmation = await workshop.call('AnswerClarification', { contractVersion: 'session/v2', actorRef: 'user',
-      sessionRef: 's1', requestId: 'answer', authorizationRef: 'grant', turnRef: 'turn-1',
+      sessionRef: 's1', requestId: 'invoke-1', authorizationRef: 'grant', turnRef: 'turn-1',
       expectedRevision: current.result.context.sessionRevision,
       clarificationId: turn.result.clarification.clarificationId, answer: '确认' });
     assert.equal(confirmation.error, null);

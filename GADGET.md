@@ -47,6 +47,17 @@ picking. Its recorded `RegionInspection` is passed to Exterior unchanged and
 is carried into Canvas Apply with the matching BUILD/V2 document.
 
 Workshop never mutates a world. Canvas owns atomic Apply and recovery.
+For first-building `DEFAULT_PLAYER`, the explicit `AnswerClarification`
+confirmation must correspond to one durable Core Session `user/message` after
+the outstanding clarification. Its message ID must equal that request's
+`requestId`, its text must equal the answer, and its source must be a direct
+user message. Workshop saves that ID with the confirmed intent and uses only
+the saved ID as the placement `invocationId`; a later mismatched caller value
+fails before Canvas. A missing or ambiguous Core input fails closed. Product
+composition must prove that a Luanti-started confirmation uses the same ID as
+the Adapter's recorded relay invocation. This host/Adapter mapping is not
+established by the Workshop component fixture.
+
 Workshop persists the exact Apply request before sending it; after an
 uncertain transport outcome a later authorized call reuses the same request
 ID and transaction ID. It records an action receipt only after a verified
