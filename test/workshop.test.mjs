@@ -9,6 +9,11 @@ import * as contractsV4 from '../vendor/contracts/dist/v4/index.mjs';
 
 class CoreSessions {
   logs = new Map();
+  constructor() {
+    this.logs.set('s1', { meta: { version: SESSION_FORMAT_VERSION,
+      id: 's1', createdAt: 1, isSeeded: false },
+    events: [], owned: true, flushes: 0 });
+  }
   async create(header) {
     assert.equal(header.version, SESSION_FORMAT_VERSION);
     assert.equal(header.isSeeded, false);
@@ -27,7 +32,8 @@ class CoreSessions {
     return this.#handle(row, access);
   }
   #handle(row, access) {
-    return { async read() { return { eventState: 'exclusive', events: structuredClone(row.events) }; },
+    return { header: row.meta,
+      async read() { return { eventState: 'exclusive', events: structuredClone(row.events) }; },
       async append(events) { assert.equal(access, 'write');
         assert.equal(events[0].seq, row.events.length); row.events.push(...structuredClone(events)); },
       async flush() { assert.equal(access, 'write'); row.flushes++; },
@@ -35,16 +41,41 @@ class CoreSessions {
   }
 }
 
+class ProjectionStore {
+  rows = new Map();
+  writes = 0;
+  async get(id, identity) {
+    const row = this.rows.get(id);
+    if (!row) return null;
+    assert.deepEqual(row.identity, identity);
+    return structuredClone(row.state);
+  }
+  async create(id, identity, state) {
+    assert.equal(this.rows.has(id), false);
+    this.rows.set(id, { identity, state: structuredClone(state) });
+    this.writes++;
+  }
+  async replace(id, identity, expectedRevision, state) {
+    const row = this.rows.get(id);
+    assert.deepEqual(row.identity, identity);
+    assert.equal(row.state.context.sessionRevision, expectedRevision);
+    row.state = structuredClone(state);
+    this.writes++;
+  }
+  state(id = 's1') { return this.rows.get(id)?.state; }
+}
+
 function setup(overrides = {}) {
   const sessions = new CoreSessions();
+  const projectionStore = new ProjectionStore();
   const calls = [];
   const workshop = new WorkshopV1({
-    sessionPersistence: sessions,
+    sessionPersistence: sessions, projectionStore,
     authority: { async verify(request) { return { current: true, actorRef: request.actorRef, sessionRef: request.sessionRef, authorizationRef: request.authorizationRef, surface: 'SHELL', allowedActions: ['READ', 'APPEND', 'INSPECT', 'SELECT', 'ANALYZE', 'APPLY_RECOVERABLE'] }; } },
     capabilities: { providerRef: 'core', capabilityRevision: '1', worldRef: null, engineBounds: null, limits: [], recoveryGuarantee: null, stateProfile: null, regionProtectionWriters: [], sessionDeleteSupported: false, imageMediaTypes: ['image/png'], model: 'gpt-5.6-luna' },
     ...overrides,
   });
-  return { workshop, sessions, calls };
+  return { workshop, sessions, projectionStore, calls };
 }
 
 const start = (sessionRef = 's1') => ({ contractVersion: 'session/v2', actorRef: 'user', sessionRef, requestId: `start-${sessionRef}`, authorizationRef: 'grant', expectedRevision: null });
@@ -57,13 +88,16 @@ function recordUserInput(sessions, requestId, text, sessionRef = 's1') {
       content: [{ type: 'text', text }] } });
 }
 
-test('uses Core SessionPersistence for a durable session across Workshop instances', async () => {
-  const { workshop, sessions } = setup();
+test('uses the existing Core Session as read-only fact source and durable projection across Workshop instances', async () => {
+  const { workshop, sessions, projectionStore } = setup();
   const created = await workshop.call('StartOrResumeSession', start());
   assert.equal(created.error, null);
   assert.equal(created.result.context.currentSession, 's1');
-  assert.equal(sessions.logs.get('s1').events.length > 0, true);
-  const resumed = new WorkshopV1({ sessionPersistence: sessions, authority: workshop.authority, capabilities: workshop.capabilities });
+  assert.equal(sessions.logs.get('s1').events.length, 0);
+  assert.equal(sessions.logs.get('s1').owned, true);
+  assert.equal(projectionStore.writes, 1);
+  const resumed = new WorkshopV1({ sessionPersistence: sessions, projectionStore,
+    authority: workshop.authority, capabilities: workshop.capabilities });
   const again = await resumed.call('StartOrResumeSession', { ...start(), requestId: 'resume', expectedRevision: created.result.context.sessionRevision });
   assert.equal(again.result.context.currentSession, 's1');
   assert.equal(again.result.context.sessionRevision, created.result.context.sessionRevision);
@@ -83,6 +117,15 @@ test('DSH plugin resolves late host ports and rejects stale Session revision', a
   assert.equal(missing.error.code, 'CAPABILITY_UNAVAILABLE');
   const fixture = setup();
   ports.set('sessionPersistence', fixture.sessions);
+  ports.set('storageDomain', { async open() { return {
+    table() { return { get(id) { const row = fixture.projectionStore.rows.get(id);
+      return row && { coreIdentity: row.identity, state: row.state }; },
+    async put(id, row) { fixture.projectionStore.rows.set(id,
+      { identity: row.coreIdentity, state: row.state }); },
+    async update(id, update) { const row = fixture.projectionStore.rows.get(id);
+      const next = update({ coreIdentity: row.identity, state: row.state });
+      fixture.projectionStore.rows.set(id, { identity: next.coreIdentity,
+        state: next.state }); } }; }, async close() {} }; } });
   ports.set('hanaworldsAuthority', fixture.workshop.authority);
   ports.set('hanaworldsCapabilities', fixture.workshop.capabilities);
   ports.set('hanaworldsBrushV2', { compile() {} });
@@ -132,7 +175,8 @@ test('DSH client contributes a Workshop panel and only typed offered Shell choic
   const panelSeat = seats[1].component();
   assert.equal(panelSeat.type, client.WorkshopPanel);
   const panel = client.WorkshopPanel({ flow: { snapshot: () => ({ ready: true,
-    busy: false, error: '', turns: [], reply: '', clarification: null }),
+    busy: false, error: '', turns: [], reply: '', clarification: null,
+    sessions: [], selectedSessionRef: null }),
     subscribe() { return () => {}; }, open() {} } });
   assert.equal(panel.children[1].props.role, 'status');
   assert.equal(panel.children.at(-1).type, 'form');
@@ -238,7 +282,7 @@ test('an answer to a clarification returns to the model, then requires explicit 
 test('a user correction replaces the pending proposal before confirmation', async () => {
   const contracts = contractsV4;
   let modelCalls = 0;
-  const { workshop, sessions } = setup({
+  const { workshop, sessions, projectionStore } = setup({
     canvas: { contractHandshake: contracts.contractHandshake,
       async call(_operation, request) { return { contractVersion: 'canvas/v4',
         requestId: request.requestId, error: null,
@@ -272,7 +316,7 @@ test('a user correction replaces the pending proposal before confirmation', asyn
     turnRef: 'turn-1', expectedRevision: current2.result.context.sessionRevision,
     clarificationId: corrected.result.clarification.clarificationId, answer: '确认' });
   assert.equal(confirmed.error, null);
-  assert.equal(sessions.logs.get('s1').events.at(-1).data.confirmedIntents['turn-1']
+  assert.equal(projectionStore.state().confirmedIntents['turn-1']
     .intent.confirmedIntent.dimensions.width, 6);
 });
 
@@ -357,7 +401,7 @@ test('first confirmed structure sends DEFAULT_PLAYER and exact node footprint to
       error: null, unavailableSettings: null }; } };
   const proposal = { kind: 'BUILD_STRUCTURE', text: '小石屋', purpose: 'first building',
     dimensions: { width: 3, depth: 4, height: 5, unit: 'node' }, entrancePortalRefs: [] };
-  const { workshop, sessions } = setup({ canvas,
+  const { workshop, sessions, projectionStore } = setup({ canvas,
     authority: { async verify(request) { return { current: true,
       actorRef: request.actorRef, sessionRef: request.sessionRef,
       authorizationRef: request.authorizationRef, worldRef: 'world-a',
@@ -417,7 +461,7 @@ test('first confirmed structure sends DEFAULT_PLAYER and exact node footprint to
     authorizationRef: request.authorizationRef, worldRef: 'world-a',
     engineActorName: 'initiator', surface: 'LUANTI',
     allowedActions: ['INSPECT'] }; } };
-  const pending = sessions.logs.get('s1').events.at(-1).data.pendingPlacement;
+  const pending = projectionStore.state().pendingPlacement;
   const pick = pending.frame.actions.find(action => action.inputKinds.includes('PICK_WORLD_POINT'));
   const relay = { contractVersion: 'interaction-surface/v3', actorRef: 'user',
     sessionRef: 's1', requestId: 'relay-pick', invocationId: 'relay-pick',
@@ -443,7 +487,7 @@ test('first building rejects a different same-Session relay before Canvas', asyn
   const canvasCalls = [];
   const proposal = { kind: 'BUILD_STRUCTURE', text: '石屋', purpose: 'first building',
     dimensions: { width: 3, depth: 4, height: 5, unit: 'node' }, entrancePortalRefs: [] };
-  const { workshop, sessions } = setup({
+  const { workshop, sessions, projectionStore } = setup({
     canvas: { contractHandshake: contracts.contractHandshake,
       async call(operation, request) {
         if (operation === 'ListObjects') return { contractVersion: 'canvas/v4',
@@ -493,7 +537,7 @@ test('first building rejects a different same-Session relay before Canvas', asyn
     expectedRevision: current.result.context.sessionRevision,
     clarificationId: turn.result.clarification.clarificationId, answer: '确认' });
   assert.equal(confirmed.error, null);
-  const restarted = new WorkshopV1({ sessionPersistence: sessions,
+  const restarted = new WorkshopV1({ sessionPersistence: sessions, projectionStore,
     authority: workshop.authority, canvas: workshop.canvas });
   await assert.rejects(() => restarted.beginFirstBuilding({ actorRef: 'user',
     sessionRef: 's1', authorizationRef: 'grant', turnRef: 'turn-1',
@@ -661,20 +705,18 @@ test('an uncertain Apply reuses its durable Canvas request after Workshop restar
           observedWorldRevision: 'world-after', readbackDigest: 'c'.repeat(64),
           restoreStatus: 'NOT_REQUIRED', error: null } };
     } };
-  const { workshop, sessions } = setup({ canvas });
+  const { workshop, sessions, projectionStore } = setup({ canvas });
+  sessions.logs.set(request.sessionRef, { meta: { version: SESSION_FORMAT_VERSION,
+    id: request.sessionRef, createdAt: 2, isSeeded: false },
+  events: [], owned: true, flushes: 0 });
   await workshop.call('StartOrResumeSession', start(request.sessionRef));
-  const log = sessions.logs.get(request.sessionRef);
-  const state = structuredClone(log.events.at(-1).data);
+  const state = structuredClone(projectionStore.state(request.sessionRef));
   state.pendingApply = { request, turnRef: 'turn-1', status: 'RESERVED' };
-  const handle = await sessions.open(request.sessionRef, 'write');
-  await handle.append([{ type: 'hanaworlds/workshop-state/v1',
-    seq: log.events.length, time: Date.now(), data: state, ignorable: true }]);
-  await handle.flush();
-  await handle.close();
+  projectionStore.rows.get(request.sessionRef).state = state;
   const body = { actorRef: request.actorRef, sessionRef: request.sessionRef,
     authorizationRef: request.authorizationRef, turnRef: 'turn-1', requestId: 'retry-1' };
   await assert.rejects(() => workshop.applyCurrentBuild(body));
-  const restarted = new WorkshopV1({ sessionPersistence: sessions,
+  const restarted = new WorkshopV1({ sessionPersistence: sessions, projectionStore,
     authority: workshop.authority, canvas });
   const recovered = await restarted.applyCurrentBuild({ ...body, requestId: 'retry-2' });
   assert.equal(recovered.status, 'VERIFIED');

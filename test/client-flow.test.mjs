@@ -41,8 +41,9 @@ test('client flow sends the current DSH Session through the desktop bridge witho
     invoke: async (command, args) => {
       assert.equal(command, 'hanaworlds_request');
       requests.push(args);
-      if (args.operation === 'context') return { status: 'bound',
-        sessionRef: 'session-a', worldRef: 'world-a' };
+      if (args.operation === 'context') return args.input.sessionRef
+        ? { status: 'bound', sessionRef: 'session-a', worldRef: 'world-a' }
+        : { sessions: [{ sessionRef: 'session-a', label: 'Session 1' }] };
       return calls.shift();
     },
   });
@@ -57,7 +58,8 @@ test('client flow sends the current DSH Session through the desktop bridge witho
     for (const key of ['actorRef', 'sessionRef', 'authorizationRef', 'worldRef'])
       assert.equal(Object.hasOwn(request.input.payload, key), false, key);
   }
-  assert.equal(requests[3].input.payload.text, '放一个方块');
+  assert.equal(requests.find(item => item.input?.operation === 'AppendMultimodalTurn')
+    .input.payload.text, '放一个方块');
   assert.equal(flow.snapshot().turns[0].text, '放一个方块');
   assert.equal(flow.snapshot().reply, '请确认一块方块，尺寸为 1×1×1。');
 });
@@ -69,13 +71,47 @@ test('client flow refuses missing trusted binding before calling Workshop', asyn
     currentSessionRef: () => 'session-a', newId: () => 'id-1',
     invoke: async (_command, args) => {
       requests.push(args);
-      return { status: 'unbound', sessionRef: 'session-a' };
+      return args.input.sessionRef
+        ? { status: 'unbound', sessionRef: 'session-a' }
+        : { sessions: [{ sessionRef: 'session-a', label: 'Session 1' }] };
     },
   });
   await flow.open();
   assert.match(flow.snapshot().error, /绑定/);
   assert.equal(flow.snapshot().ready, false);
-  assert.deepEqual(requests.map(item => item.operation), ['context']);
+  assert.deepEqual(requests.map(item => item.operation), ['context', 'context']);
   await flow.submit('放一个方块');
-  assert.deepEqual(requests.map(item => item.operation), ['context']);
+  assert.deepEqual(requests.map(item => item.operation), ['context', 'context']);
+});
+
+test('client chooses only a Shell-listed bound live Session when DSH has no current conversation', async () => {
+  const client = clientModule();
+  const requests = [];
+  const flow = client.createWorkshopFlow({
+    currentSessionRef: () => null, newId: () => 'id-1',
+    invoke: async (_command, args) => {
+      requests.push(args);
+      if (args.operation === 'context') return args.input.sessionRef
+        ? { status: args.input.sessionRef === 'session-b' ? 'bound' : 'unbound',
+          sessionRef: args.input.sessionRef, worldRef: 'world-b' }
+        : { sessions: [
+          { sessionRef: 'session-a', label: 'Session 1' },
+          { sessionRef: 'session-b', label: 'Session 2' },
+        ] };
+      return packet('id-1', { context: { currentSession: 'session-b',
+        activeWorldRef: 'world-b', sessionRevision: 'rev-1' }, turns: [] });
+    },
+  });
+  await flow.open();
+  assert.equal(flow.snapshot().ready, false);
+  assert.deepEqual(JSON.parse(JSON.stringify(flow.snapshot().sessions.map(item => item.label))),
+    ['Session 2']);
+  flow.chooseSession('session-a');
+  assert.equal(flow.snapshot().selectedSessionRef, null);
+  flow.chooseSession('session-b');
+  await flow.open();
+  assert.equal(flow.snapshot().ready, true);
+  assert.equal(flow.snapshot().sessionRef, 'session-b');
+  assert.deepEqual(requests.filter(item => item.operation === 'workshop')
+    .map(item => item.input.sessionRef), ['session-b']);
 });

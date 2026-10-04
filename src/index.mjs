@@ -1,5 +1,5 @@
 import { randomUUID, createHash } from 'node:crypto';
-import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
+import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import {
   admitRequest, validateRequest, validateBoundRequest, validateResponse,
   ContractError, contractHandshake, checkContractHandshake, digestValue, validateType,
@@ -31,6 +31,7 @@ function initialState(sessionRef) {
     orderedSelectedObjectRefs: [], sessionRevision: revision(), selectionRevision: '0' },
     turns: [], pendingClarification: null, pendingPlacement: null, frames: [],
     receipts: [], artifacts: Object.create(null), offeredInventory: null,
+    turnDetails: Object.create(null),
     confirmedIntents: Object.create(null),
     turnControls: Object.create(null), turnWorldRefs: Object.create(null),
     lastPlacement: null };
@@ -55,7 +56,7 @@ function confirmingSessionInputId(log, pending, body) {
   // Core's durable user/message ID identifies the actual Session input. A
   // caller's requestId alone is not evidence that an Adapter relay issued it.
   const after = pending.afterSessionEventSeq;
-  if (!Number.isSafeInteger(after) || after < 0)
+  if (!Number.isSafeInteger(after) || after < -1)
     failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
   const inputs = log.events.slice(after + 1).filter(event =>
     event.type === 'user/message');
@@ -71,12 +72,12 @@ function confirmingSessionInputId(log, pending, body) {
   return message.id;
 }
 
-/** Session state is carried in Core SessionPersistence's public append-only event log. */
+/** Workshop state is durable in its own domain; Core JSONL is read for confirmation facts. */
 export class WorkshopV1 {
-  constructor({ sessionPersistence, attachments, llm, authority, capabilities,
+  constructor({ sessionPersistence, projectionStore, attachments, llm, authority, capabilities,
     canvas, painter, brush, resources, mediaAuthority, modelRoute,
     catalogue, safety, compilerConfig, applyAuthority } = {}) {
-    Object.assign(this, { sessionPersistence, attachments, llm, authority,
+    Object.assign(this, { sessionPersistence, projectionStore, attachments, llm, authority,
       capabilities, canvas, painter, brush, resources, mediaAuthority, modelRoute,
       catalogue, safety, compilerConfig, applyAuthority });
     this.locks = new Map();
@@ -102,29 +103,47 @@ export class WorkshopV1 {
     return proof;
   }
 
-  async #load(id) {
+  async #readCore(id) {
     if (!this.sessionPersistence?.open) failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    const handle = await this.sessionPersistence.open(id, 'read');
-    let log;
-    try { log = await handle.read(); }
+    let handle;
+    try { handle = await this.sessionPersistence.open(id, 'read'); }
+    catch (error) {
+      if (error?.name === 'SessionPersistenceNotFoundError')
+        failure('SESSION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
+      throw error;
+    }
+    let data, identity;
+    try {
+      identity = coreIdentity(handle.header, id);
+      data = await handle.read();
+    }
     finally { await handle.close(); }
-    const records = log.events.filter(e => e.type === 'hanaworlds/workshop-state/v1');
-    if (records.length === 0) failure('SESSION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
-    return { log, state: copy(records.at(-1).data) };
+    if (!Array.isArray(data?.events))
+      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+    return { events: data.events, coreIdentity: identity };
+  }
+
+  async #load(id, { allowUninitialized = false } = {}) {
+    if (!this.projectionStore?.get)
+      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+    const log = await this.#readCore(id);
+    const state = await this.projectionStore.get(id, log.coreIdentity);
+    if (!state && !allowUninitialized)
+      failure('SESSION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
+    return { log, state };
   }
 
   async #save(id, log, state) {
     const next = copy(state);
+    const expectedRevision = next.context.sessionRevision;
     next.context.sessionRevision = revision();
-    const handle = await this.sessionPersistence.open(id, 'write');
-    try {
-      const current = await handle.read();
-      if (current.events.length !== log.events.length)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      await handle.append([{ type: 'hanaworlds/workshop-state/v1',
-        seq: current.events.length, time: Date.now(), data: next, ignorable: true }]);
-      await handle.flush();
-    } finally { await handle.close(); }
+    if (!this.projectionStore?.replace)
+      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+    const current = await this.#readCore(id);
+    if (current.events.length !== log.events.length ||
+        JSON.stringify(current.coreIdentity) !== JSON.stringify(log.coreIdentity))
+      failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
+    await this.projectionStore.replace(id, log.coreIdentity, expectedRevision, next);
     return next;
   }
 
@@ -645,21 +664,15 @@ export class WorkshopV1 {
       if (!this.capabilities)
         failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
       let loaded;
-      try { loaded = await this.#load(body.sessionRef); }
-      catch (error) {
-        if (error.code !== 'SESSION_NOT_FOUND' &&
-            error.name !== 'SessionPersistenceNotFoundError') throw error;
+      loaded = await this.#load(body.sessionRef, { allowUninitialized: true });
+      if (!loaded.state) {
         if (body.expectedRevision !== null) failure('SESSION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
-        const header = { version: SESSION_FORMAT_VERSION, id: body.sessionRef,
-          createdAt: Date.now(), isSeeded: false };
-        const handle = await this.sessionPersistence.create(header);
         const state = initialState(body.sessionRef);
         state.context.sessionRevision = revision();
-        try {
-          await handle.append([{ type: 'hanaworlds/workshop-state/v1',
-            seq: 0, time: Date.now(), data: state, ignorable: true }]);
-          await handle.flush();
-        } finally { await handle.close(); }
+        if (!this.projectionStore?.create)
+          failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+        await this.projectionStore.create(body.sessionRef,
+          loaded.log.coreIdentity, state);
         return this.#snapshot(state);
       }
       if (body.expectedRevision !== null &&
@@ -788,8 +801,10 @@ export class WorkshopV1 {
       state.turnWorldRefs ??= Object.create(null);
       state.turnWorldRefs[body.turnRef] = state.context.activeWorldRef;
       state.pendingClarification = { ...clarification, proposal, turnRef: body.turnRef,
-        answers: [], afterSessionEventSeq: log.events.length };
+        answers: [], afterSessionEventSeq: log.events.length - 1 };
       state.turnControls[body.turnRef] = body.controls;
+      state.turnDetails[body.turnRef] = { resultText: clarification.question,
+        confirmedBrief: null };
       await this.#save(body.sessionRef, log, state);
       return { sessionRef: body.sessionRef, turnRef: body.turnRef, turnRevision,
         briefDigest: null, model: 'gpt-5.6-luna', resultText: clarification.question, clarification };
@@ -818,11 +833,13 @@ export class WorkshopV1 {
           proposal = parseStructureProposal(answer);
         }
         const next = { ...pending, proposal, answers,
-          afterSessionEventSeq: log.events.length,
+          afterSessionEventSeq: log.events.length - 1,
           clarificationId: `clarify-${randomUUID()}`,
           question: proposal ?
             `请确认在当前世界建造${proposal.text}，尺寸为${proposal.dimensions.width}×${proposal.dimensions.depth}×${proposal.dimensions.height}个节点。回复“确认”或说明修改。` : answer };
         state.pendingClarification = next;
+        state.turnDetails[body.turnRef] = { resultText: next.question,
+          confirmedBrief: null };
         await this.#save(body.sessionRef, log, state);
         return { sessionRef: body.sessionRef, turnRef: body.turnRef,
           turnRevision: pending.turnRevision, briefDigest: null, model: 'gpt-5.6-luna',
@@ -851,6 +868,8 @@ export class WorkshopV1 {
       state.confirmedIntents[body.turnRef] = { brief, intent,
         confirmationInputId };
       state.pendingClarification = null;
+      state.turnDetails[body.turnRef] = { resultText: '已确认建造意图。',
+        confirmedBrief: brief };
       await this.#save(body.sessionRef, log, state);
       return { sessionRef: body.sessionRef, turnRef: body.turnRef,
         turnRevision: turn.turnRevision, briefDigest,
@@ -863,7 +882,9 @@ export class WorkshopV1 {
 export const name = 'hanaworlds-workshop';
 export const inject = [];
 export function apply(ctx) {
-  const service = new WorkshopV1();
+  const projectionStore = new WorkshopProjectionStore(() => ctx.get?.('storageDomain'));
+  ctx.effect?.(() => () => projectionStore.close(), 'hanaworlds-workshop.projection-close');
+  const service = new WorkshopV1({ projectionStore });
   const ports = {
     sessionPersistence: 'sessionPersistence', attachments: 'attachments',
     llm: 'llm', authority: 'hanaworldsAuthority',

@@ -13,8 +13,10 @@ window.__ModuleLoader__.load({
     function createWorkshopFlow({ invoke, currentSessionRef, newId }) {
       const listeners = new Set();
       let state = { ready: false, busy: false, error: '', turns: [], reply: '',
-        sessionRef: null, worldRef: null, revision: null, clarification: null };
-      const snapshot = () => ({ ...state, turns: [...state.turns] });
+        sessionRef: null, worldRef: null, revision: null, clarification: null,
+        sessions: [], selectedSessionRef: null };
+      const snapshot = () => ({ ...state, turns: [...state.turns],
+        sessions: [...state.sessions] });
       const publish = patch => {
         state = { ...state, ...patch };
         for (const listener of listeners) listener(snapshot());
@@ -48,12 +50,39 @@ window.__ModuleLoader__.load({
           throw Error('请先在 HanaWorlds 管理页面绑定当前 Session、玩家和世界。');
         return current;
       };
-      async function open() {
+      async function boundSessions() {
+        if (typeof invoke !== 'function') throw Error('桌面工作坊连接不可用。');
+        const listing = await invoke('hanaworlds_request', {
+          operation: 'context', input: {},
+        });
+        if (!Array.isArray(listing?.sessions))
+          throw Error('无法读取 Shell 的当前 Session 列表。');
+        const available = [];
+        for (const item of listing.sessions) {
+          if (typeof item?.sessionRef !== 'string' || !item.sessionRef ||
+              typeof item?.label !== 'string') continue;
+          const checked = await invoke('hanaworlds_request', {
+            operation: 'context', input: { sessionRef: item.sessionRef },
+          });
+          if (checked?.status === 'bound' &&
+              checked.sessionRef === item.sessionRef &&
+              typeof checked.worldRef === 'string' && checked.worldRef)
+            available.push({ sessionRef: item.sessionRef, label: item.label });
+        }
+        return available;
+      }
+      async function open(selected = state.selectedSessionRef) {
         publish({ ready: false, busy: true, error: '', reply: '', clarification: null });
         try {
-          const sessionRef = currentSessionRef?.();
-          if (typeof sessionRef !== 'string' || !sessionRef)
-            throw Error('请先在 Shell 打开一个 Session。');
+          const sessions = await boundSessions();
+          publish({ sessions });
+          const current = currentSessionRef?.();
+          const sessionRef = current || selected;
+          if (!sessions.some(item => item.sessionRef === sessionRef)) {
+            publish({ sessions, selectedSessionRef: null });
+            throw Error(sessions.length ? '请选择已绑定的 Session 并连接。' :
+              '请先在 HanaWorlds 管理页面绑定一个 live Session、玩家和世界。');
+          }
           const binding = await context(sessionRef);
           let session = await workshop(sessionRef, 'StartOrResumeSession', {
             requestId: id(), expectedRevision: null,
@@ -65,15 +94,20 @@ window.__ModuleLoader__.load({
               requestId: id(), expectedRevision: session.context.sessionRevision,
               selectionRevision: id(),
             });
-          if (currentSessionRef?.() !== sessionRef)
+          if (currentSessionRef?.() && currentSessionRef() !== sessionRef)
             throw Error('当前 Session 已切换，请刷新工作坊。');
           publish({ ready: true, sessionRef, worldRef: binding.worldRef,
             revision: session.context.sessionRevision, turns: session.turns,
+            sessions, selectedSessionRef: sessionRef,
             error: '' });
         } catch (error) {
           publish({ ready: false, sessionRef: null, worldRef: null,
             revision: null, turns: [], error: String(error?.message ?? error) });
         } finally { publish({ busy: false }); }
+      }
+      function chooseSession(sessionRef) {
+        if (!state.sessions.some(item => item.sessionRef === sessionRef)) return;
+        publish({ selectedSessionRef: sessionRef });
       }
       async function submit(text) {
         if (!state.ready || state.busy) return false;
@@ -84,7 +118,7 @@ window.__ModuleLoader__.load({
         const { sessionRef, revision } = state;
         publish({ busy: true, error: '' });
         try {
-          if (currentSessionRef?.() !== sessionRef)
+          if (currentSessionRef?.() && currentSessionRef() !== sessionRef)
             throw Error('当前 Session 已切换，请刷新工作坊。');
           const body = state.clarification
             ? { requestId: id(), turnRef: state.clarification.turnRef,
@@ -98,7 +132,7 @@ window.__ModuleLoader__.load({
           const session = await workshop(sessionRef, 'StartOrResumeSession', {
             requestId: id(), expectedRevision: null,
           });
-          if (currentSessionRef?.() !== sessionRef ||
+          if ((currentSessionRef?.() && currentSessionRef() !== sessionRef) ||
               session.context.currentSession !== sessionRef)
             throw Error('当前 Session 已切换，请刷新工作坊。');
           publish({ turns: session.turns, revision: session.context.sessionRevision,
@@ -111,7 +145,7 @@ window.__ModuleLoader__.load({
           return false;
         } finally { publish({ busy: false }); }
       }
-      return { snapshot, subscribe, open, submit };
+      return { snapshot, subscribe, open, chooseSession, submit };
     }
 
     function WorkshopChoiceFrame({ frame, onSelect }) {
@@ -143,6 +177,17 @@ window.__ModuleLoader__.load({
         view.error ? h('p', { role: 'alert' }, view.error) : null,
         h('button', { type: 'button', disabled: view.busy,
           onClick: () => { void flow.open(); } }, '刷新连接'),
+        view.sessions.length ? h('div', null,
+          h('label', { htmlFor: 'hanaworlds-workshop-session' }, '已绑定的 Session'),
+          h('select', { id: 'hanaworlds-workshop-session',
+            value: view.selectedSessionRef ?? '', disabled: view.busy,
+            onChange: event => flow.chooseSession(event.target.value) },
+          h('option', { value: '' }, '请选择 Session'),
+          ...view.sessions.map(item => h('option', {
+            key: item.sessionRef, value: item.sessionRef }, item.label))),
+          h('button', { type: 'button', disabled: view.busy || !view.selectedSessionRef,
+            onClick: () => { void flow.open(view.selectedSessionRef); } },
+          '连接所选 Session')) : null,
         h('ol', { 'aria-label': '工作坊轮次' },
           ...view.turns.map(turn => h('li', { key: turn.turnRef }, turn.text))),
         view.reply ? h('p', { 'aria-label': '工作坊回复' }, view.reply) : null,
