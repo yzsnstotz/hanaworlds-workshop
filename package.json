@@ -9,7 +9,7 @@
   "engines": {"node": ">=24.13.1 <25"},
   "exports": {".": "./src/index.mjs", "./client": "./client.cjs"},
   "files": ["src/", "client.cjs", "vendor/contracts/", "cordis.patch.yml", "GADGET.md", "NOTICE", "LICENSE"],
-  "dsh": {"client": {"inject": ["@deepseek-ai/dsh-client-ui-layout", "@deepseek-ai/dsh-client-ui-sidebar"], "platform": "web"}, "bundle": {"patch": "./cordis.patch.yml"}},
+  "dsh": {"client": {"inject": ["@deepseek-ai/dsh-client-ui-layout", "@deepseek-ai/dsh-client-ui-sidebar", "dsh-tauri"], "external": ["dsh-tauri/client"], "platform": "web"}, "bundle": {"patch": "./cordis.patch.yml"}},
   "scripts": {"build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs", "test": "node --test test/*.test.mjs"},
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.4",

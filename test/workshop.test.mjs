@@ -103,8 +103,10 @@ test('DSH client contributes a Workshop panel and only typed offered Shell choic
   });
   assert.equal(definition.id, 'hanaworlds-workshop');
   const client = definition.factory(name => {
+    if (name === 'dsh-tauri') return { invoke() {} };
     assert.equal(name, 'react');
-    return { createElement(type, props, ...children) { return { type, props, children }; } };
+    return { createElement(type, props, ...children) { return { type, props, children }; },
+      useState(value) { return [value, () => {}]; }, useEffect() {} };
   });
   const seats = [];
   client.apply({ slots: { inject(name, register) {
@@ -127,8 +129,13 @@ test('DSH client contributes a Workshop panel and only typed offered Shell choic
   assert.deepEqual(JSON.parse(JSON.stringify(offered)), [{ actionId: 'choose',
     input: { kind: 'SELECT_CHOICE', value: 'bob' } }]);
   assert.equal(view.children.at(-1).children[0], '也可以在游戏中选点。');
-  const panel = seats[1].component();
+  const panelSeat = seats[1].component();
+  assert.equal(panelSeat.type, client.WorkshopPanel);
+  const panel = client.WorkshopPanel({ flow: { snapshot: () => ({ ready: true,
+    busy: false, error: '', turns: [], reply: '', clarification: null }),
+    subscribe() { return () => {}; }, open() {} } });
   assert.equal(panel.children[1].props.role, 'status');
+  assert.equal(panel.children.at(-1).type, 'form');
 });
 
 const sha = data => createHash('sha256').update(data).digest('hex');
