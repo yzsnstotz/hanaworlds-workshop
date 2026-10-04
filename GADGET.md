@@ -26,12 +26,15 @@ the approved composition order.
 
 The package contributes a DSH web-client `./client` entry. It registers the
 Workshop sidebar/main panel and contains a typed Shell `SELECT_CHOICE`
-presenter. The panel reports unavailable until the composition supplies a
-trusted client Session, actor and authorization context. It never asks a user
-to enter internal refs and does not claim a live model or world path.
+presenter. The panel lists only live Sessions with a trusted Shell binding;
+the host rechecks the chosen Session, actor and authorization on every call.
+It never asks a user to enter internal refs. The typed
+`ReadSessionTurnDetails` operation returns complete replies and confirmed
+Briefs for reopening the same Session.
 
 The service resolves peer ports through the host at call time. Required host
-ports are `sessionPersistence` (create/open and per-Session read/append/flush/close handles), `attachments` (readImage,
+ports are `sessionPersistence` (read-only Core Session access),
+`storageDomain` (durable Workshop projection), `attachments` (readImage,
 readImageRequest), `llm` (stream), `hanaworldsAuthority` (verify),
 `hanaworldsMediaAuthority` (verify), `hanaworldsModelRoute` (provider,
 gpt-5.6-luna, imagePolicy), `hanaworldsCanvasV4`,
@@ -45,11 +48,12 @@ these services to one isolated HanaWorlds profile.
 
 ## Flow and recovery
 
-Workshop stores its projection in the Core SessionPersistence append-only
-event log and calls the public handle durability barrier before acknowledging
-a state change. The Session header uses the installed Core
-`SESSION_FORMAT_VERSION`; Shell currently pins `@deepseek-ai/dsh-session`
-`0.2.0-rc.2`. A world switch verifies the world through Canvas inventory and
+Workshop stores its projection in its own `storageDomain` JSON KV table under
+the live Core Session ID and awaits the table write before acknowledging a
+state change. It reads the Core JSONL Session for identity and confirmed user
+messages without taking the live Session's write handle or creating another
+Core Session. Shell currently pins `@deepseek-ai/dsh-session` `0.2.0-rc.2`.
+A world switch verifies the world through Canvas inventory and
 clears old selection and placement. A turn sends user-selected text and
 authorized, digest-checked image attachments through the host model route.
 Ambiguous output requests clarification; later user corrections are sent
@@ -85,8 +89,8 @@ independent of the old Session log.
 Use Node 24.13.1, isolated HOME, npm cache and DSH profile. `npm ci`,
 `npm run build`, `npm test`, and `npm pack --ignore-scripts` operate from a
 fresh public clone. The 17-module v4 runtime closure and placement fixture
-under `vendor/contracts/` are byte-identical to the admitted Contracts 0.3.0
-public pack at revision `e82735780bdfd4ea8e662781455040a6e5306121`.
+under `vendor/contracts/` are byte-identical to the Contracts 0.3.1
+public source pack at revision `896f8b9ebd75f8dbe5657f48c41c53d52c61f94b`.
 `npm run build` verifies the pinned source/artifact, every file digest,
 runtime import closure and permitted external imports. `canonicalize@5.1.0`
 is an ordinary registry dependency. No sibling path, `file:` dependency,

@@ -270,6 +270,15 @@ export function checkContractHandshake(advertisedInput, requiredInput) {
   requireFact(supported, 'UNSUPPORTED_VERSION', 'VERSION_UNSUPPORTED', 'decode');
   return deepFreeze({ result: 'HANDSHAKE_VERSION_MATCH', advertised });
 }
+/** A session/v2 major match alone does not advertise the added 0.3.1 readback
+ * operation. Reject an older package peer before issuing this operation. */
+export function checkSessionReadbackHandshake(advertisedInput) {
+  const { advertised } = checkContractHandshake(advertisedInput, { wires: ['session/v2'], factProfiles: [] });
+  requireFact(advertised.contracts === 'hanaworlds-contracts@0.3.1' &&
+    operationContracts['session/v2'].some(op => op.operation === 'ReadSessionTurnDetails'),
+    'UNSUPPORTED_VERSION', 'VERSION_UNSUPPORTED', 'decode');
+  return deepFreeze({ result: 'HANDSHAKE_OPERATION_MATCH', advertised });
+}
 /** interaction-surface/v3 SELECT_CHOICE: the value must be one listed choice of the
  * same frameRef/frameRevision/actionId; renderers never parse frame text for options. */
 export function validateChoiceSelection(frameInput, requestInput) {

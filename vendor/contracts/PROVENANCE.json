@@ -1,8 +1,8 @@
 {
   "sourceOrigin": "https://github.com/yzsnstotz/hanaworlds-contracts",
-  "sourceRevision": "e82735780bdfd4ea8e662781455040a6e5306121",
-  "admittedPackSha256": "47a2e5cc77590fb471ffedde715682564e169a0d88dbc5005b71d8d542b38f5c",
-  "sourcePackageVersion": "0.3.0",
+  "sourceRevision": "896f8b9ebd75f8dbe5657f48c41c53d52c61f94b",
+  "admittedPackSha256": "3087ea0d12e80f348d02f2e4057d78a8c36e434409fa788a001cddf80f01c422",
+  "sourcePackageVersion": "0.3.1",
   "runtimeRoots": [
     "dist/v4/index.mjs"
   ],
@@ -87,13 +87,13 @@
     },
     {
       "path": "dist/v4/domain.mjs",
-      "sha256": "014b3ac651f36c8d4e54bf53727ec711e8bf17276a6f38b33b91dbef3b30cf32",
-      "bytes": 10064
+      "sha256": "4af6e6b9c87ce101f2a0fbad380b07910a67ce1ae67f14cf3aa547c6c0ff9431",
+      "bytes": 10297
     },
     {
       "path": "dist/v4/generated/contracts.mjs",
-      "sha256": "bdbf59bd0c710d21e6cdb60ada7d2eb295473c59941beca09b626a0a67ae6e91",
-      "bytes": 272353
+      "sha256": "191141a22f799d5f05b9a64aabff65d14e3d105307f603b9a6ef43377eb8cf6a",
+      "bytes": 275971
     },
     {
       "path": "dist/v4/index.mjs",
@@ -102,8 +102,8 @@
     },
     {
       "path": "dist/v4/runtime.mjs",
-      "sha256": "ac3b5516e41994e665147bdbf9839ae87d3ea6e748b70144f36c484eaac76b3d",
-      "bytes": 21653
+      "sha256": "dfbbc13b94736083686b3bc0541022abfe30de65d87c80b3dd48d6918a8925c4",
+      "bytes": 22285
     },
     {
       "path": "dist/v4/schema-validator.mjs",

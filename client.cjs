@@ -14,9 +14,9 @@ window.__ModuleLoader__.load({
       const listeners = new Set();
       let state = { ready: false, busy: false, error: '', turns: [], reply: '',
         sessionRef: null, worldRef: null, revision: null, clarification: null,
-        sessions: [], selectedSessionRef: null };
+        sessions: [], selectedSessionRef: null, details: [] };
       const snapshot = () => ({ ...state, turns: [...state.turns],
-        sessions: [...state.sessions] });
+        sessions: [...state.sessions], details: [...state.details] });
       const publish = patch => {
         state = { ...state, ...patch };
         for (const listener of listeners) listener(snapshot());
@@ -40,6 +40,8 @@ window.__ModuleLoader__.load({
           throw Error(`工作坊拒绝：${response?.error?.code ?? 'INVALID_RESPONSE'}`);
         return response.result;
       };
+      const bindingLost = error => /\b(TRUSTED_BINDING_REQUIRED|AUTHORIZATION_REVOKED)\b/
+        .test(`${String(error?.code ?? '')} ${String(error?.message ?? error)}`);
       const context = async sessionRef => {
         if (typeof invoke !== 'function') throw Error('桌面工作坊连接不可用。');
         const current = await invoke('hanaworlds_request', {
@@ -49,6 +51,23 @@ window.__ModuleLoader__.load({
             typeof current.worldRef !== 'string' || !current.worldRef)
           throw Error('请先在 HanaWorlds 管理页面绑定当前 Session、玩家和世界。');
         return current;
+      };
+      const readDetails = async (sessionRef, sessionRevision, turns) => {
+        if (!turns.length) return [];
+        const result = await workshop(sessionRef, 'ReadSessionTurnDetails', {
+          requestId: id(),
+        });
+        if (result.sessionRef !== sessionRef ||
+            result.sessionRevision !== sessionRevision ||
+            !Array.isArray(result.turns) ||
+            result.turns.length !== turns.length ||
+            result.turns.some((item, index) => item.turnRef !== turns[index].turnRef ||
+              item.turnRevision !== turns[index].turnRevision ||
+              item.userText !== turns[index].text ||
+              typeof item.resultText !== 'string' ||
+              !Object.hasOwn(item, 'confirmedBrief')))
+          throw Error('工作坊轮次读回与当前 Session 不一致。');
+        return result.turns;
       };
       async function boundSessions() {
         if (typeof invoke !== 'function') throw Error('桌面工作坊连接不可用。');
@@ -71,13 +90,13 @@ window.__ModuleLoader__.load({
         }
         return available;
       }
-      async function open(selected = state.selectedSessionRef) {
+      async function open(selected = null) {
         publish({ ready: false, busy: true, error: '', reply: '', clarification: null });
         try {
           const sessions = await boundSessions();
           publish({ sessions });
           const current = currentSessionRef?.();
-          const sessionRef = current || selected;
+          const sessionRef = selected || state.selectedSessionRef || current;
           if (!sessions.some(item => item.sessionRef === sessionRef)) {
             publish({ sessions, selectedSessionRef: null });
             throw Error(sessions.length ? '请选择已绑定的 Session 并连接。' :
@@ -94,20 +113,24 @@ window.__ModuleLoader__.load({
               requestId: id(), expectedRevision: session.context.sessionRevision,
               selectionRevision: id(),
             });
-          if (currentSessionRef?.() && currentSessionRef() !== sessionRef)
-            throw Error('当前 Session 已切换，请刷新工作坊。');
+          const details = await readDetails(sessionRef,
+            session.context.sessionRevision, session.turns);
           publish({ ready: true, sessionRef, worldRef: binding.worldRef,
             revision: session.context.sessionRevision, turns: session.turns,
-            sessions, selectedSessionRef: sessionRef,
+            sessions, selectedSessionRef: sessionRef, details,
             error: '' });
         } catch (error) {
           publish({ ready: false, sessionRef: null, worldRef: null,
-            revision: null, turns: [], error: String(error?.message ?? error) });
+            revision: null, turns: [], details: [],
+            error: String(error?.message ?? error) });
         } finally { publish({ busy: false }); }
       }
       function chooseSession(sessionRef) {
         if (!state.sessions.some(item => item.sessionRef === sessionRef)) return;
-        publish({ selectedSessionRef: sessionRef });
+        publish(sessionRef === state.sessionRef ? { selectedSessionRef: sessionRef } :
+          { selectedSessionRef: sessionRef, ready: false, sessionRef: null,
+            worldRef: null, revision: null, turns: [], details: [], reply: '',
+            clarification: null, error: '请连接所选 Session。' });
       }
       async function submit(text) {
         if (!state.ready || state.busy) return false;
@@ -117,9 +140,8 @@ window.__ModuleLoader__.load({
         }
         const { sessionRef, revision } = state;
         publish({ busy: true, error: '' });
+        let committed = false;
         try {
-          if (currentSessionRef?.() && currentSessionRef() !== sessionRef)
-            throw Error('当前 Session 已切换，请刷新工作坊。');
           const body = state.clarification
             ? { requestId: id(), turnRef: state.clarification.turnRef,
               expectedRevision: revision,
@@ -129,20 +151,27 @@ window.__ModuleLoader__.load({
                 entrancePortalRefs: [], styleText: null } };
           const receipt = await workshop(sessionRef,
             state.clarification ? 'AnswerClarification' : 'AppendMultimodalTurn', body);
+          committed = true;
+          publish({ reply: receipt.resultText, clarification: receipt.clarification
+            ? { turnRef: receipt.turnRef,
+              clarificationId: receipt.clarification.clarificationId } : null });
           const session = await workshop(sessionRef, 'StartOrResumeSession', {
             requestId: id(), expectedRevision: null,
           });
-          if ((currentSessionRef?.() && currentSessionRef() !== sessionRef) ||
-              session.context.currentSession !== sessionRef)
+          const details = await readDetails(sessionRef,
+            session.context.sessionRevision, session.turns);
+          if (session.context.currentSession !== sessionRef)
             throw Error('当前 Session 已切换，请刷新工作坊。');
-          publish({ turns: session.turns, revision: session.context.sessionRevision,
-            reply: receipt.resultText, clarification: receipt.clarification
-              ? { turnRef: receipt.turnRef,
-                clarificationId: receipt.clarification.clarificationId } : null });
+          publish({ turns: session.turns, details,
+            revision: session.context.sessionRevision });
           return true;
         } catch (error) {
-          publish({ error: String(error?.message ?? error) });
-          return false;
+          const lost = bindingLost(error);
+          publish({ error: committed ?
+            `本轮已发送，但历史读回失败：${String(error?.message ?? error)}${lost ? '。受信绑定已失效，请在管理页面重新绑定后刷新连接。' : ''}` :
+            `${String(error?.message ?? error)}${lost ? '。受信绑定已失效，请在管理页面重新绑定后刷新连接。' : ''}`,
+          ...(lost ? { ready: false, clarification: null } : {}) });
+          return committed;
         } finally { publish({ busy: false }); }
       }
       return { snapshot, subscribe, open, chooseSession, submit };
@@ -189,8 +218,15 @@ window.__ModuleLoader__.load({
             onClick: () => { void flow.open(view.selectedSessionRef); } },
           '连接所选 Session')) : null,
         h('ol', { 'aria-label': '工作坊轮次' },
-          ...view.turns.map(turn => h('li', { key: turn.turnRef }, turn.text))),
-        view.reply ? h('p', { 'aria-label': '工作坊回复' }, view.reply) : null,
+          ...(view.details.length ? view.details.map(turn => h('li', {
+            key: turn.turnRef },
+          h('p', null, turn.userText),
+          h('p', { 'aria-label': '完整工作坊回复' }, turn.resultText),
+          turn.confirmedBrief ? h('details', null,
+            h('summary', null, '已确认的 ReferenceBrief/v2'),
+            h('pre', null, JSON.stringify(turn.confirmedBrief, null, 2))) : null)) :
+            view.turns.map(turn => h('li', { key: turn.turnRef }, turn.text)))),
+        view.reply ? h('p', { 'aria-label': '本次工作坊回复' }, view.reply) : null,
         h('form', { onSubmit: event => {
           event.preventDefault();
           void flow.submit(draft).then(sent => { if (sent) setDraft(''); });

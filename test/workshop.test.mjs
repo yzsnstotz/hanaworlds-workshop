@@ -176,7 +176,7 @@ test('DSH client contributes a Workshop panel and only typed offered Shell choic
   assert.equal(panelSeat.type, client.WorkshopPanel);
   const panel = client.WorkshopPanel({ flow: { snapshot: () => ({ ready: true,
     busy: false, error: '', turns: [], reply: '', clarification: null,
-    sessions: [], selectedSessionRef: null }),
+    sessions: [], selectedSessionRef: null, details: [] }),
     subscribe() { return () => {}; }, open() {} } });
   assert.equal(panel.children[1].props.role, 'status');
   assert.equal(panel.children.at(-1).type, 'form');
@@ -218,6 +218,22 @@ test('passes selected text and verified image together through Core attachment a
   assert.equal(reads, 1);
 });
 
+test('rejects a DSH LLM error finish even after a text delta', async () => {
+  const { workshop, projectionStore } = setup({
+    modelRoute: { provider: 'fixed-stub', model: 'gpt-5.6-luna' },
+    llm: { async *stream() {
+      yield { type: 'text-delta', index: 0, text: '看似完整的回答' };
+      yield { type: 'finish', reason: { kind: 'error',
+        failure: { code: 'FIXTURE_FAILURE', message: 'failed' } } };
+    } },
+  });
+  const started = await workshop.call('StartOrResumeSession', start());
+  const response = await workshop.call('AppendMultimodalTurn',
+    append(started.result.context.sessionRevision));
+  assert.equal(response.error.code, 'MODEL_REQUEST_FAILED');
+  assert.equal(projectionStore.state().turns.length, 0);
+});
+
 test('rejects media scope before reading bytes and never degrades corrupt image to text-only model call', async () => {
   const bytes = Buffer.from('image bytes');
   let reads = 0, modelCalls = 0;
@@ -243,7 +259,7 @@ test('an answer to a clarification returns to the model, then requires explicit 
   const proposal = { kind: 'BUILD_STRUCTURE', text: '石屋', purpose: 'first building',
     dimensions: { width: 3, depth: 4, height: 5, unit: 'node' }, entrancePortalRefs: [] };
   const prompts = [];
-  const { workshop, sessions } = setup({
+  const { workshop, sessions, projectionStore } = setup({
     canvas: { contractHandshake: contractsV4.contractHandshake,
       async call(_operation, request) { return { contractVersion: 'canvas/v4',
         requestId: request.requestId, error: null,
@@ -260,6 +276,12 @@ test('an answer to a clarification returns to the model, then requires explicit 
     expectedRevision: first.result.context.sessionRevision, worldRef: 'world-a', selectionRevision: 'sel-1' });
   const turn = await workshop.call('AppendMultimodalTurn', append(switched.result.context.sessionRevision));
   assert.equal(turn.result.clarification.question, '屋子要多大？');
+  const read = { contractVersion: 'session/v2', actorRef: 'user',
+    sessionRef: 's1', requestId: 'read-1', authorizationRef: 'grant' };
+  const early = await workshop.call('ReadSessionTurnDetails', read);
+  assert.equal(early.error, null);
+  assert.equal(early.result.turns[0].resultText, '屋子要多大？');
+  assert.equal(early.result.turns[0].confirmedBrief, null);
   const current = await workshop.call('StartOrResumeSession', { ...start(), requestId: 'resume' });
   recordUserInput(sessions, 'followup', '宽3、深4、高5个节点');
   const followup = await workshop.call('AnswerClarification', { contractVersion: 'session/v2',
@@ -277,6 +299,21 @@ test('an answer to a clarification returns to the model, then requires explicit 
     clarificationId: followup.result.clarification.clarificationId, answer: '确认' });
   assert.equal(confirmed.error, null);
   assert.equal(confirmed.result.clarification, null);
+  const reopened = new WorkshopV1({ sessionPersistence: sessions, projectionStore,
+    authority: workshop.authority, capabilities: workshop.capabilities });
+  const details = await reopened.call('ReadSessionTurnDetails',
+    { ...read, requestId: 'read-after-reopen' });
+  assert.equal(details.error, null);
+  assert.equal(details.result.turns[0].userText, '请帮我建一个小屋');
+  assert.equal(details.result.turns[0].resultText, '已确认建造意图。');
+  assert.equal(details.result.turns[0].confirmedBrief.contractVersion, 'ReferenceBrief/v2');
+  assert.equal(details.result.turns[0].confirmedBrief.sessionRef, 's1');
+  assert.equal(details.result.turns[0].confirmedBrief.turnRevision,
+    details.result.turns[0].turnRevision);
+  reopened.authority = { async verify() { return { current: false }; } };
+  const revoked = await reopened.call('ReadSessionTurnDetails',
+    { ...read, requestId: 'read-revoked' });
+  assert.equal(revoked.error.code, 'AUTHORIZATION_REVOKED');
 });
 
 test('a user correction replaces the pending proposal before confirmation', async () => {

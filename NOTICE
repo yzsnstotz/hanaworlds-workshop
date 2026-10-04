@@ -1,9 +1,9 @@
 HanaWorlds Workshop 0.1.0 component candidate.
 
 HanaWorlds-owned source is MIT; see LICENSE. Workshop includes a byte-identical
-runtime and one test-fixture subset of hanaworlds-contracts@0.3.0 from public
-revision e82735780bdfd4ea8e662781455040a6e5306121 (admitted npm pack SHA256
-47a2e5cc77590fb471ffedde715682564e169a0d88dbc5005b71d8d542b38f5c).
+runtime and one test-fixture subset of hanaworlds-contracts@0.3.1 from public
+revision 896f8b9ebd75f8dbe5657f48c41c53d52c61f94b (npm pack SHA256
+3087ea0d12e80f348d02f2e4057d78a8c36e434409fa788a001cddf80f01c422).
 That source is MIT; its LICENSE, NOTICE, per-file hashes, import closure and
 canonicalize Apache-2.0 license text are retained under vendor/contracts/.
 The package installs canonicalize@5.1.0 separately from the public registry;
@@ -11,7 +11,8 @@ its Apache-2.0 license remains with that dependency. Workshop does not embed
 the upstream canonicalize implementation.
 The Core `@deepseek-ai/dsh-session@0.2.0-rc.2` runtime dependency and its
 public `@deepseek-ai/cordis@4.0.4`, `@deepseek-ai/dsh-scope@0.2.0-rc.2`,
-and `@deepseek-ai/dsh-invariants@0.2.0-rc.2` peers are separately installed
-MIT packages.
+`@deepseek-ai/dsh-invariants@0.2.0-rc.2`, and
+`@deepseek-ai/dsh-storage-domain@0.2.0-rc.2` peers are separately installed
+MIT packages. Workshop also uses `zod@4.6.5` for its durable projection schema.
 Core DSH, its Session/Attachment services, and the PiAiAdapter are reused as
 host services; their source and license are not copied into this package.

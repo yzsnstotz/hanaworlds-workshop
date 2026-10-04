@@ -3,7 +3,7 @@ import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import {
   admitRequest, validateRequest, validateBoundRequest, validateResponse,
   ContractError, contractHandshake, checkContractHandshake, digestValue, validateType,
-  validateChoiceSelection, validateRegionInspection,
+  validateChoiceSelection, validateRegionInspection, checkSessionReadbackHandshake,
 } from '../vendor/contracts/dist/v4/index.mjs';
 
 const VERSION = 'session/v2';
@@ -18,6 +18,12 @@ function packet(version, requestId, result, error = null) {
 }
 function toPublic(error) {
   return error?.publicError ?? new ContractError('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE').publicError;
+}
+function readbackPublic(error) {
+  const publicError = error?.publicError;
+  return ['PERMISSION_DENIED', 'AUTHORIZATION_REVOKED', 'SESSION_NOT_FOUND',
+    'READBACK_FAILED'].includes(publicError?.code) ? publicError :
+    new ContractError('READBACK_FAILED', 'validate', 'POLICY_UNAVAILABLE').publicError;
 }
 function requirePeer(port, requirement) {
   if (!port) failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
@@ -221,7 +227,8 @@ export class WorkshopV1 {
           message], sessionId: body.sessionRef,
         system: 'You are HanaWorlds Workshop. Never guess a world, target, dimension, or placement. If the user refers to another or an unclear world, ask them to select or clarify it in the Shell. Later user corrections override earlier details. When the user has supplied a concrete structure and all three node dimensions, respond with only JSON matching {"kind":"BUILD_STRUCTURE","text":"<structure>","purpose":"<purpose>","dimensions":{"width":1,"depth":1,"height":1,"unit":"node"},"entrancePortalRefs":[]}. Use the supplied integer dimensions; do not invent values. If any required fact is missing, ask one concise clarification question in Chinese instead of JSON.' })) {
         if (chunk.type === 'text-delta') result += chunk.text;
-        if (chunk.type === 'finish') finished = chunk.reason !== 'error' && chunk.reason !== 'aborted';
+        if (chunk.type === 'finish')
+          finished = chunk.reason === 'stop' || chunk.reason?.kind === 'stop';
       }
     } catch { failure('MODEL_REQUEST_FAILED', 'validate', 'POLICY_UNAVAILABLE'); }
     if (!finished || !result.trim()) failure('MODEL_REQUEST_FAILED', 'validate', 'POLICY_UNAVAILABLE');
@@ -249,7 +256,10 @@ export class WorkshopV1 {
       const response = packet(version, body.requestId, result);
       return validateResponse(version, operation, response);
     } catch (error) {
-      return packet(version, body?.requestId ?? null, null, toPublic(error));
+      const denied = packet(version, body?.requestId ?? null, null,
+        operation === 'ReadSessionTurnDetails' ? readbackPublic(error) : toPublic(error));
+      return operation === 'ReadSessionTurnDetails' && body?.requestId
+        ? validateResponse(version, operation, denied) : denied;
     }
   }
 
@@ -679,6 +689,21 @@ export class WorkshopV1 {
           loaded.state.context.sessionRevision !== body.expectedRevision)
         failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
       return this.#snapshot(loaded.state);
+    }
+    if (operation === 'ReadSessionTurnDetails') {
+      checkSessionReadbackHandshake(this.contractHandshake);
+      const { state } = await this.#load(body.sessionRef);
+      const turns = state.turns.map(turn => {
+        const detail = state.turnDetails?.[turn.turnRef];
+        if (typeof detail?.resultText !== 'string' ||
+            !Object.hasOwn(detail, 'confirmedBrief'))
+          failure('READBACK_FAILED', 'validate', 'POLICY_UNAVAILABLE');
+        return { turnRef: turn.turnRef, turnRevision: turn.turnRevision,
+          userText: turn.text, resultText: detail.resultText,
+          confirmedBrief: detail.confirmedBrief };
+      });
+      return { sessionRef: body.sessionRef,
+        sessionRevision: state.context.sessionRevision, turns };
     }
     const { log, state } = await this.#load(body.sessionRef);
     if (operation === 'InvokeAction') {
