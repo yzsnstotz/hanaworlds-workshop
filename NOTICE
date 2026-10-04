@@ -1,9 +1,9 @@
 HanaWorlds Workshop 0.1.0 component candidate.
 
 HanaWorlds-owned source is MIT; see LICENSE. Workshop includes a byte-identical
-runtime and one test-fixture subset of hanaworlds-contracts@0.3.1 from public
-revision 896f8b9ebd75f8dbe5657f48c41c53d52c61f94b (npm pack SHA256
-3087ea0d12e80f348d02f2e4057d78a8c36e434409fa788a001cddf80f01c422).
+runtime and one test-fixture subset of hanaworlds-contracts@0.3.2 from public
+revision 3d64364782181c8b5abc3150f8fa9f7ae20bf101 (npm pack SHA256
+48f0b56a3b385bd3a17773fd968c0566068fe1a28ecb4aa08d9686d254cdbb0a).
 That source is MIT; its LICENSE, NOTICE, per-file hashes, import closure and
 canonicalize Apache-2.0 license text are retained under vendor/contracts/.
 The package installs canonicalize@5.1.0 separately from the public registry;

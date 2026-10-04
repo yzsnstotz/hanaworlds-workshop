@@ -4,6 +4,7 @@ import {
   admitRequest, validateRequest, validateBoundRequest, validateResponse,
   ContractError, contractHandshake, checkContractHandshake, digestValue, validateType,
   validateChoiceSelection, validateRegionInspection, checkSessionReadbackHandshake,
+  checkSessionUndoHandshake,
 } from '../vendor/contracts/dist/v4/index.mjs';
 
 const VERSION = 'session/v2';
@@ -11,6 +12,7 @@ const ACTION_VERSION = 'interaction-surface/v3';
 const revision = () => `rev-${randomUUID()}`;
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const copy = value => structuredClone(value);
+const recordedDigest = receipt => digestValue('receipt', receipt).sha256;
 
 function failure(code, phase, reason) { throw new ContractError(code, phase, reason); }
 function packet(version, requestId, result, error = null) {
@@ -32,6 +34,11 @@ function requirePeer(port, requirement) {
   if (!advertised) failure('UNSUPPORTED_VERSION', 'decode', 'VERSION_UNSUPPORTED');
   return checkContractHandshake(advertised, requirement);
 }
+function requireUndoPeer(port) {
+  const peer = requirePeer(port,
+    { wires: ['canvas/v4', 'session/v2'], factProfiles: [] });
+  return checkSessionUndoHandshake(peer.advertised);
+}
 function initialState(sessionRef) {
   return { context: { currentSession: sessionRef, activeWorldRef: null,
     orderedSelectedObjectRefs: [], sessionRevision: revision(), selectionRevision: '0' },
@@ -40,7 +47,7 @@ function initialState(sessionRef) {
     turnDetails: Object.create(null),
     confirmedIntents: Object.create(null),
     turnControls: Object.create(null), turnWorldRefs: Object.create(null),
-    lastPlacement: null };
+    lastPlacement: null, pendingUndo: null };
 }
 
 function parseStructureProposal(text) {
@@ -100,12 +107,17 @@ export class WorkshopV1 {
       operation === 'SwitchWorldContext' || operation === 'SelectObjects' ? 'SELECT' :
       operation === 'AnalyzeCurrentBuild' ? 'ANALYZE' :
       operation === 'ApplyCurrentBuild' ? 'APPLY_RECOVERABLE' :
+      operation === 'ReadCurrentUndoStatus' ? 'HISTORY' :
+      operation === 'UndoCurrentBuild' ? 'UNDO' :
       ['BeginFirstBuilding', 'InvokeAction', 'CreateBuildPlan', 'CompileCurrentBuild'].includes(operation) ? 'INSPECT' : 'READ';
     if (!proof?.current || proof.actorRef !== body.actorRef ||
         proof.sessionRef !== body.sessionRef ||
         proof.authorizationRef !== body.authorizationRef ||
         !proof.allowedActions?.includes(required))
       failure('AUTHORIZATION_REVOKED', 'authorize', 'GRANT_REVOKED');
+    if (['ReadCurrentUndoStatus', 'UndoCurrentBuild'].includes(operation) &&
+        proof.worldRef !== body.worldRef)
+      failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
     return proof;
   }
 
@@ -252,13 +264,15 @@ export class WorkshopV1 {
           proof.engineActorName !== relayPrincipal.engineActorName))
         failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
       validateBoundRequest(version, operation, body);
-      const result = await this.#withLock(body.sessionRef, async () => this.#dispatch(operation, body, proof));
+      const result = operation === 'UndoCurrentBuild' ?
+        await this.#undoCurrentBuild(body) :
+        await this.#withLock(body.sessionRef, async () => this.#dispatch(operation, body, proof));
       const response = packet(version, body.requestId, result);
       return validateResponse(version, operation, response);
     } catch (error) {
       const denied = packet(version, body?.requestId ?? null, null,
         operation === 'ReadSessionTurnDetails' ? readbackPublic(error) : toPublic(error));
-      return operation === 'ReadSessionTurnDetails' && body?.requestId
+      return ['ReadSessionTurnDetails', 'ReadCurrentUndoStatus', 'UndoCurrentBuild'].includes(operation) && body?.requestId
         ? validateResponse(version, operation, denied) : denied;
     }
   }
@@ -653,6 +667,241 @@ export class WorkshopV1 {
     });
   }
 
+  async #undoSource(body, state) {
+    if (state.context.activeWorldRef !== body.worldRef)
+      failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
+    const recorded = state.receipts.at(-1);
+    if (!recorded) return null;
+    const turn = state.turns.find(row => row.turnRef === recorded.turnRef);
+    const saved = recorded.apply ?? (state.pendingApply?.turnRef === recorded.turnRef ?
+      { request: state.pendingApply.request, response: state.pendingApply.response?.result,
+        sampledBounds: state.lastCompiled?.turnRef === recorded.turnRef ?
+          state.lastCompiled.inspection?.targetFacts?.sampledBounds : null } : null);
+    if (saved?.request?.worldRef && saved.request.worldRef !== body.worldRef)
+      failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
+    if (!turn || turn.actionReceiptDigest !== recorded.domainReceiptDigest ||
+        !saved?.request || saved.response?.status !== 'VERIFIED' ||
+        saved.request.actorRef !== body.actorRef ||
+        saved.request.sessionRef !== body.sessionRef ||
+        saved.request.transactionId !== saved.response.transactionId ||
+        digestValue('receipt', saved.response).sha256 !== recorded.domainReceiptDigest ||
+        !saved.sampledBounds)
+      failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'RESOURCE_MISSING');
+    return { turn, request: saved.request, receipt: saved.response,
+      sampledBounds: saved.sampledBounds };
+  }
+
+  async #canvasRead(operation, request) {
+    validateBoundRequest('canvas/v4', operation, request);
+    const response = validateResponse('canvas/v4', operation,
+      await this.canvas.call(operation, request));
+    if (response.requestId !== request.requestId)
+      failure('READBACK_FAILED', 'validate', 'REVISION_CHANGED');
+    if (response.error) {
+      const allowed = new Set(['PERMISSION_DENIED', 'AUTHORIZATION_REVOKED',
+        'WORLD_NOT_BOUND', 'SESSION_NOT_FOUND', 'OBJECT_NOT_FOUND',
+        'STALE_REVISION', 'UNDO_CONFLICT', 'SAVED_RESOURCE_UNAVAILABLE',
+        'CAPABILITY_UNAVAILABLE', 'READBACK_FAILED', 'TRANSACTION_CONFLICT',
+        'APPLY_FAILED', 'ROLLBACK_FAILED', 'RESTORE_FAILED',
+        'RECOVERY_PENDING', 'OBJECT_SCOPE_MISMATCH']);
+      if (!allowed.has(response.error.code))
+        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+      const error = new Error(response.error.code);
+      error.publicError = response.error;
+      throw error;
+    }
+    return response.result;
+  }
+
+  async #currentUndo(body, state) {
+    checkSessionUndoHandshake(this.contractHandshake);
+    const source = await this.#undoSource(body, state);
+    if (!source) return { status: { sessionRef: body.sessionRef, worldRef: body.worldRef,
+      turnRef: null, turnRevision: null, availability: 'NO_VERIFIED_BUILD', head: null } };
+    requireUndoPeer(this.canvas);
+    if (!this.canvas?.call)
+      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+    const common = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
+      sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
+      worldRef: body.worldRef };
+    const inventory = await this.#canvasRead('ListObjects', { ...common,
+      requestId: `${body.requestId}:objects`, expectedRevision: null });
+    if (inventory.worldRef !== body.worldRef)
+      failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
+    const matches = [];
+    for (const object of inventory.objects) {
+      const history = await this.#canvasRead('HistoryQuery', { ...common,
+        requestId: `${body.requestId}:history:${object.objectRef}`,
+        objectRef: object.objectRef, expectedHistoryRevision: null });
+      if (history.worldRef !== body.worldRef || history.objectRef !== object.objectRef)
+        failure('READBACK_FAILED', 'validate', 'REVISION_CHANGED');
+      const entry = history.entries.find(row =>
+        row.transactionId === source.receipt.transactionId &&
+        row.receiptDigest === recordedDigest(source.receipt) &&
+        row.operationDigest === source.receipt.operationDigest &&
+        row.status === 'VERIFIED' && row.affectedObjectRefs.includes(object.objectRef));
+      if (entry) matches.push({ object, history, entry });
+    }
+    if (!matches.length)
+      failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'RESOURCE_MISSING');
+    const refs = matches[0].entry.affectedObjectRefs;
+    if (matches.length !== refs.length ||
+        !refs.every(ref => matches.some(row => row.object.objectRef === ref &&
+          JSON.stringify(row.entry) === JSON.stringify(matches[0].entry))))
+      failure('OBJECT_SCOPE_MISMATCH', 'validate', 'SCOPE_DENIED');
+    const sameHead = matches.every(row =>
+      row.history.historyRevision === matches[0].history.historyRevision &&
+      row.history.headTransactionId === matches[0].history.headTransactionId);
+    if (!sameHead)
+      failure('UNDO_CONFLICT', 'validate', 'EXTERNAL_EDIT_CONFLICT');
+    const history = matches[0].history;
+    const head = { historyRevision: history.historyRevision,
+      headTransactionId: history.headTransactionId };
+    const available = history.undoAvailable &&
+      history.headTransactionId === source.receipt.transactionId;
+    return { source, matches, status: { sessionRef: body.sessionRef,
+      worldRef: body.worldRef, turnRef: source.turn.turnRef,
+      turnRevision: source.turn.turnRevision,
+      availability: available ? 'AVAILABLE' : 'NO_UNDO_AT_HEAD', head } };
+  }
+
+  async #finishUndo(body, log, state, pending) {
+    const before = pending.beforeHead;
+    const after = [];
+    for (const objectRef of pending.affectedObjectRefs) {
+      const history = await this.#canvasRead('HistoryQuery', {
+        contractVersion: 'canvas/v4', actorRef: body.actorRef,
+        sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
+        worldRef: body.worldRef, objectRef,
+        requestId: `${pending.request.requestId}:after:${objectRef}:${randomUUID()}`,
+        expectedHistoryRevision: null });
+      if (history.worldRef !== body.worldRef || history.objectRef !== objectRef ||
+          history.historyRevision === before.historyRevision ||
+          history.headTransactionId !== pending.expectedAfterHeadTransactionId)
+        failure('READBACK_FAILED', 'validate', 'REVISION_CHANGED');
+      const linked = history.entries.filter(entry =>
+        entry.transactionId === pending.request.transactionId &&
+        entry.originTransactionId === pending.request.historyTransactionId &&
+        entry.status === 'VERIFIED' &&
+        entry.receiptDigest === recordedDigest(pending.receipt) &&
+        entry.historyRevision === history.historyRevision &&
+        JSON.stringify(entry.affectedObjectRefs) ===
+          JSON.stringify(pending.affectedObjectRefs));
+      if (linked.length !== 1)
+        failure('READBACK_FAILED', 'validate', 'REVISION_CHANGED');
+      after.push(history);
+    }
+    if (after.some(row => row.historyRevision !== after[0].historyRevision ||
+        row.headTransactionId !== after[0].headTransactionId))
+      failure('READBACK_FAILED', 'validate', 'REVISION_CHANGED');
+    const result = { sessionRef: body.sessionRef, worldRef: body.worldRef,
+      turnRef: pending.turnRef, turnRevision: pending.turnRevision,
+      status: 'VERIFIED', beforeHead: before,
+      afterHead: { historyRevision: after[0].historyRevision,
+        headTransactionId: after[0].headTransactionId } };
+    state.pendingUndo = { ...pending, status: 'VERIFIED', result };
+    await this.#save(body.sessionRef, log, state);
+    return result;
+  }
+
+  async #sendReservedUndo(body, pending) {
+    let receipt;
+    try { receipt = await this.#canvasRead('Undo', pending.request); }
+    catch (error) {
+      if (['NONE', 'ROLLED_BACK'].includes(error?.publicError?.mutationState)) {
+        const latest = await this.#load(body.sessionRef);
+        if (latest.state.pendingUndo?.request?.requestId === pending.request.requestId) {
+          latest.state.pendingUndo = null;
+          await this.#save(body.sessionRef, latest.log, latest.state);
+        }
+      }
+      throw error;
+    }
+    if (receipt.status !== 'VERIFIED' ||
+        receipt.transactionId !== pending.request.transactionId)
+      failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
+    const latest = await this.#load(body.sessionRef);
+    latest.state.pendingUndo = { ...pending, status: 'CANVAS_VERIFIED', receipt };
+    await this.#save(body.sessionRef, latest.log, latest.state);
+    const saved = await this.#load(body.sessionRef);
+    return this.#finishUndo(body, saved.log, saved.state, saved.state.pendingUndo);
+  }
+
+  async #undoCurrentBuild(body) {
+    return this.#withLock(body.sessionRef, async () => {
+      checkSessionUndoHandshake(this.contractHandshake);
+      requireUndoPeer(this.canvas);
+      const { log, state } = await this.#load(body.sessionRef);
+      const pending = state.pendingUndo;
+      if (pending) {
+        if (pending.request.requestId !== body.requestId)
+          failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
+        if (pending.expectedTurnRevision !== body.expectedTurnRevision ||
+            pending.expectedHistoryRevision !== body.expectedHistoryRevision ||
+            pending.request.actorRef !== body.actorRef ||
+            pending.request.authorizationRef !== body.authorizationRef ||
+            pending.request.worldRef !== body.worldRef)
+          failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
+        if (pending.status === 'VERIFIED') return pending.result;
+        if (pending.status === 'RESERVED')
+          return this.#sendReservedUndo(body, pending);
+        return this.#finishUndo(body, log, state, pending);
+      }
+      const current = await this.#currentUndo(body, state);
+      if (current.status.availability !== 'AVAILABLE')
+        failure('UNDO_CONFLICT', 'validate', 'EXTERNAL_EDIT_CONFLICT');
+      if (current.status.turnRevision !== body.expectedTurnRevision ||
+          current.status.head.historyRevision !== body.expectedHistoryRevision)
+        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
+      const worldRevisions = [];
+      const objectRevisions = {};
+      for (const { object } of current.matches) {
+        const facts = await this.#canvasRead('InspectObject', {
+          contractVersion: 'canvas/v4', actorRef: body.actorRef,
+          sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
+          worldRef: body.worldRef, objectRef: object.objectRef,
+          requestId: `${body.requestId}:inspect:${object.objectRef}`,
+          expectedRevision: object.objectRevision,
+          sampledBounds: current.source.sampledBounds });
+        if (facts.worldRef !== body.worldRef ||
+            facts.objectRef !== object.objectRef ||
+            facts.objectRevision !== object.objectRevision ||
+            typeof facts.worldRevision !== 'string')
+          failure('READBACK_FAILED', 'validate', 'REVISION_CHANGED');
+        worldRevisions.push(facts.worldRevision);
+        objectRevisions[object.objectRef] = facts.objectRevision;
+      }
+      if (worldRevisions.some(value => value !== worldRevisions[0]))
+        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
+      const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
+        sessionRef: body.sessionRef, requestId: body.requestId,
+        authorizationRef: body.authorizationRef, worldRef: body.worldRef,
+        objectRef: current.matches[0].object.objectRef,
+        transactionId: `undo-${randomUUID()}`,
+        historyTransactionId: current.source.receipt.transactionId,
+        expectedHistoryRevision: body.expectedHistoryRevision,
+        expectedWorldRevision: worldRevisions[0],
+        expectedObjectRevisions: objectRevisions,
+        intentDigest: current.source.request.authorizationBinding.intentDigest,
+        surfaceActionDigest: current.source.request.authorizationBinding.surfaceActionDigest };
+      validateBoundRequest('canvas/v4', 'Undo', request);
+      const reserved = { request, turnRef: current.status.turnRef,
+        turnRevision: current.status.turnRevision,
+        expectedTurnRevision: body.expectedTurnRevision,
+        expectedHistoryRevision: body.expectedHistoryRevision,
+        beforeHead: current.status.head,
+        expectedAfterHeadTransactionId: current.matches[0].history.entries[
+          current.matches[0].history.entries.findIndex(row =>
+            row.transactionId === current.source.receipt.transactionId) - 1
+        ]?.transactionId ?? null,
+        affectedObjectRefs: current.matches[0].entry.affectedObjectRefs,
+        status: 'RESERVED' };
+      state.pendingUndo = reserved;
+      await this.#save(body.sessionRef, log, state);
+      return this.#sendReservedUndo(body, reserved);
+    });
+  }
+
   async #dispatch(operation, body, proof) {
     if (operation === 'DeleteSession')
       failure('SESSION_DELETE_UNSUPPORTED', 'validate', 'POLICY_UNAVAILABLE');
@@ -704,6 +953,14 @@ export class WorkshopV1 {
       });
       return { sessionRef: body.sessionRef,
         sessionRevision: state.context.sessionRevision, turns };
+    }
+    if (operation === 'ReadCurrentUndoStatus') {
+      const { log, state } = await this.#load(body.sessionRef);
+      if (state.pendingUndo?.status === 'CANVAS_VERIFIED')
+        await this.#finishUndo(body, log, state, state.pendingUndo);
+      else if (state.pendingUndo && state.pendingUndo.status !== 'VERIFIED')
+        failure('READBACK_FAILED', 'validate', 'REQUIRED_FACT_UNKNOWN');
+      return (await this.#currentUndo(body, state)).status;
     }
     const { log, state } = await this.#load(body.sessionRef);
     if (operation === 'InvokeAction') {
@@ -768,12 +1025,18 @@ export class WorkshopV1 {
       const turn = state.turns.find(row => row.turnRef === body.turnRef);
       const receipt = state.pendingApply?.response?.result;
       if (!turn || !receipt || receipt.status !== 'VERIFIED' ||
+          state.pendingApply?.turnRef !== body.turnRef ||
+          state.pendingApply?.status !== 'VERIFIED' ||
           state.pendingApply.request.sessionRef !== body.sessionRef ||
           digestValue('receipt', receipt).sha256 !== body.domainReceiptDigest)
         failure('RECOVERY_PENDING', 'validate', 'REQUIRED_FACT_UNKNOWN');
       turn.actionReceiptDigest = body.domainReceiptDigest;
       state.receipts.push({ turnRef: body.turnRef, actionId: body.actionId,
-        domainReceiptDigest: body.domainReceiptDigest });
+        domainReceiptDigest: body.domainReceiptDigest,
+        apply: { request: copy(state.pendingApply.request),
+          response: copy(receipt),
+          sampledBounds: copy(state.lastCompiled?.inspection?.targetFacts?.sampledBounds ?? null) } });
+      if (state.pendingUndo?.status === 'VERIFIED') state.pendingUndo = null;
       await this.#save(body.sessionRef, log, state);
       return { sessionRef: body.sessionRef, turnRef: body.turnRef,
         turnRevision: turn.turnRevision, briefDigest: turn.referenceBriefDigest,

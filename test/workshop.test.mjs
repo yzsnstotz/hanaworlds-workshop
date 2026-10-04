@@ -80,6 +80,30 @@ function setup(overrides = {}) {
 
 const start = (sessionRef = 's1') => ({ contractVersion: 'session/v2', actorRef: 'user', sessionRef, requestId: `start-${sessionRef}`, authorizationRef: 'grant', expectedRevision: null });
 
+test('action receipt cannot attach a verified Apply from another turn', async () => {
+  const { workshop, projectionStore } = setup();
+  const opened = await workshop.call('StartOrResumeSession', start());
+  const state = projectionStore.state();
+  state.turns.push({ turnRef: 'turn-a', turnRevision: 'rev-a', text: 'A' },
+    { turnRef: 'turn-b', turnRevision: 'rev-b', text: 'B' });
+  const receipt = { contractVersion: 'canvas/v2', transactionId: 'tx-a',
+    operationDigest: 'a'.repeat(64), transactionPayloadDigest: 'b'.repeat(64),
+    status: 'VERIFIED', previousWorldRevision: 'world-0',
+    observedWorldRevision: 'world-1', readbackDigest: 'c'.repeat(64),
+    restoreStatus: 'NOT_REQUIRED', error: null };
+  state.pendingApply = { turnRef: 'turn-a', status: 'VERIFIED',
+    request: { sessionRef: 's1', actorRef: 'user', worldRef: 'world-a',
+      authorizationRef: 'grant', transactionId: 'tx-a' },
+    response: { result: receipt } };
+  const result = await workshop.call('RecordActionReceipt', {
+    contractVersion: 'session/v2', actorRef: 'user', sessionRef: 's1',
+    requestId: 'attach-wrong-turn', authorizationRef: 'grant',
+    turnRef: 'turn-b', expectedRevision: opened.result.context.sessionRevision,
+    actionId: 'apply', domainReceiptDigest: contractsV4.digestValue('receipt', receipt).sha256 });
+  assert.equal(result.error.code, 'RECOVERY_PENDING');
+  assert.equal(state.turns[1].actionReceiptDigest, undefined);
+});
+
 function recordUserInput(sessions, requestId, text, sessionRef = 's1') {
   const events = sessions.logs.get(sessionRef).events;
   events.push({ type: 'user/message', seq: events.length, time: Date.now(),

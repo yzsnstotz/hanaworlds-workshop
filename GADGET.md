@@ -31,6 +31,11 @@ the host rechecks the chosen Session, actor and authorization on every call.
 It never asks a user to enter internal refs. The typed
 `ReadSessionTurnDetails` operation returns complete replies and confirmed
 Briefs for reopening the same Session.
+For a completed build with a durable VERIFIED Apply receipt, the same panel
+reads `ReadCurrentUndoStatus` and shows a withdraw button only when the
+current author history has that Apply transaction at its head. The Shell host
+supplies the current actor, Session, world and authorization; the client sends
+only the two displayed CAS revisions to `UndoCurrentBuild`.
 
 The service resolves peer ports through the host at call time. Required host
 ports are `sessionPersistence` (read-only Core Session access),
@@ -84,13 +89,23 @@ durable resource service. The current Core Session delete seam is unsupported,
 and `DeleteSession` reports that truthfully; reopening saved resources is
 independent of the old Session log.
 
+For Undo, Workshop stores the verified Apply request, receipt and inspection
+bounds with the turn. It resolves the affected Canvas objects by matching that
+transaction and receipt digest in the current author-scoped durable history,
+then inspects current object and world revisions. It persists the exact Canvas
+Undo request before calling Canvas. A success is shown only after Canvas
+returns VERIFIED and a fresh HistoryQuery confirms the expected prior head.
+Revocation, world switch, missing receipt, external edit and unconfirmed
+readback are surfaced as failures. Workshop never writes the world or moves
+Canvas history itself.
+
 ## Build and lifecycle
 
 Use Node 24.13.1, isolated HOME, npm cache and DSH profile. `npm ci`,
 `npm run build`, `npm test`, and `npm pack --ignore-scripts` operate from a
 fresh public clone. The 17-module v4 runtime closure and placement fixture
-under `vendor/contracts/` are byte-identical to the Contracts 0.3.1
-public source pack at revision `896f8b9ebd75f8dbe5657f48c41c53d52c61f94b`.
+under `vendor/contracts/` are byte-identical to the Contracts 0.3.2
+public source pack at revision `3d64364782181c8b5abc3150f8fa9f7ae20bf101`.
 `npm run build` verifies the pinned source/artifact, every file digest,
 runtime import closure and permitted external imports. `canonicalize@5.1.0`
 is an ordinary registry dependency. No sibling path, `file:` dependency,

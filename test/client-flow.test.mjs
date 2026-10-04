@@ -177,3 +177,54 @@ test('revoked Shell binding disconnects the panel and keeps the host denial visi
   await flow.submit('放一个方块');
   assert.equal(requests.length, before);
 });
+
+test('client exposes Undo only for a current verified build and confirms the changed history after click', async () => {
+  const client = clientModule();
+  const requests = [];
+  let undone = false;
+  let id = 0;
+  const session = () => ({ context: { currentSession: 'session-a',
+    activeWorldRef: 'world-a', sessionRevision: 'session-1' },
+    turns: [{ turnRef: 'turn-a', turnRevision: 'turn-1', text: '建一块',
+      actionReceiptDigest: 'a'.repeat(64) }] });
+  const flow = client.createWorkshopFlow({
+    currentSessionRef: () => 'session-a', newId: () => `id-${++id}`,
+    invoke: async (_command, args) => {
+      requests.push(args);
+      if (args.operation === 'context') return args.input.sessionRef
+        ? { status: 'bound', sessionRef: 'session-a', worldRef: 'world-a' }
+        : { sessions: [{ sessionRef: 'session-a', label: 'Session 1' }] };
+      const op = args.input.operation;
+      if (op === 'StartOrResumeSession') return packet(args.input.payload.requestId, session());
+      if (op === 'ReadSessionTurnDetails') return packet(args.input.payload.requestId,
+        { sessionRef: 'session-a', sessionRevision: 'session-1', turns: [{
+          turnRef: 'turn-a', turnRevision: 'turn-1', userText: '建一块',
+          resultText: '已建造', confirmedBrief: null }] });
+      if (op === 'ReadCurrentUndoStatus') return packet(args.input.payload.requestId,
+        { sessionRef: 'session-a', worldRef: 'world-a', turnRef: 'turn-a',
+          turnRevision: 'turn-1', availability: undone ? 'NO_UNDO_AT_HEAD' : 'AVAILABLE',
+          head: { historyRevision: undone ? 'history-2' : 'history-1',
+            headTransactionId: undone ? null : 'apply-tx' } });
+      if (op === 'UndoCurrentBuild') {
+        assert.deepEqual(Object.keys(args.input.payload).sort(),
+          ['contractVersion', 'expectedHistoryRevision', 'expectedTurnRevision', 'requestId']);
+        assert.equal(args.input.payload.expectedHistoryRevision, 'history-1');
+        undone = true;
+        return packet(args.input.payload.requestId, { sessionRef: 'session-a',
+          worldRef: 'world-a', turnRef: 'turn-a', turnRevision: 'turn-1',
+          status: 'VERIFIED', beforeHead: { historyRevision: 'history-1', headTransactionId: 'apply-tx' },
+          afterHead: { historyRevision: 'history-2', headTransactionId: null } });
+      }
+      throw Error(`unexpected ${op}`);
+    },
+  });
+  await flow.open();
+  assert.equal(flow.snapshot().undoStatus.availability, 'AVAILABLE');
+  assert.equal(await flow.undoCurrentBuild(), true);
+  assert.equal(flow.snapshot().undoStatus.availability, 'NO_UNDO_AT_HEAD');
+  assert.equal(flow.snapshot().undoResult.status, 'VERIFIED');
+  const calls = requests.filter(row => row.input?.operation === 'UndoCurrentBuild');
+  assert.equal(calls.length, 1);
+  for (const key of ['actorRef', 'sessionRef', 'worldRef', 'authorizationRef', 'objectRef', 'transactionId'])
+    assert.equal(Object.hasOwn(calls[0].input.payload, key), false);
+});

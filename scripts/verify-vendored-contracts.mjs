@@ -3,9 +3,9 @@ import { readFile, readdir } from 'node:fs/promises';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const sourceRevision = '896f8b9ebd75f8dbe5657f48c41c53d52c61f94b';
-const admittedPackSha256 = '3087ea0d12e80f348d02f2e4057d78a8c36e434409fa788a001cddf80f01c422';
-const manifestSha256 = '59e4216b0bbfba90a3b9f60feef9cdc09d74e3e4f649a22f146aed232c7ebce4';
+const sourceRevision = '3d64364782181c8b5abc3150f8fa9f7ae20bf101';
+const admittedPackSha256 = '48f0b56a3b385bd3a17773fd968c0566068fe1a28ecb4aa08d9686d254cdbb0a';
+const manifestSha256 = 'dc0911f5662f0affb54511eb79f6a44293628040d55524ced90d5c0a51542fcb';
 const defaultRoot = fileURLToPath(new URL('../vendor/contracts/', import.meta.url));
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 
@@ -27,7 +27,7 @@ export async function verifyVendoredContracts(root = defaultRoot) {
   const manifest = JSON.parse(rawManifest);
   if (manifest.sourceRevision !== sourceRevision ||
       manifest.admittedPackSha256 !== admittedPackSha256 ||
-      manifest.sourcePackageVersion !== '0.3.1' ||
+      manifest.sourcePackageVersion !== '0.3.2' ||
       JSON.stringify(manifest.runtimeRoots) !== JSON.stringify(['dist/v4/index.mjs']) ||
       JSON.stringify(manifest.fixtureFiles) !== JSON.stringify([
         'fixtures/v4/candidate/placement-region-chain-v4.json']))

@@ -10,3 +10,4 @@ Workshop 不猜、不编译、不写世界。证据上限：`REAL_RUNTIME`（存
 | WS-03 | 存根模型下能产出 ReferenceBrief | 存根模型固定把「放一个方块」翻成一份合法 ReferenceBrief/v2；输出通过 schema | `npm test`（stub-model 用例） | FIXTURE |
 | WS-04 | 对象选择只接受 Canvas 返回的 ref | SetObjectSelection 只用 ListObjects 返回的 ref；手填 ID 被类型化拒绝 | `npm test`（selection 用例） | FIXTURE |
 | WS-05 | 多在线玩家只在 Shell 侧列名 | 多玩家的 PlacementChoiceRequired 在 Shell 渲染为 SELECT_CHOICE 名单；游戏内渲染器收到同一请求返回 `RENDERER_CAPABILITY_UNAVAILABLE` | `npm test`（placement-ask 用例） | FIXTURE |
+| WS-06 | Shell 中撤回本 Session 的已验证建造 | 只在当前作者的 Apply 交易位于 Canvas 历史 head 时显示「撤回此建造」；点击后 VERIFIED 回执与后续历史读回共同确认回退；重启后历史位置一致，拒绝情形显示原因 | `npm test`（undo 与 client-flow 用例）；PM 在隔离 DSH profile 跑真实门 | REAL_UI（待真实门） |

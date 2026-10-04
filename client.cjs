@@ -14,7 +14,8 @@ window.__ModuleLoader__.load({
       const listeners = new Set();
       let state = { ready: false, busy: false, error: '', turns: [], reply: '',
         sessionRef: null, worldRef: null, revision: null, clarification: null,
-        sessions: [], selectedSessionRef: null, details: [] };
+        sessions: [], selectedSessionRef: null, details: [],
+        undoStatus: null, undoResult: null, undoError: '' };
       const snapshot = () => ({ ...state, turns: [...state.turns],
         sessions: [...state.sessions], details: [...state.details] });
       const publish = patch => {
@@ -36,8 +37,18 @@ window.__ModuleLoader__.load({
           operation: 'workshop', input: { sessionRef, operation,
             payload: { contractVersion: 'session/v2', ...payload } },
         });
-        if (!response || response.error || !response.result)
-          throw Error(`工作坊拒绝：${response?.error?.code ?? 'INVALID_RESPONSE'}`);
+        if (!response || response.error || !response.result) {
+          const code = response?.error?.code ?? 'INVALID_RESPONSE';
+          const reasons = { AUTHORIZATION_REVOKED: '当前授权已撤销',
+            WORLD_NOT_BOUND: '当前世界已变化',
+            SAVED_RESOURCE_UNAVAILABLE: '缺少已验证建造的持久回执',
+            UNDO_CONFLICT: '建造历史已变化或发生外部编辑冲突',
+            STALE_REVISION: '历史版本已变化',
+            READBACK_FAILED: '撤回后历史读回未确认',
+            RECOVERY_PENDING: '撤回交易仍在恢复中',
+            CAPABILITY_UNAVAILABLE: '撤回能力暂不可用' };
+          throw Error(`工作坊拒绝：${reasons[code] ?? '请求未完成'}（${code}）。`);
+        }
         return response.result;
       };
       const bindingLost = error => /\b(TRUSTED_BINDING_REQUIRED|AUTHORIZATION_REVOKED)\b/
@@ -69,6 +80,23 @@ window.__ModuleLoader__.load({
           throw Error('工作坊轮次读回与当前 Session 不一致。');
         return result.turns;
       };
+      const readUndoStatus = async (sessionRef, worldRef, turns) => {
+        if (!turns.some(turn => typeof turn.actionReceiptDigest === 'string'))
+          return null;
+        const result = await workshop(sessionRef, 'ReadCurrentUndoStatus', {
+          requestId: id(),
+        });
+        if (result.sessionRef !== sessionRef || result.worldRef !== worldRef ||
+            !['AVAILABLE', 'NO_VERIFIED_BUILD', 'NO_UNDO_AT_HEAD'].includes(result.availability) ||
+            (result.turnRef !== null && !turns.some(turn =>
+              turn.turnRef === result.turnRef &&
+              turn.turnRevision === result.turnRevision)) ||
+            (result.availability === 'AVAILABLE' &&
+              (typeof result.head?.historyRevision !== 'string' ||
+                typeof result.head?.headTransactionId !== 'string')))
+          throw Error('撤回状态与当前 Session 或世界不一致。');
+        return result;
+      };
       async function boundSessions() {
         if (typeof invoke !== 'function') throw Error('桌面工作坊连接不可用。');
         const listing = await invoke('hanaworlds_request', {
@@ -91,7 +119,8 @@ window.__ModuleLoader__.load({
         return available;
       }
       async function open(selected = null) {
-        publish({ ready: false, busy: true, error: '', reply: '', clarification: null });
+        publish({ ready: false, busy: true, error: '', reply: '',
+          clarification: null, undoStatus: null, undoResult: null, undoError: '' });
         try {
           const sessions = await boundSessions();
           publish({ sessions });
@@ -115,13 +144,15 @@ window.__ModuleLoader__.load({
             });
           const details = await readDetails(sessionRef,
             session.context.sessionRevision, session.turns);
+          const undoStatus = await readUndoStatus(sessionRef, binding.worldRef,
+            session.turns);
           publish({ ready: true, sessionRef, worldRef: binding.worldRef,
             revision: session.context.sessionRevision, turns: session.turns,
-            sessions, selectedSessionRef: sessionRef, details,
+            sessions, selectedSessionRef: sessionRef, details, undoStatus,
             error: '' });
         } catch (error) {
           publish({ ready: false, sessionRef: null, worldRef: null,
-            revision: null, turns: [], details: [],
+            revision: null, turns: [], details: [], undoStatus: null,
             error: String(error?.message ?? error) });
         } finally { publish({ busy: false }); }
       }
@@ -130,6 +161,7 @@ window.__ModuleLoader__.load({
         publish(sessionRef === state.sessionRef ? { selectedSessionRef: sessionRef } :
           { selectedSessionRef: sessionRef, ready: false, sessionRef: null,
             worldRef: null, revision: null, turns: [], details: [], reply: '',
+            undoStatus: null, undoResult: null, undoError: '',
             clarification: null, error: '请连接所选 Session。' });
       }
       async function submit(text) {
@@ -139,7 +171,7 @@ window.__ModuleLoader__.load({
           return false;
         }
         const { sessionRef, revision } = state;
-        publish({ busy: true, error: '' });
+        publish({ busy: true, error: '', undoStatus: null, undoResult: null, undoError: '' });
         let committed = false;
         try {
           const body = state.clarification
@@ -160,9 +192,11 @@ window.__ModuleLoader__.load({
           });
           const details = await readDetails(sessionRef,
             session.context.sessionRevision, session.turns);
+          const undoStatus = await readUndoStatus(sessionRef, state.worldRef,
+            session.turns);
           if (session.context.currentSession !== sessionRef)
             throw Error('当前 Session 已切换，请刷新工作坊。');
-          publish({ turns: session.turns, details,
+          publish({ turns: session.turns, details, undoStatus,
             revision: session.context.sessionRevision });
           return true;
         } catch (error) {
@@ -174,7 +208,57 @@ window.__ModuleLoader__.load({
           return committed;
         } finally { publish({ busy: false }); }
       }
-      return { snapshot, subscribe, open, chooseSession, submit };
+      async function undoCurrentBuild() {
+        const before = state.undoStatus;
+        if (!state.ready || state.busy || before?.availability !== 'AVAILABLE')
+          return false;
+        const { sessionRef, worldRef } = state;
+        publish({ busy: true, error: '', undoError: '', undoResult: null });
+        let verified = false;
+        try {
+          const binding = await context(sessionRef);
+          if (binding.worldRef !== worldRef)
+            throw Error('当前世界已切换，请刷新工作坊。');
+          const result = await workshop(sessionRef, 'UndoCurrentBuild', {
+            requestId: id(), expectedTurnRevision: before.turnRevision,
+            expectedHistoryRevision: before.head.historyRevision,
+          });
+          if (result.status !== 'VERIFIED' || result.sessionRef !== sessionRef ||
+              result.worldRef !== worldRef || result.turnRef !== before.turnRef ||
+              result.turnRevision !== before.turnRevision ||
+              result.beforeHead?.historyRevision !== before.head.historyRevision ||
+              result.beforeHead?.headTransactionId !== before.head.headTransactionId ||
+              result.afterHead?.historyRevision === before.head.historyRevision ||
+              result.afterHead?.headTransactionId === before.head.headTransactionId)
+            throw Error('撤回回执与当前建造不一致。');
+          verified = true;
+          const session = await workshop(sessionRef, 'StartOrResumeSession', {
+            requestId: id(), expectedRevision: null,
+          });
+          if (session.context.currentSession !== sessionRef ||
+              session.context.activeWorldRef !== worldRef)
+            throw Error('撤回后当前 Session 或世界已变化。');
+          const details = await readDetails(sessionRef,
+            session.context.sessionRevision, session.turns);
+          const undoStatus = await readUndoStatus(sessionRef, worldRef,
+            session.turns);
+          if (!undoStatus ||
+              undoStatus.head?.historyRevision !== result.afterHead.historyRevision ||
+              undoStatus.head?.headTransactionId !== result.afterHead.headTransactionId)
+            throw Error('撤回后的历史位置未能读回确认。');
+          publish({ turns: session.turns, details,
+            revision: session.context.sessionRevision, undoStatus, undoResult: result });
+          return true;
+        } catch (error) {
+          const lost = bindingLost(error);
+          publish({ undoStatus: null, undoError: `${verified ?
+            'Canvas 已返回已验证撤回，但工作坊未确认更新后的历史：' : '撤回未确认：'}${String(error?.message ?? error)}${lost ?
+              '。受信绑定已失效，请在管理页面重新绑定后刷新连接。' : ''}`,
+          ...(lost ? { ready: false, clarification: null } : {}) });
+          return false;
+        } finally { publish({ busy: false }); }
+      }
+      return { snapshot, subscribe, open, chooseSession, submit, undoCurrentBuild };
     }
 
     function WorkshopChoiceFrame({ frame, onSelect }) {
@@ -224,8 +308,18 @@ window.__ModuleLoader__.load({
           h('p', { 'aria-label': '完整工作坊回复' }, turn.resultText),
           turn.confirmedBrief ? h('details', null,
             h('summary', null, '已确认的 ReferenceBrief/v2'),
-            h('pre', null, JSON.stringify(turn.confirmedBrief, null, 2))) : null)) :
+            h('pre', null, JSON.stringify(turn.confirmedBrief, null, 2))) : null,
+          view.undoStatus?.availability === 'AVAILABLE' &&
+            view.undoStatus.turnRef === turn.turnRef ?
+            h('button', { type: 'button', disabled: view.busy || !view.ready,
+              onClick: () => { void flow.undoCurrentBuild(); } }, '撤回此建造') : null)) :
             view.turns.map(turn => h('li', { key: turn.turnRef }, turn.text)))),
+        view.undoStatus?.head ? h('p', { 'aria-label': '当前历史位置' },
+          `历史位置：${view.undoStatus.head.historyRevision}；${view.undoStatus.availability === 'AVAILABLE' ?
+            '可撤回当前建造。' : '当前建造不可撤回。'}`) : null,
+        view.undoResult ? h('p', { role: 'status', 'aria-label': '撤回结果' },
+          `撤回已验证；历史位置：${view.undoResult.afterHead.historyRevision}`) : null,
+        view.undoError ? h('p', { role: 'alert' }, view.undoError) : null,
         view.reply ? h('p', { 'aria-label': '本次工作坊回复' }, view.reply) : null,
         h('form', { onSubmit: event => {
           event.preventDefault();
