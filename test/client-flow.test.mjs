@@ -3,17 +3,64 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
-function clientModule() {
+function clientModule({ tauri = true, tauriInvoke = () => {}, transport } = {}) {
   let definition;
+  let id = 0;
   runInNewContext(readFileSync(new URL('../client.cjs', import.meta.url), 'utf8'), {
-    window: { __ModuleLoader__: { load(value) { definition = value; } } },
+    window: { hanaworldsWorkshopTransport: transport,
+      crypto: { randomUUID: () => `request-${++id}` },
+      __ModuleLoader__: { load(value) { definition = value; } } },
   });
   return definition.factory(name => {
-    if (name === 'react') return { createElement() {} };
-    if (name === 'dsh-tauri') return { invoke() {} };
+    if (name === 'react') return { createElement(type, props, ...children) {
+      return { type, props, children };
+    } };
+    if (name === 'dsh-tauri' && tauri) return { invoke: tauriInvoke };
     throw Error(`unexpected module ${name}`);
   });
 }
+
+test('Electron panel uses an injected host transport for its own service without dsh-tauri', async () => {
+  const calls = [];
+  const client = clientModule({ tauri: false, transport: {
+    async invoke(command, args) {
+      calls.push({ command, args });
+      if (args.operation === 'context') return args.input.sessionRef
+        ? { status: 'bound', sessionRef: 'session-a', worldRef: 'world-a' }
+        : { sessions: [{ sessionRef: 'session-a', label: 'Session A' }] };
+      return packet(args.input.payload.requestId, { context: {
+        currentSession: 'session-a', activeWorldRef: 'world-a', sessionRevision: 'r1',
+      }, turns: [] });
+    },
+  } });
+  let panel;
+  client.apply({ sessions: { list: { getSnapshot: () => ({ current: 'session-a' }) } },
+    slots: { inject(_name, register) { register(); }, register(meta, component) {
+      if (meta.name === 'main') panel = component;
+    } } });
+  const flow = panel().props.flow;
+  await flow.open();
+  assert.equal(flow.snapshot().ready, true);
+  assert.deepEqual(calls.map(call => call.command),
+    ['hanaworlds_request', 'hanaworlds_request', 'hanaworlds_request',
+      'hanaworlds_request']);
+  assert.equal(calls.at(-1).args.input.operation, 'StartOrResumeSession');
+});
+
+test('Tauri panel retains its host transport when no Electron transport is injected', async () => {
+  const calls = [];
+  const client = clientModule({ tauriInvoke: async (command, args) => {
+    calls.push({ command, args });
+    return { sessions: [] };
+  } });
+  let panel;
+  client.apply({ slots: { inject(_name, register) { register(); }, register(meta, component) {
+    if (meta.name === 'main') panel = component;
+  } } });
+  await panel().props.flow.open();
+  assert.equal(calls[0].command, 'hanaworlds_request');
+  assert.equal(calls[0].args.operation, 'context');
+});
 
 function packet(requestId, result, error = null) {
   return { contractVersion: 'session/v2', requestId, result, error };

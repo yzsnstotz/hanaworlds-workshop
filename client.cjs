@@ -455,7 +455,14 @@ window.__ModuleLoader__.load({
     }
 
     function apply(ctx) {
-      const flow = createWorkshopFlow({ invoke: desktopInvoke,
+      // Electron supplies the same host-owned request boundary through its
+      // preload/client service. The host remains responsible for every live
+      // Session and authorization check; this renderer receives no refs.
+      const transport = ctx.get?.('hanaworldsWorkshopTransport') ??
+        window.hanaworldsWorkshopTransport;
+      const invoke = typeof transport?.invoke === 'function'
+        ? (command, args) => transport.invoke(command, args) : desktopInvoke;
+      const flow = createWorkshopFlow({ invoke,
         currentSessionRef: () => {
           try { return ctx.sessions?.list?.getSnapshot?.()?.current ?? null; }
           catch { return null; }
