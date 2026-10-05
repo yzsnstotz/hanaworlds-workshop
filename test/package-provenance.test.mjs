@@ -18,16 +18,16 @@ test('Workshop package uses a pinned admitted Contracts runtime closure without 
   assert.equal(JSON.stringify(lock).includes('codeload.github.com'), false);
   const { verifyVendoredContracts } = await import('../scripts/verify-vendored-contracts.mjs');
   const proof = await verifyVendoredContracts();
-  assert.equal(proof.sourceRevision, '3d64364782181c8b5abc3150f8fa9f7ae20bf101');
+  assert.equal(proof.sourceRevision, 'c00a489a6118fda68b80c7c1eee9a2aa90b6ddc0');
   assert.equal(proof.admittedPackSha256,
-    '48f0b56a3b385bd3a17773fd968c0566068fe1a28ecb4aa08d9686d254cdbb0a');
+    '9157fac5942b3604c8b145922c526f7ae6bdafc681ac8ac75feb2489bdddb8a2');
   assert.ok(proof.runtimeModuleCount > 0);
   assert.equal(proof.fixtureCount, 1);
 });
 
 test('Workshop rejects altered vendored Contracts source and manifest', async t => {
   const { verifyVendoredContracts } = await import('../scripts/verify-vendored-contracts.mjs');
-  const base = join(homedir(), '.cache', 'hanaworlds-runs', 'S1-WS-UNDO-01');
+  const base = join(homedir(), '.cache', 'hanaworlds-runs', 'S1-WS-UNDO-RECOVERY-01');
   await mkdir(base, { recursive: true });
   const temp = await mkdtemp(join(base, 'contracts-pin-'));
   t.after(() => rm(temp, { recursive: true, force: true }));

@@ -4,7 +4,8 @@ import {
   admitRequest, validateRequest, validateBoundRequest, validateResponse,
   ContractError, contractHandshake, checkContractHandshake, digestValue, validateType,
   validateChoiceSelection, validateRegionInspection, checkSessionReadbackHandshake,
-  checkSessionUndoHandshake,
+  checkSessionUndoHandshake, checkUndoRecoveryHandshake,
+  validateUndoRecoveryResponse,
 } from '../vendor/contracts/dist/v4/index.mjs';
 
 const VERSION = 'session/v2';
@@ -249,6 +250,98 @@ export class WorkshopV1 {
 
   async call(operation, raw) {
     return this.#call(operation, raw, null);
+  }
+
+  /** Host service only. The original Undo is selected from this Session's durable projection. */
+  async recoverPendingUndo(raw) {
+    let body;
+    try {
+      body = raw instanceof Uint8Array || typeof raw === 'string' ?
+        admitRequest(VERSION, 'RecoverPendingUndo', Buffer.from(raw)) :
+        validateRequest(VERSION, 'RecoverPendingUndo', raw);
+      if (!this.authority?.verifyService)
+        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+      const service = await this.authority.verifyService(body, 'RecoverPendingUndo');
+      if (service?.current !== true ||
+          service.domainOwner !== 'hanaworlds-workshop' ||
+          service.serviceRecoveryRef !== body.serviceRecoveryRef ||
+          !['actorRef', 'sessionRef', 'worldRef', 'authorizationRef'].every(
+            key => service[key] === body[key]) ||
+          !service.allowedActions?.includes('RecoverPendingUndo'))
+        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+      validateBoundRequest(VERSION, 'RecoverPendingUndo', body);
+      checkUndoRecoveryHandshake(this.contractHandshake);
+      requireUndoPeer(this.canvas);
+      checkUndoRecoveryHandshake(this.canvas.contractHandshake ??
+        this.canvas.handshake?.() ?? this.canvas.status?.().contractHandshake);
+      if (!this.canvas?.call)
+        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+      const result = await this.#withLock(body.sessionRef, async () => {
+        const { state } = await this.#load(body.sessionRef);
+        const pending = state.pendingUndo;
+        if (!pending)
+          failure('TRANSACTION_CONFLICT', 'validate', 'POLICY_UNAVAILABLE');
+        const original = validateRequest('canvas/v4', 'Undo', pending.request);
+        if (state.context.currentSession !== body.sessionRef ||
+            state.context.activeWorldRef !== body.worldRef ||
+            original.actorRef !== body.actorRef ||
+            original.sessionRef !== body.sessionRef ||
+            original.authorizationRef !== body.authorizationRef ||
+            original.worldRef !== body.worldRef ||
+            pending.turnRef == null || pending.turnRevision == null ||
+            pending.expectedTurnRevision !== pending.turnRevision ||
+            pending.expectedHistoryRevision !== original.expectedHistoryRevision ||
+            pending.beforeHead?.historyRevision !== original.expectedHistoryRevision ||
+            pending.beforeHead?.headTransactionId !== original.historyTransactionId ||
+            !Array.isArray(pending.affectedObjectRefs) ||
+            !pending.affectedObjectRefs.includes(original.objectRef) ||
+            !['RESERVED', 'CANVAS_VERIFIED', 'VERIFIED'].includes(pending.status))
+          failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+        const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
+          sessionRef: body.sessionRef, requestId: body.requestId,
+          authorizationRef: body.authorizationRef, worldRef: body.worldRef,
+          serviceRecoveryRef: body.serviceRecoveryRef,
+          originalUndoRequestId: original.requestId };
+        const unknown = () => ({ sessionRef: body.sessionRef,
+          worldRef: body.worldRef, originalUndoRequestId: original.requestId,
+          status: 'UNKNOWN', receipt: null });
+        let result;
+        let canvasOperation = 'ReadPendingUndoResult';
+        try { result = await this.#canvasRead(canvasOperation, request); }
+        catch (error) {
+          if (!error?.publicError) return unknown();
+          if (pending.status !== 'RESERVED' ||
+              error?.publicError?.code !== 'TRANSACTION_CONFLICT') throw error;
+          return unknown();
+        }
+        if (result.status === 'RECOVERY_PENDING') {
+          canvasOperation = 'RecoverPendingUndo';
+          try { result = await this.#canvasRead(canvasOperation, request); }
+          catch (error) {
+            if (!error?.publicError) return unknown();
+            throw error;
+          }
+        }
+        validateUndoRecoveryResponse('canvas/v4', canvasOperation,
+          request, packet('canvas/v4', request.requestId, result));
+        if (pending.receipt?.status === 'VERIFIED' &&
+            result.status === 'ROLLED_BACK')
+          failure('READBACK_FAILED', 'readback', 'READBACK_ERROR');
+        if (result.originalUndoRequestId !== original.requestId ||
+            result.sessionRef !== body.sessionRef || result.worldRef !== body.worldRef ||
+            (result.status === 'VERIFIED' &&
+              (result.receipt?.transactionId !== original.transactionId ||
+               (pending.receipt &&
+                recordedDigest(result.receipt) !== recordedDigest(pending.receipt)))))
+          failure('READBACK_FAILED', 'readback', 'READBACK_ERROR');
+        return result;
+      });
+      return validateUndoRecoveryResponse(VERSION, 'RecoverPendingUndo', body,
+        packet(VERSION, body.requestId, result));
+    } catch (error) {
+      const denied = packet(VERSION, body?.requestId ?? null, null, toPublic(error));
+      return body?.requestId ? validateResponse(VERSION, 'RecoverPendingUndo', denied) : denied;
+    }
   }
 
   async #call(operation, raw, relayPrincipal) {

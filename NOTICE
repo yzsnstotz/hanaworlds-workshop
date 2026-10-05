@@ -1,14 +1,18 @@
 HanaWorlds Workshop 0.1.0 component candidate.
 
 HanaWorlds-owned source is MIT; see LICENSE. Workshop includes a byte-identical
-runtime and one test-fixture subset of hanaworlds-contracts@0.3.2 from public
-revision 3d64364782181c8b5abc3150f8fa9f7ae20bf101 (npm pack SHA256
-48f0b56a3b385bd3a17773fd968c0566068fe1a28ecb4aa08d9686d254cdbb0a).
+runtime and one test-fixture subset of hanaworlds-contracts@0.3.4 from public
+revision c00a489a6118fda68b80c7c1eee9a2aa90b6ddc0 (npm pack SHA256
+9157fac5942b3604c8b145922c526f7ae6bdafc681ac8ac75feb2489bdddb8a2).
 That source is MIT; its LICENSE, NOTICE, per-file hashes, import closure and
 canonicalize Apache-2.0 license text are retained under vendor/contracts/.
 The package installs canonicalize@5.1.0 separately from the public registry;
 its Apache-2.0 license remains with that dependency. Workshop does not embed
 the upstream canonicalize implementation.
+The test-only `@deepseek-ai/dsh-session-persistence-jsonl@0.2.0-rc.2` package
+is MIT, sourced from the public npm registry / DeepSeek Harness repository,
+and runs the isolated real Core Session JSONL recovery test; it is not bundled
+into the Workshop runtime package.
 The Core `@deepseek-ai/dsh-session@0.2.0-rc.2` runtime dependency and its
 public `@deepseek-ai/cordis@4.0.4`, `@deepseek-ai/dsh-scope@0.2.0-rc.2`,
 `@deepseek-ai/dsh-invariants@0.2.0-rc.2`, and

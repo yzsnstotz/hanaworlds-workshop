@@ -42,9 +42,14 @@ function fixture() {
   let allowed = true;
   let world = 'world-a';
   let undoDenial = null;
+  let undoTransportFailure = false;
   let moveHead = true;
   let linkUndo = true;
   let afterReadFailures = 0;
+  let serviceStatus = 'RECOVERY_PENDING';
+  let serviceReceipt = null;
+  let serviceAllowed = true;
+  let serviceFailure = null;
   let history = { worldRef: 'world-a', objectRef: 'object-a',
     historyRevision: 'history-1', headTransactionId: 'apply-tx',
     entries: [entry], undoAvailable: true, redoAvailable: false };
@@ -53,6 +58,12 @@ function fixture() {
     calls.push({ operation, body: structuredClone(body) });
     const envelope = result => ({ contractVersion: 'canvas/v4',
       requestId: body.requestId, result, error: null });
+    if (operation === 'ReadPendingUndoResult' || operation === 'RecoverPendingUndo') {
+      if (serviceFailure) throw serviceFailure;
+      return envelope({ sessionRef: body.sessionRef, worldRef: body.worldRef,
+        originalUndoRequestId: body.originalUndoRequestId,
+        status: serviceStatus, receipt: serviceReceipt });
+    }
     if (operation === 'ListObjects') return envelope({ worldRef: 'world-a',
       registryRevision: 'registry-1', objects: [{ worldRef: 'world-a', objectRef: 'object-a',
         objectRevision: 'object-1', displayName: '石块', nameRevision: 'name-1',
@@ -66,6 +77,7 @@ function fixture() {
     }
     if (operation === 'InspectObject') return envelope(targetFacts);
     if (operation === 'Undo') {
+      if (undoTransportFailure) throw Error('Undo transport interrupted');
       if (undoDenial) return { contractVersion: 'canvas/v4',
         requestId: body.requestId, result: null, error: undoDenial };
       const receipt = { ...applyReceipt, transactionId: body.transactionId,
@@ -91,21 +103,140 @@ function fixture() {
       assert.equal(expected, current.context.sessionRevision);
       current = structuredClone(next);
     } };
-  const authority = { async verify(body) { return { current: allowed,
+  const authority = { async verifyService(body) { return { current: serviceAllowed,
+    domainOwner: 'hanaworlds-workshop', serviceRecoveryRef: body.serviceRecoveryRef,
+    actorRef: body.actorRef, sessionRef: body.sessionRef, worldRef: body.worldRef,
+    authorizationRef: body.authorizationRef,
+    allowedActions: ['RecoverPendingUndo'] }; },
+    async verify(body) { return { current: allowed,
     actorRef: body.actorRef, sessionRef: body.sessionRef,
     authorizationRef: body.authorizationRef, worldRef: world,
     allowedActions: ['HISTORY', 'UNDO'] }; } };
   const create = () => new WorkshopV1({ sessionPersistence: persistence,
     projectionStore, canvas, authority, capabilities: {} });
   return { create, calls, revoke: () => { allowed = false; },
+    revokeService: () => { serviceAllowed = false; },
+    serviceResult: (status, receipt = null) => { serviceStatus = status; serviceReceipt = receipt; },
+    failService: error => { serviceFailure = error; },
     switchWorld: () => { world = 'world-b'; },
     setPeer: handshake => { canvas.contractHandshake = handshake; },
     denyUndo: error => { undoDenial = error; },
+    interruptUndo: () => { undoTransportFailure = true; },
     keepHead: () => { moveHead = false; },
     omitUndoEntry: () => { linkUndo = false; },
     failNextAfterRead: () => { afterReadFailures = 1; },
     setHistory: value => { history = value; }, state: () => current };
 }
+
+const recovery = (extra = {}) => ({ contractVersion: 'session/v2',
+  actorRef: 'actor-a', sessionRef: 'session-a', requestId: 'recovery-1',
+  authorizationRef: 'grant-a', worldRef: 'world-a',
+  serviceRecoveryRef: 'trusted-service-1', ...extra });
+
+test('service recovery rejects absent and forged pending Undo without Canvas calls', async () => {
+  const f = fixture();
+  const absent = await f.create().recoverPendingUndo(recovery());
+  assert.equal(absent.error.code, 'TRANSACTION_CONFLICT');
+  assert.equal(f.calls.length, 0);
+  f.failNextAfterRead();
+  await f.create().call('UndoCurrentBuild', request('uncertain-read', {
+    expectedTurnRevision: 'turn-1', expectedHistoryRevision: 'history-1' }));
+  const before = f.calls.length;
+  for (const changed of [{ sessionRef: 'other-session' }, { worldRef: 'other-world' },
+    { authorizationRef: 'other-grant' }, { actorRef: 'other-actor' },
+    { originalUndoRequestId: 'forged' }, { transactionId: 'forged' }]) {
+    const denied = await f.create().recoverPendingUndo(recovery(changed));
+    assert.ok(denied.error);
+  }
+  assert.equal(f.calls.length, before);
+});
+
+test('revoked player can recover only the original durable Undo through authenticated service', async () => {
+  const f = fixture(); f.failNextAfterRead();
+  await f.create().call('UndoCurrentBuild', request('uncertain-read', {
+    expectedTurnRevision: 'turn-1', expectedHistoryRevision: 'history-1' }));
+  assert.equal(f.state().pendingUndo.status, 'CANVAS_VERIFIED');
+  const receipt = f.state().pendingUndo.receipt;
+  f.serviceResult('VERIFIED', receipt);
+  f.revoke();
+  const result = await f.create().recoverPendingUndo(recovery());
+  assert.equal(result.error, null);
+  assert.equal(result.result.status, 'VERIFIED');
+  assert.equal(result.result.originalUndoRequestId, 'request-uncertain-read');
+  assert.equal(result.result.receipt.transactionId, receipt.transactionId);
+  assert.equal(f.calls.at(-1).operation, 'ReadPendingUndoResult');
+  assert.equal(f.calls.at(-1).body.originalUndoRequestId, 'request-uncertain-read');
+  assert.equal('transactionId' in f.calls.at(-1).body, false);
+  assert.equal((await f.create().call('UndoCurrentBuild', request('new', {
+    expectedTurnRevision: 'turn-1', expectedHistoryRevision: 'history-1' }))).error.code,
+  'AUTHORIZATION_REVOKED');
+  f.revokeService();
+  assert.equal((await f.create().recoverPendingUndo(recovery())).error.code,
+    'PERMISSION_DENIED');
+});
+
+test('pending and unknown service outcomes never turn an unverified receipt into success', async () => {
+  const f = fixture(); f.failNextAfterRead();
+  await f.create().call('UndoCurrentBuild', request('uncertain-read', {
+    expectedTurnRevision: 'turn-1', expectedHistoryRevision: 'history-1' }));
+  f.revoke();
+  const pending = await f.create().recoverPendingUndo(recovery());
+  assert.equal(pending.result.status, 'RECOVERY_PENDING');
+  assert.equal(f.calls.at(-1).operation, 'RecoverPendingUndo');
+  f.serviceResult('UNKNOWN');
+  const unknown = await f.create().recoverPendingUndo(recovery());
+  assert.equal(unknown.result.status, 'UNKNOWN');
+  f.serviceResult('VERIFIED', { ...f.state().pendingUndo.receipt,
+    transactionId: 'foreign-tx' });
+  const forged = await f.create().recoverPendingUndo(recovery());
+  assert.ok(forged.error);
+  assert.equal(forged.result, null);
+});
+
+test('rolled back and unavailable Canvas recovery stay minimal after player revocation', async () => {
+  const f = fixture(); f.interruptUndo();
+  await f.create().call('UndoCurrentBuild', request('uncertain-read', {
+    expectedTurnRevision: 'turn-1', expectedHistoryRevision: 'history-1' }));
+  assert.equal(f.state().pendingUndo.status, 'RESERVED');
+  f.revoke();
+  f.serviceResult('ROLLED_BACK');
+  const rolled = await f.create().recoverPendingUndo(recovery());
+  assert.deepEqual(JSON.parse(JSON.stringify(rolled.result)),
+    { sessionRef: 'session-a', worldRef: 'world-a',
+    originalUndoRequestId: 'request-uncertain-read', status: 'ROLLED_BACK',
+    receipt: null });
+  f.failService(Error('Canvas transport lost'));
+  const unknown = await f.create().recoverPendingUndo(recovery());
+  assert.equal(unknown.result.status, 'UNKNOWN');
+  assert.equal(unknown.result.receipt, null);
+});
+
+test('a reserved Undo recovers the same Canvas transaction without resending ordinary Undo', async () => {
+  const f = fixture(); f.interruptUndo();
+  await f.create().call('UndoCurrentBuild', request('crashed-send', {
+    expectedTurnRevision: 'turn-1', expectedHistoryRevision: 'history-1' }));
+  const pending = f.state().pendingUndo;
+  assert.equal(pending.status, 'RESERVED');
+  f.revoke();
+  f.serviceResult('VERIFIED', { ...applyReceipt,
+    transactionId: pending.request.transactionId });
+  const recovered = await f.create().recoverPendingUndo(recovery());
+  assert.equal(recovered.error, null);
+  assert.equal(recovered.result.status, 'VERIFIED');
+  assert.deepEqual(f.calls.filter(row => row.operation === 'Undo').map(row =>
+    row.body.requestId), ['request-crashed-send']);
+  assert.equal(f.calls.at(-1).body.originalUndoRequestId, 'request-crashed-send');
+});
+
+test('Canvas rollback cannot contradict a locally recorded VERIFIED Undo receipt', async () => {
+  const f = fixture(); f.failNextAfterRead();
+  await f.create().call('UndoCurrentBuild', request('uncertain-read', {
+    expectedTurnRevision: 'turn-1', expectedHistoryRevision: 'history-1' }));
+  f.revoke(); f.serviceResult('ROLLED_BACK');
+  const contradicted = await f.create().recoverPendingUndo(recovery());
+  assert.equal(contradicted.result, null);
+  assert.equal(contradicted.error.code, 'READBACK_FAILED');
+});
 
 test('status matches this Session verified Apply to the current author head and Undo reads it back', async () => {
   const f = fixture();

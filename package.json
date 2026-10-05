@@ -21,6 +21,7 @@
     "canonicalize": "5.1.0"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.0-rc.2",
     "@deepseek-ai/dsh-storage-json": "0.2.0-rc.2"
   }
 }
