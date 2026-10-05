@@ -15,7 +15,8 @@ window.__ModuleLoader__.load({
       let state = { ready: false, busy: false, error: '', turns: [], reply: '',
         sessionRef: null, worldRef: null, revision: null, clarification: null,
         sessions: [], selectedSessionRef: null, details: [],
-        undoStatus: null, undoResult: null, undoError: '' };
+        undoStatus: null, undoResult: null, undoError: '',
+        buildOutcome: null, buildError: '' };
       const snapshot = () => ({ ...state, turns: [...state.turns],
         sessions: [...state.sessions], details: [...state.details] });
       const publish = patch => {
@@ -35,7 +36,8 @@ window.__ModuleLoader__.load({
       const workshop = async (sessionRef, operation, payload) => {
         const response = await invoke('hanaworlds_request', {
           operation: 'workshop', input: { sessionRef, operation,
-            payload: { contractVersion: 'session/v2', ...payload } },
+            payload: { contractVersion: operation === 'InvokeAction' ?
+              'interaction-surface/v3' : 'session/v2', ...payload } },
         });
         if (!response || response.error || !response.result) {
           const code = response?.error?.code ?? 'INVALID_RESPONSE';
@@ -44,9 +46,12 @@ window.__ModuleLoader__.load({
             SAVED_RESOURCE_UNAVAILABLE: '缺少已验证建造的持久回执',
             UNDO_CONFLICT: '建造历史已变化或发生外部编辑冲突',
             STALE_REVISION: '历史版本已变化',
-            READBACK_FAILED: '撤回后历史读回未确认',
-            RECOVERY_PENDING: '撤回交易仍在恢复中',
-            CAPABILITY_UNAVAILABLE: '撤回能力暂不可用' };
+            READBACK_FAILED: '世界与历史读回未确认',
+            INTENT_UNCONFIRMED: '请先确认当前轮建造意图',
+            TURN_REVISION_MISMATCH: '当前轮次已变化',
+            IMAGE_REQUIRED: '当前建造还需要图片',
+            RECOVERY_PENDING: '交易仍在恢复中',
+            CAPABILITY_UNAVAILABLE: '所需能力暂不可用' };
           throw Error(`工作坊拒绝：${reasons[code] ?? '请求未完成'}（${code}）。`);
         }
         return response.result;
@@ -120,7 +125,8 @@ window.__ModuleLoader__.load({
       }
       async function open(selected = null) {
         publish({ ready: false, busy: true, error: '', reply: '',
-          clarification: null, undoStatus: null, undoResult: null, undoError: '' });
+          clarification: null, undoStatus: null, undoResult: null, undoError: '',
+          buildOutcome: null, buildError: '' });
         try {
           const sessions = await boundSessions();
           publish({ sessions });
@@ -162,6 +168,7 @@ window.__ModuleLoader__.load({
           { selectedSessionRef: sessionRef, ready: false, sessionRef: null,
             worldRef: null, revision: null, turns: [], details: [], reply: '',
             undoStatus: null, undoResult: null, undoError: '',
+            buildOutcome: null, buildError: '',
             clarification: null, error: '请连接所选 Session。' });
       }
       async function submit(text) {
@@ -171,7 +178,8 @@ window.__ModuleLoader__.load({
           return false;
         }
         const { sessionRef, revision } = state;
-        publish({ busy: true, error: '', undoStatus: null, undoResult: null, undoError: '' });
+        publish({ busy: true, error: '', undoStatus: null, undoResult: null,
+          undoError: '', buildOutcome: null, buildError: '' });
         let committed = false;
         try {
           const body = state.clarification
@@ -213,7 +221,8 @@ window.__ModuleLoader__.load({
         if (!state.ready || state.busy || before?.availability !== 'AVAILABLE')
           return false;
         const { sessionRef, worldRef } = state;
-        publish({ busy: true, error: '', undoError: '', undoResult: null });
+        publish({ busy: true, error: '', undoError: '', undoResult: null,
+          buildOutcome: null, buildError: '' });
         let verified = false;
         try {
           const binding = await context(sessionRef);
@@ -258,7 +267,98 @@ window.__ModuleLoader__.load({
           return false;
         } finally { publish({ busy: false }); }
       }
-      return { snapshot, subscribe, open, chooseSession, submit, undoCurrentBuild };
+      async function advanceCurrentBuild() {
+        if (!state.ready || state.busy) return false;
+        const turn = state.turns.at(-1);
+        const detail = state.details.at(-1);
+        if (!turn || !detail?.confirmedBrief ||
+            detail.turnRef !== turn.turnRef ||
+            detail.turnRevision !== turn.turnRevision) return false;
+        const { sessionRef, worldRef } = state;
+        publish({ busy: true, buildError: '', buildOutcome: null });
+        try {
+          const binding = await context(sessionRef);
+          if (binding.worldRef !== worldRef)
+            throw Error('当前世界已切换，请刷新工作坊。');
+          const result = await workshop(sessionRef, 'AdvanceCurrentBuild', {
+            requestId: id(), expectedTurnRevision: turn.turnRevision });
+          if (result.sessionRef !== sessionRef || result.worldRef !== worldRef ||
+              result.turnRevision !== turn.turnRevision ||
+              !['CHOICE_REQUIRED', 'PENDING', 'VERIFIED'].includes(result.outcome) ||
+              (result.outcome === 'CHOICE_REQUIRED' &&
+                (result.stage !== 'PLACEMENT' ||
+                 result.frame?.sessionRef !== sessionRef ||
+                 result.frame?.turnRevision !== turn.turnRevision)) ||
+              (result.outcome === 'VERIFIED' &&
+                (result.stage !== 'COMPLETE' || result.receipt?.status !== 'VERIFIED')))
+            throw Error('建造结果与当前轮次不一致。');
+          if (result.outcome === 'VERIFIED') {
+            const session = await workshop(sessionRef, 'StartOrResumeSession', {
+              requestId: id(), expectedRevision: null });
+            if (session.context.currentSession !== sessionRef ||
+                session.context.activeWorldRef !== worldRef ||
+                session.turns.at(-1)?.turnRevision !== turn.turnRevision ||
+                typeof session.turns.at(-1)?.actionReceiptDigest !== 'string')
+              throw Error('已验证建造未能从当前 Session 读回。');
+            const details = await readDetails(sessionRef,
+              session.context.sessionRevision, session.turns);
+            publish({ turns: session.turns, details,
+              revision: session.context.sessionRevision });
+          }
+          publish({ buildOutcome: result });
+          return true;
+        } catch (error) {
+          const lost = bindingLost(error);
+          publish({ buildOutcome: null,
+            buildError: `建造未确认：${String(error?.message ?? error)}${lost ?
+              '。受信绑定已失效，请在管理页面重新绑定后刷新连接。' : ''}`,
+            ...(lost ? { ready: false, clarification: null } : {}) });
+          return false;
+        } finally { publish({ busy: false }); }
+      }
+      async function chooseBuildPlacement(actionId, value) {
+        const current = state.buildOutcome;
+        const frame = current?.frame;
+        const turn = state.turns.at(-1);
+        const action = frame?.actions?.find(item => item.actionId === actionId &&
+          item.inputKinds?.includes('SELECT_CHOICE') &&
+          item.choices?.some(choice => choice.value === value));
+        if (!state.ready || state.busy || current?.outcome !== 'CHOICE_REQUIRED' ||
+            !action || turn?.turnRevision !== frame.turnRevision ||
+            typeof turn.intentDigest !== 'string') return false;
+        const { sessionRef, worldRef } = state;
+        publish({ busy: true, buildError: '' });
+        let accepted = false;
+        try {
+          const binding = await context(sessionRef);
+          if (binding.worldRef !== worldRef)
+            throw Error('当前世界已切换，请刷新工作坊。');
+          const invocationId = id();
+          const surfaceAction = { contractVersion: 'interaction-surface/v2',
+            sessionRef, turnRevision: frame.turnRevision,
+            frameRef: frame.frameRef, frameRevision: frame.frameRevision,
+            actionId, orderedTargetRefs: [], intentDigest: turn.intentDigest,
+            operationDigest: null, analysisDigest: null, decisionRevision: null };
+          const result = await workshop(sessionRef, 'InvokeAction', {
+            requestId: id(), invocationId, turnRevision: frame.turnRevision,
+            frameRevision: frame.frameRevision, frameRef: frame.frameRef,
+            actionId, surfaceAction, surfaceActionDigest: action.surfaceActionDigest,
+            input: { kind: 'SELECT_CHOICE', value } });
+          if (result.accepted !== true || result.invocationId !== invocationId ||
+              result.ownerRef !== 'hanaworlds-workshop')
+            throw Error('选点结果未被当前工作坊确认。');
+          accepted = true;
+          publish({ buildOutcome: null });
+        } catch (error) {
+          const lost = bindingLost(error);
+          publish({ buildError: `选择未确认：${String(error?.message ?? error)}${lost ?
+            '。受信绑定已失效，请在管理页面重新绑定后刷新连接。' : ''}`,
+            ...(lost ? { ready: false, clarification: null } : {}) });
+        } finally { publish({ busy: false }); }
+        return accepted ? advanceCurrentBuild() : false;
+      }
+      return { snapshot, subscribe, open, chooseSession, submit,
+        undoCurrentBuild, advanceCurrentBuild, chooseBuildPlacement };
     }
 
     function WorkshopChoiceFrame({ frame, onSelect }) {
@@ -309,6 +409,10 @@ window.__ModuleLoader__.load({
           turn.confirmedBrief ? h('details', null,
             h('summary', null, '已确认的 ReferenceBrief/v2'),
             h('pre', null, JSON.stringify(turn.confirmedBrief, null, 2))) : null,
+          turn.confirmedBrief && view.turns.at(-1)?.turnRef === turn.turnRef &&
+            !view.turns.at(-1)?.actionReceiptDigest ?
+            h('button', { type: 'button', disabled: view.busy || !view.ready,
+              onClick: () => { void flow.advanceCurrentBuild(); } }, '建造当前轮') : null,
           view.undoStatus?.availability === 'AVAILABLE' &&
             view.undoStatus.turnRef === turn.turnRef ?
             h('button', { type: 'button', disabled: view.busy || !view.ready,
@@ -320,6 +424,18 @@ window.__ModuleLoader__.load({
         view.undoResult ? h('p', { role: 'status', 'aria-label': '撤回结果' },
           `撤回已验证；历史位置：${view.undoResult.afterHead.historyRevision}`) : null,
         view.undoError ? h('p', { role: 'alert' }, view.undoError) : null,
+        view.buildOutcome?.outcome === 'CHOICE_REQUIRED' ?
+          h(WorkshopChoiceFrame, { frame: view.buildOutcome.frame,
+            onSelect: view.ready && !view.busy ? ({ actionId, input }) => {
+              void flow.chooseBuildPlacement(actionId, input.value);
+            } : null }) : null,
+        view.buildOutcome?.outcome === 'PENDING' ?
+          h('p', { role: 'status', 'aria-label': '建造待决' },
+            `建造仍待确认：${view.buildOutcome.stage}`) : null,
+        view.buildOutcome?.outcome === 'VERIFIED' ?
+          h('p', { role: 'status', 'aria-label': '建造结果' },
+            '建造已验证，并已读回当前 Session。') : null,
+        view.buildError ? h('p', { role: 'alert' }, view.buildError) : null,
         view.reply ? h('p', { 'aria-label': '本次工作坊回复' }, view.reply) : null,
         h('form', { onSubmit: event => {
           event.preventDefault();

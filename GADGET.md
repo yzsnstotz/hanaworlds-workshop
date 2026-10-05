@@ -13,6 +13,12 @@ The public service exports `contractHandshake`,
 `call(operation, request)` for the `session/v2` and `interaction-surface/v3`
 operations, and the component orchestration methods:
 
+- `AdvanceCurrentBuild` on `session/v2` is the public current-turn build action.
+  It resolves the turn and phase from the Workshop projection, calls only
+  published peer ports, and returns a typed choice, pending state, or a Canvas
+  VERIFIED receipt linked to a fresh public history readback. Its 0.3.5
+  capability check rejects older contract peers.
+
 - `beginFirstBuilding`, `getPlacementState`, `createBuildPlan`,
   `compileCurrentBuild`, `analyzeCurrentBuild`, `applyCurrentBuild`;
 - `listObjects`, `selectObjects`.
@@ -36,6 +42,10 @@ reads `ReadCurrentUndoStatus` and shows a withdraw button only when the
 current author history has that Apply transaction at its head. The Shell host
 supplies the current actor, Session, world and authorization; the client sends
 only the two displayed CAS revisions to `UndoCurrentBuild`.
+The current-turn build button sends only the displayed turn revision. A
+placement choice is submitted through `InvokeAction` using the published
+frame, action digest, and the current turn's public intent digest. The panel
+shows a pending state until the service returns a verified readback.
 
 The service resolves peer ports through the host at call time. Required host
 ports are `sessionPersistence` (read-only Core Session access),

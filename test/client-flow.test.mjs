@@ -228,3 +228,126 @@ test('client exposes Undo only for a current verified build and confirms the cha
   for (const key of ['actorRef', 'sessionRef', 'worldRef', 'authorizationRef', 'objectRef', 'transactionId'])
     assert.equal(Object.hasOwn(calls[0].input.payload, key), false);
 });
+
+test('client starts only the displayed confirmed current turn and shows the exact placement choice', async () => {
+  const client = clientModule();
+  const requests = [];
+  let sequence = 0;
+  const frame = { sessionRef: 'session-a', turnRevision: 'turn-1',
+    frameRef: 'frame-1', frameRevision: 'frame-rev-1', content: '请选择在线玩家',
+    actions: [{ actionId: 'choice-1', inputKinds: ['SELECT_CHOICE'],
+      surfaceActionDigest: 'a'.repeat(64), capabilityRef: 'hanaworlds-workshop',
+      choices: [{ value: 'alice', label: 'alice' }] }] };
+  const flow = client.createWorkshopFlow({
+    currentSessionRef: () => 'session-a', newId: () => `id-${++sequence}`,
+    invoke: async (_command, args) => {
+      requests.push(args);
+      if (args.operation === 'context') return args.input.sessionRef
+        ? { status: 'bound', sessionRef: 'session-a', worldRef: 'world-a' }
+        : { sessions: [{ sessionRef: 'session-a', label: 'Session 1' }] };
+      const op = args.input.operation;
+      if (op === 'StartOrResumeSession') return packet(args.input.payload.requestId,
+        { context: { currentSession: 'session-a', activeWorldRef: 'world-a',
+          sessionRevision: 'session-1' }, turns: [{ turnRef: 'turn-a',
+          turnRevision: 'turn-1', text: '建一座石屋', actionReceiptDigest: null }] });
+      if (op === 'ReadSessionTurnDetails') return packet(args.input.payload.requestId,
+        { sessionRef: 'session-a', sessionRevision: 'session-1', turns: [{
+          turnRef: 'turn-a', turnRevision: 'turn-1', userText: '建一座石屋',
+          resultText: '已确认建造意图', confirmedBrief: { text: '石屋' } }] });
+      if (op === 'AdvanceCurrentBuild') return packet(args.input.payload.requestId,
+        { sessionRef: 'session-a', worldRef: 'world-a', turnRevision: 'turn-1',
+          stage: 'PLACEMENT', outcome: 'CHOICE_REQUIRED', frame });
+      throw Error(`unexpected ${op}`);
+    },
+  });
+  await flow.open();
+  assert.equal(await flow.advanceCurrentBuild(), true);
+  assert.equal(flow.snapshot().buildOutcome.outcome, 'CHOICE_REQUIRED');
+  assert.equal(flow.snapshot().buildOutcome.frame.content, '请选择在线玩家');
+  const call = requests.find(row => row.input?.operation === 'AdvanceCurrentBuild');
+  assert.deepEqual(Object.keys(call.input.payload).sort(),
+    ['contractVersion', 'expectedTurnRevision', 'requestId']);
+  assert.equal(call.input.payload.expectedTurnRevision, 'turn-1');
+});
+
+test('client submits only a published choice through InvokeAction and resumes the build', async () => {
+  const client = clientModule();
+  const requests = [];
+  let sequence = 0, advances = 0;
+  const frame = { sessionRef: 'session-a', turnRevision: 'turn-1',
+    frameRef: 'frame-1', frameRevision: 'frame-rev-1', content: '请选择在线玩家',
+    actions: [{ actionId: 'choice-1', inputKinds: ['SELECT_CHOICE'],
+      surfaceActionDigest: 'a'.repeat(64), capabilityRef: 'hanaworlds-workshop',
+      choices: [{ value: 'alice', label: 'alice' }] }] };
+  const flow = client.createWorkshopFlow({
+    currentSessionRef: () => 'session-a', newId: () => `id-${++sequence}`,
+    invoke: async (_command, args) => {
+      requests.push(args);
+      if (args.operation === 'context') return args.input.sessionRef
+        ? { status: 'bound', sessionRef: 'session-a', worldRef: 'world-a' }
+        : { sessions: [{ sessionRef: 'session-a', label: 'Session 1' }] };
+      const { operation, payload } = args.input;
+      if (operation === 'StartOrResumeSession') return packet(payload.requestId,
+        { context: { currentSession: 'session-a', activeWorldRef: 'world-a',
+          sessionRevision: 'session-1' }, turns: [{ turnRef: 'turn-a',
+          turnRevision: 'turn-1', text: '建一座石屋', intentDigest: 'f'.repeat(64),
+          actionReceiptDigest: null }] });
+      if (operation === 'ReadSessionTurnDetails') return packet(payload.requestId,
+        { sessionRef: 'session-a', sessionRevision: 'session-1', turns: [{
+          turnRef: 'turn-a', turnRevision: 'turn-1', userText: '建一座石屋',
+          resultText: '已确认建造意图', confirmedBrief: { text: '石屋' } }] });
+      if (operation === 'AdvanceCurrentBuild') return packet(payload.requestId,
+        advances++ === 0 ? { sessionRef: 'session-a', worldRef: 'world-a',
+          turnRevision: 'turn-1', stage: 'PLACEMENT', outcome: 'CHOICE_REQUIRED', frame } :
+          { sessionRef: 'session-a', worldRef: 'world-a', turnRevision: 'turn-1',
+            stage: 'PLAN', outcome: 'PENDING' });
+      if (operation === 'InvokeAction') return {
+        contractVersion: 'interaction-surface/v3', requestId: payload.requestId,
+        result: { invocationId: payload.invocationId, resultRevision: 'result-1',
+          ownerRef: 'hanaworlds-workshop', domainReceiptDigest: null, accepted: true },
+        error: null };
+      throw Error(`unexpected ${operation}`);
+    },
+  });
+  await flow.open();
+  await flow.advanceCurrentBuild();
+  assert.equal(await flow.chooseBuildPlacement('choice-1', 'alice'), true);
+  const selected = requests.find(row => row.input?.operation === 'InvokeAction');
+  assert.equal(selected.input.payload.contractVersion, 'interaction-surface/v3');
+  assert.equal(selected.input.payload.surfaceAction.intentDigest, 'f'.repeat(64));
+  assert.deepEqual(JSON.parse(JSON.stringify(selected.input.payload.input)),
+    { kind: 'SELECT_CHOICE', value: 'alice' });
+  for (const key of ['actorRef', 'sessionRef', 'worldRef', 'authorizationRef', 'transactionId'])
+    assert.equal(Object.hasOwn(selected.input.payload, key), false);
+  assert.equal(flow.snapshot().buildOutcome.outcome, 'PENDING');
+});
+
+test('client never shows a Canvas VERIFIED result when the current Session receipt is not durably read back', async () => {
+  const client = clientModule();
+  let sequence = 0;
+  const flow = client.createWorkshopFlow({
+    currentSessionRef: () => 'session-a', newId: () => `id-${++sequence}`,
+    invoke: async (_command, args) => {
+      if (args.operation === 'context') return args.input.sessionRef
+        ? { status: 'bound', sessionRef: 'session-a', worldRef: 'world-a' }
+        : { sessions: [{ sessionRef: 'session-a', label: 'Session 1' }] };
+      const { operation, payload } = args.input;
+      if (operation === 'StartOrResumeSession') return packet(payload.requestId,
+        { context: { currentSession: 'session-a', activeWorldRef: 'world-a',
+          sessionRevision: 'session-1' }, turns: [{ turnRef: 'turn-a',
+          turnRevision: 'turn-1', text: '建石屋', actionReceiptDigest: null }] });
+      if (operation === 'ReadSessionTurnDetails') return packet(payload.requestId,
+        { sessionRef: 'session-a', sessionRevision: 'session-1', turns: [{
+          turnRef: 'turn-a', turnRevision: 'turn-1', userText: '建石屋',
+          resultText: '已确认', confirmedBrief: { text: '石屋' } }] });
+      if (operation === 'AdvanceCurrentBuild') return packet(payload.requestId,
+        { sessionRef: 'session-a', worldRef: 'world-a', turnRevision: 'turn-1',
+          outcome: 'VERIFIED', stage: 'COMPLETE', receipt: { status: 'VERIFIED' } });
+      throw Error(`unexpected ${operation}`);
+    },
+  });
+  await flow.open();
+  assert.equal(await flow.advanceCurrentBuild(), false);
+  assert.equal(flow.snapshot().buildOutcome, null);
+  assert.match(flow.snapshot().buildError, /未能从当前 Session 读回/);
+});

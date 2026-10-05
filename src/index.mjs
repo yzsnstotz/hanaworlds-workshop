@@ -1,11 +1,14 @@
 import { randomUUID, createHash } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import canonicalize from 'canonicalize';
 import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import {
   admitRequest, validateRequest, validateBoundRequest, validateResponse,
   ContractError, contractHandshake, checkContractHandshake, digestValue, validateType,
   validateChoiceSelection, validateRegionInspection, checkSessionReadbackHandshake,
   checkSessionUndoHandshake, checkUndoRecoveryHandshake,
-  validateUndoRecoveryResponse,
+  validateUndoRecoveryResponse, checkBuildEntryHandshake,
+  validateBuildEntryContext, validateBuildEntryResponse,
 } from '../vendor/contracts/dist/v4/index.mjs';
 
 const VERSION = 'session/v2';
@@ -95,6 +98,7 @@ export class WorkshopV1 {
       capabilities, canvas, painter, brush, resources, mediaAuthority, modelRoute,
       catalogue, safety, compilerConfig, applyAuthority });
     this.locks = new Map();
+    this.lockContext = new AsyncLocalStorage();
     this.contractHandshake = contractHandshake;
   }
 
@@ -108,6 +112,7 @@ export class WorkshopV1 {
       operation === 'SwitchWorldContext' || operation === 'SelectObjects' ? 'SELECT' :
       operation === 'AnalyzeCurrentBuild' ? 'ANALYZE' :
       operation === 'ApplyCurrentBuild' ? 'APPLY_RECOVERABLE' :
+      operation === 'AdvanceCurrentBuild' ? 'APPLY_RECOVERABLE' :
       operation === 'ReadCurrentUndoStatus' ? 'HISTORY' :
       operation === 'UndoCurrentBuild' ? 'UNDO' :
       ['BeginFirstBuilding', 'InvokeAction', 'CreateBuildPlan', 'CompileCurrentBuild'].includes(operation) ? 'INSPECT' : 'READ';
@@ -116,7 +121,7 @@ export class WorkshopV1 {
         proof.authorizationRef !== body.authorizationRef ||
         !proof.allowedActions?.includes(required))
       failure('AUTHORIZATION_REVOKED', 'authorize', 'GRANT_REVOKED');
-    if (['ReadCurrentUndoStatus', 'UndoCurrentBuild'].includes(operation) &&
+    if (['ReadCurrentUndoStatus', 'UndoCurrentBuild', 'AdvanceCurrentBuild'].includes(operation) &&
         proof.worldRef !== body.worldRef)
       failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
     return proof;
@@ -167,14 +172,21 @@ export class WorkshopV1 {
   }
 
   async #withLock(id, action) {
+    const inherited = this.lockContext.getStore();
+    if (inherited?.id === id && inherited.active) return action();
     const prior = this.locks.get(id) ?? Promise.resolve();
     let release;
     const next = new Promise(resolve => { release = resolve; });
     const gate = prior.then(() => next);
     this.locks.set(id, gate);
     await prior;
-    try { return await action(); }
-    finally { release(); if (this.locks.get(id) === gate) this.locks.delete(id); }
+    const held = { id, active: true };
+    try { return await this.lockContext.run(held, action); }
+    finally {
+      held.active = false;
+      release();
+      if (this.locks.get(id) === gate) this.locks.delete(id);
+    }
   }
 
   #snapshot(state) {
@@ -370,15 +382,20 @@ export class WorkshopV1 {
           proof.engineActorName !== relayPrincipal.engineActorName))
         failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
       validateBoundRequest(version, operation, body);
-      const result = operation === 'UndoCurrentBuild' ?
+      const result = operation === 'AdvanceCurrentBuild' ?
+        await this.#advanceCurrentBuild(body) :
+        operation === 'UndoCurrentBuild' ?
         await this.#undoCurrentBuild(body) :
         await this.#withLock(body.sessionRef, async () => this.#dispatch(operation, body, proof));
       const response = packet(version, body.requestId, result);
-      return validateResponse(version, operation, response);
+      return operation === 'AdvanceCurrentBuild' ?
+        validateBuildEntryResponse(body, response) :
+        validateResponse(version, operation, response);
     } catch (error) {
       const denied = packet(version, body?.requestId ?? null, null,
         operation === 'ReadSessionTurnDetails' ? readbackPublic(error) : toPublic(error));
-      return ['ReadSessionTurnDetails', 'ReadCurrentUndoStatus', 'UndoCurrentBuild'].includes(operation) && body?.requestId
+      return ['ReadSessionTurnDetails', 'ReadCurrentUndoStatus', 'UndoCurrentBuild',
+        'AdvanceCurrentBuild'].includes(operation) && body?.requestId
         ? validateResponse(version, operation, denied) : denied;
     }
   }
@@ -462,6 +479,185 @@ export class WorkshopV1 {
       await this.#save(body.sessionRef, log, state);
       return outcome;
     });
+  }
+
+  /** The public entry owns phase selection; callers never supply a turn or transaction ID. */
+  async #advanceCurrentBuild(body) {
+    checkBuildEntryHandshake(this.contractHandshake);
+    return this.#withLock(body.sessionRef, async () => {
+      let { log, state } = await this.#load(body.sessionRef);
+      const current = state.turns.at(-1);
+      const turnWorldRef = current && state.turnWorldRefs?.[current.turnRef];
+      if (!current || !state.confirmedIntents?.[current.turnRef] ||
+          state.pendingClarification?.turnRef === current.turnRef)
+        failure('INTENT_UNCONFIRMED', 'validate', 'REQUIRED_FACT_UNKNOWN');
+      if (state.context.currentSession !== body.sessionRef ||
+          state.context.activeWorldRef !== body.worldRef ||
+          (turnWorldRef !== undefined && turnWorldRef !== body.worldRef))
+        failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
+      if (state.pendingApply?.status === 'RESERVED' &&
+          state.pendingApply.turnRef !== current.turnRef)
+        failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
+      const stage = () => state.pendingApply?.turnRef === current.turnRef ?
+        (state.pendingApply.status === 'VERIFIED' ? 'COMPLETE' : 'APPLY') :
+        state.lastAnalysis?.turnRef === current.turnRef ? 'APPLY' :
+        state.lastCompiled?.turnRef === current.turnRef ? 'ANALYZE' :
+        state.lastBuild?.turnRef === current.turnRef ? 'COMPILE' :
+        state.lastPlacement?.turnRef === current.turnRef &&
+        state.lastPlacement.outcome === 'REGION_INSPECTED' ? 'PLAN' : 'PLACEMENT';
+      const entries = state.buildEntries ??= Object.create(null);
+      const payloadDigest = hash(canonicalize(body));
+      const prior = entries[body.requestId];
+      validateBuildEntryContext(body, { actorRef: body.actorRef,
+        sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
+        worldRef: body.worldRef, currentTurnRevision: current.turnRevision,
+        turnStatus: 'CURRENT_CONFIRMED', grantStatus: 'CURRENT', stage: stage(),
+        replay: prior ? prior.payloadDigest === payloadDigest ? 'EXACT_REPLAY' :
+          'CONFLICT' : 'NEW' });
+      if (prior?.outcome) return prior.outcome;
+      if (!prior) {
+        entries[body.requestId] = { payloadDigest, turnRef: current.turnRef,
+          worldRef: body.worldRef, authorizationRef: body.authorizationRef,
+          outcome: null };
+        state = await this.#save(body.sessionRef, log, state);
+      } else if (prior.turnRef !== current.turnRef || prior.worldRef !== body.worldRef ||
+          prior.authorizationRef !== body.authorizationRef) {
+        failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
+      }
+      const refresh = async () => {
+        ({ log, state } = await this.#load(body.sessionRef));
+        if (state.context.activeWorldRef !== body.worldRef ||
+            state.turns.at(-1)?.turnRef !== current.turnRef ||
+            state.turns.at(-1)?.turnRevision !== current.turnRevision)
+          failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
+      };
+      const finish = async outcome => {
+        await refresh();
+        state.buildEntries[body.requestId].outcome = outcome;
+        await this.#save(body.sessionRef, log, state);
+        return outcome;
+      };
+      const pending = stageName => ({ sessionRef: body.sessionRef,
+        worldRef: body.worldRef, turnRevision: current.turnRevision,
+        stage: stageName, outcome: 'PENDING' });
+      const stageBody = name => ({ actorRef: body.actorRef,
+        sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
+        turnRef: current.turnRef, requestId: `${body.requestId}:${name}` });
+      if (state.pendingPlacement?.turnRef === current.turnRef) {
+        const frame = state.pendingPlacement.frame;
+        if (frame.sessionRef !== body.sessionRef ||
+            frame.turnRevision !== current.turnRevision)
+          failure('INVALID_FRAME', 'validate', 'REVISION_CHANGED');
+        return finish({ sessionRef: body.sessionRef, worldRef: body.worldRef,
+          turnRevision: current.turnRevision, stage: 'PLACEMENT',
+          outcome: 'CHOICE_REQUIRED', frame });
+      }
+      if (stage() === 'PLACEMENT') {
+        const placed = await this.beginFirstBuilding({ ...stageBody('placement'),
+          invocationId: state.confirmedIntents[current.turnRef].confirmationInputId });
+        await refresh();
+        if (placed.outcome === 'PLACEMENT_CHOICE_REQUIRED')
+          return finish({ sessionRef: body.sessionRef, worldRef: body.worldRef,
+            turnRevision: current.turnRevision, stage: 'PLACEMENT',
+            outcome: 'CHOICE_REQUIRED', frame: placed.frame });
+      }
+      if (stage() === 'PLAN') {
+        await this.createBuildPlan(stageBody('plan'));
+        await refresh();
+      }
+      if (stage() === 'COMPILE') {
+        await this.compileCurrentBuild(stageBody('compile'));
+        await refresh();
+      }
+      if (stage() === 'ANALYZE') {
+        await this.analyzeCurrentBuild(stageBody('analyze'));
+        await refresh();
+      }
+      if (stage() === 'APPLY') {
+        try { await this.applyCurrentBuild(stageBody('apply')); }
+        catch (error) {
+          await refresh();
+          if (state.pendingApply?.turnRef === current.turnRef &&
+              state.pendingApply.status === 'RESERVED' && !error?.publicError)
+            return pending('APPLY');
+          throw error;
+        }
+        await refresh();
+      }
+      if (state.pendingApply?.turnRef !== current.turnRef ||
+          state.pendingApply.status !== 'VERIFIED') return pending('APPLY');
+      const receipt = await this.#readAppliedBuild(body, state, current);
+      await this.#authorized(body, 'AdvanceCurrentBuild');
+      await refresh();
+      const digest = recordedDigest(receipt);
+      const durableTurn = state.turns.find(row => row.turnRef === current.turnRef);
+      if (durableTurn.actionReceiptDigest && durableTurn.actionReceiptDigest !== digest)
+        failure('READBACK_FAILED', 'readback', 'REVISION_CHANGED');
+      if (!durableTurn.actionReceiptDigest) {
+        durableTurn.actionReceiptDigest = digest;
+        state.receipts.push({ turnRef: current.turnRef, actionId: `build-${body.requestId}`,
+          domainReceiptDigest: digest,
+          apply: { request: copy(state.pendingApply.request), response: copy(receipt),
+            sampledBounds: copy(state.lastCompiled.inspection.targetFacts.sampledBounds) } });
+        state.turnDetails ??= Object.create(null);
+        state.turnDetails[current.turnRef] = {
+          ...(state.turnDetails[current.turnRef] ?? {}),
+          resultText: '建造已验证，且已读回当前世界与历史。',
+          confirmedBrief: state.confirmedIntents[current.turnRef].brief ?? null };
+        if (state.pendingUndo?.status === 'VERIFIED') state.pendingUndo = null;
+        await this.#save(body.sessionRef, log, state);
+      }
+      return finish({ sessionRef: body.sessionRef, worldRef: body.worldRef,
+        turnRevision: current.turnRevision, stage: 'COMPLETE',
+        outcome: 'VERIFIED', receipt });
+    });
+  }
+
+  async #readAppliedBuild(body, state, turn) {
+    await this.#authorized(body, 'ReadCurrentUndoStatus');
+    const { request, response } = state.pendingApply;
+    const receipt = validateType('ReceiptProjection', response?.result);
+    if (receipt.status !== 'VERIFIED' ||
+        request.actorRef !== body.actorRef || request.sessionRef !== body.sessionRef ||
+        request.authorizationRef !== body.authorizationRef ||
+        request.worldRef !== body.worldRef ||
+        request.transactionId !== receipt.transactionId ||
+        request.operationDigest !== receipt.operationDigest)
+      failure('READBACK_FAILED', 'readback', 'REVISION_CHANGED');
+    requirePeer(this.canvas, { wires: ['canvas/v4'], factProfiles: [] });
+    const common = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
+      sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
+      worldRef: body.worldRef };
+    const inventory = await this.#canvasRead('ListObjects', { ...common,
+      requestId: `${body.requestId}:read-objects`, expectedRevision: null });
+    if (inventory.worldRef !== body.worldRef)
+      failure('READBACK_FAILED', 'readback', 'REVISION_CHANGED');
+    const matches = [];
+    for (const object of inventory.objects) {
+      const history = await this.#canvasRead('HistoryQuery', { ...common,
+        objectRef: object.objectRef, requestId: `${body.requestId}:read-history:${object.objectRef}`,
+        expectedHistoryRevision: null });
+      if (history.worldRef !== body.worldRef || history.objectRef !== object.objectRef)
+        failure('READBACK_FAILED', 'readback', 'REVISION_CHANGED');
+      const entry = history.entries.find(row =>
+        row.transactionId === receipt.transactionId &&
+        row.operationDigest === receipt.operationDigest &&
+        row.expectedAfterReadbackDigest === receipt.readbackDigest &&
+        row.receiptDigest === recordedDigest(receipt) && row.status === 'VERIFIED' &&
+        row.affectedObjectRefs.includes(object.objectRef));
+      if (entry) matches.push({ object, history, entry });
+    }
+    if (!matches.length ||
+        matches.length !== matches[0].entry.affectedObjectRefs.length ||
+        !matches[0].entry.affectedObjectRefs.every(ref =>
+          matches.some(item => item.object.objectRef === ref &&
+            item.history.headTransactionId === receipt.transactionId &&
+            item.history.historyRevision === matches[0].history.historyRevision &&
+            JSON.stringify(item.entry) === JSON.stringify(matches[0].entry))))
+      failure('READBACK_FAILED', 'readback', 'REVISION_CHANGED');
+    if (turn.actionReceiptDigest && turn.actionReceiptDigest !== recordedDigest(receipt))
+      failure('READBACK_FAILED', 'readback', 'REVISION_CHANGED');
+    return receipt;
   }
 
   async #recordPlacement(state, body, result, footprint, intent) {

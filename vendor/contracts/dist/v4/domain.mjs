@@ -153,6 +153,12 @@ export function validateDomain(visits) {
     } else if (name === 'UndoRecoveryResult') {
       shape((v.status === 'VERIFIED') === (v.receipt !== null));
       if (v.receipt !== null) shape(v.receipt.status === 'VERIFIED');
+    } else if (name === 'BuildEntryChoiceRequired' ||
+      (name === 'BuildEntryOutcome' && v.outcome === 'CHOICE_REQUIRED')) {
+      shape(v.frame.sessionRef === v.sessionRef && v.frame.turnRevision === v.turnRevision);
+    } else if (name === 'BuildEntryVerified' ||
+      (name === 'BuildEntryOutcome' && v.outcome === 'VERIFIED')) {
+      shape(v.receipt.status === 'VERIFIED');
     } else if (name === 'CreateBuildPlanRequest') {
       // Payload-decidable painter/v3 rules in the approved order; digest coherence is in validateBoundRequest.
       if (v.targetFacts.source === 'REGION_INSPECTED') {
