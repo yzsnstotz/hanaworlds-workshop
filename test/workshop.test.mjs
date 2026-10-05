@@ -132,8 +132,12 @@ test('DSH plugin resolves late host ports and rejects stale Session revision', a
   const services = new Map();
   apply({ get(name) { return ports.get(name); }, provide(name, value) {
     services.set(name, value); } });
-  assert.deepEqual([...services.keys()], ['hanaworldsWorkshopV1', 'hanaworldsWorkshop']);
+  assert.deepEqual([...services.keys()], ['hanaworldsWorkshopV1', 'hanaworldsWorkshop',
+    'hanaworldsWorkshopLegacyHistoryV1']);
   const service = services.get('hanaworldsWorkshop');
+  const legacy = services.get('hanaworldsWorkshopLegacyHistoryV1');
+  assert.equal(typeof legacy.importArchive, 'function');
+  assert.equal(typeof legacy.readArchive, 'function');
   assert.equal(service, services.get('hanaworldsWorkshopV1'));
   assert.equal(typeof service.invokeAction, 'function');
   assert.equal(typeof service.verifyFrameDelivery, 'function');
@@ -200,7 +204,8 @@ test('DSH client contributes a Workshop panel and only typed offered Shell choic
   assert.equal(panelSeat.type, client.WorkshopPanel);
   const panel = client.WorkshopPanel({ flow: { snapshot: () => ({ ready: true,
     busy: false, error: '', turns: [], reply: '', clarification: null,
-    sessions: [], selectedSessionRef: null, details: [] }),
+    sessions: [], selectedSessionRef: null, details: [],
+    legacyArchives: [], legacyArchive: null, legacyError: '' }),
     subscribe() { return () => {}; }, open() {} } });
   assert.equal(panel.children[1].props.role, 'status');
   assert.equal(panel.children.at(-1).type, 'form');

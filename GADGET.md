@@ -34,6 +34,34 @@ The package contributes a DSH web-client `./client` entry. It registers the
 Workshop sidebar/main panel and contains a typed Shell `SELECT_CHOICE`
 presenter. The panel lists only live Sessions with a trusted Shell binding;
 the host rechecks the chosen Session, actor and authorization on every call.
+For Electron the client accepts a host-injected `hanaworldsWorkshopTransport`
+with `invoke(command, args)`; the existing Tauri transport remains the
+fallback. The host must route `hanaworlds_request` to its own trusted
+Workshop service, supplying and rechecking current binding facts. The
+renderer cannot mint an authorization from an old archive.
+
+The separate Host service `hanaworldsWorkshopLegacyHistoryV1` exposes
+`importArchive({ projectId, creationSessionId, actorName, panelJson,
+projectMemoryJson, evidenceJson })`, `readArchive({ projectId,
+creationSessionId, actorName })`, and `listArchives({ actorName })`.
+`panelJson` and `projectMemoryJson` are original UTF-8 JSON bytes supplied
+by the Desktop migration host; `evidenceJson` is the array of original turn
+evidence JSON bytes for that project. Workshop does not open another plugin's
+private files. Import verifies the old panel's project/Creation Session,
+the project-created event, each committed turn's original utterance and
+structured response digests, and a unique request-ID digest match against
+its evidence. Missing or conflicting input fails before publication. Exact
+repeat import is idempotent; changed bytes for an existing project are
+rejected. The independent storage domain holds only a read-only archive,
+not a Core Session projection. Its entries have no `sessionRef` or grant.
+
+The injected client transport may additionally expose
+`legacyHistory('list', {})` and `legacyHistory('read', { projectId,
+creationSessionId })`. The host supplies the trusted actor for the service
+call. This populates a separate read-only panel section even when no live
+Session is bound; send/build controls remain disabled until the ordinary
+current Session/world/Adapter authorization path succeeds. The Desktop
+origin owns the preload routing and old-profile migration/rollback.
 It never asks a user to enter internal refs. The typed
 `ReadSessionTurnDetails` operation returns complete replies and confirmed
 Briefs for reopening the same Session.

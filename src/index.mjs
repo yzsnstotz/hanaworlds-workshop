@@ -2,6 +2,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import canonicalize from 'canonicalize';
 import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
+import { LegacyHistoryService, LegacyHistoryStore } from './legacy-history.mjs';
 import {
   admitRequest, validateRequest, validateBoundRequest, validateResponse,
   ContractError, contractHandshake, checkContractHandshake, digestValue, validateType,
@@ -1480,6 +1481,9 @@ export const inject = [];
 export function apply(ctx) {
   const projectionStore = new WorkshopProjectionStore(() => ctx.get?.('storageDomain'));
   ctx.effect?.(() => () => projectionStore.close(), 'hanaworlds-workshop.projection-close');
+  const legacyStore = new LegacyHistoryStore(() => ctx.get?.('storageDomain'));
+  ctx.effect?.(() => () => legacyStore.close(), 'hanaworlds-workshop.legacy-history-close');
+  const legacyHistory = new LegacyHistoryService(legacyStore);
   const service = new WorkshopV1({ projectionStore });
   const ports = {
     sessionPersistence: 'sessionPersistence', attachments: 'attachments',
@@ -1496,5 +1500,6 @@ export function apply(ctx) {
       get: () => ctx.get?.(port) });
   ctx.provide?.('hanaworldsWorkshopV1', service);
   ctx.provide?.('hanaworldsWorkshop', service);
+  ctx.provide?.('hanaworldsWorkshopLegacyHistoryV1', legacyHistory);
 }
 export default { name, inject, apply };

@@ -10,15 +10,18 @@ window.__ModuleLoader__.load({
     let desktopInvoke;
     try { desktopInvoke = require('dsh-tauri').invoke; } catch { /* shown in panel */ }
 
-    function createWorkshopFlow({ invoke, currentSessionRef, newId }) {
+    function createWorkshopFlow({ invoke, legacyHistory, currentSessionRef, newId }) {
       const listeners = new Set();
       let state = { ready: false, busy: false, error: '', turns: [], reply: '',
         sessionRef: null, worldRef: null, revision: null, clarification: null,
         sessions: [], selectedSessionRef: null, details: [],
         undoStatus: null, undoResult: null, undoError: '',
-        buildOutcome: null, buildError: '' };
+        buildOutcome: null, buildError: '', legacyAvailable: typeof legacyHistory === 'function',
+        legacyArchives: [],
+        legacyArchive: null, legacyError: '' };
       const snapshot = () => ({ ...state, turns: [...state.turns],
-        sessions: [...state.sessions], details: [...state.details] });
+        sessions: [...state.sessions], details: [...state.details],
+        legacyArchives: [...state.legacyArchives] });
       const publish = patch => {
         state = { ...state, ...patch };
         for (const listener of listeners) listener(snapshot());
@@ -123,11 +126,49 @@ window.__ModuleLoader__.load({
         }
         return available;
       }
+      async function refreshLegacyArchives() {
+        if (typeof legacyHistory !== 'function') return;
+        try {
+          const archives = await legacyHistory('list', {});
+          if (!Array.isArray(archives) || archives.some(item =>
+            typeof item?.projectId !== 'string' || !item.projectId ||
+            typeof item?.creationSessionId !== 'string' || !item.creationSessionId ||
+            item.readOnly !== true))
+            throw Error('旧历史归档列表不完整。');
+          publish({ legacyArchives: archives, legacyError: '' });
+        } catch (error) {
+          publish({ legacyArchives: [], legacyArchive: null,
+            legacyError: `旧历史读回不可用：${String(error?.message ?? error)}` });
+        }
+      }
+      async function openLegacyArchive(projectId, creationSessionId) {
+        if (typeof legacyHistory !== 'function' ||
+            !state.legacyArchives.some(item => item.projectId === projectId &&
+              item.creationSessionId === creationSessionId)) return false;
+        try {
+          const archive = await legacyHistory('read', { projectId, creationSessionId });
+          if (archive?.kind !== 'LEGACY_PROJECT_ARCHIVE' ||
+              archive.readOnly !== true || archive.projectId !== projectId ||
+              archive.creationSessionId !== creationSessionId ||
+              !Array.isArray(archive.turns) || archive.turns.some(turn =>
+                typeof turn.utterance !== 'string' || !turn.utterance ||
+                !turn.response || typeof turn.response !== 'object' ||
+                !Number.isSafeInteger(turn.source?.seq)))
+            throw Error('旧历史归档与选中的项目不一致。');
+          publish({ legacyArchive: archive, legacyError: '' });
+          return true;
+        } catch (error) {
+          publish({ legacyArchive: null,
+            legacyError: `旧历史读回不可用：${String(error?.message ?? error)}` });
+          return false;
+        }
+      }
       async function open(selected = null) {
         publish({ ready: false, busy: true, error: '', reply: '',
           clarification: null, undoStatus: null, undoResult: null, undoError: '',
           buildOutcome: null, buildError: '' });
         try {
+          await refreshLegacyArchives();
           const sessions = await boundSessions();
           publish({ sessions });
           const current = currentSessionRef?.();
@@ -357,7 +398,7 @@ window.__ModuleLoader__.load({
         } finally { publish({ busy: false }); }
         return accepted ? advanceCurrentBuild() : false;
       }
-      return { snapshot, subscribe, open, chooseSession, submit,
+      return { snapshot, subscribe, open, chooseSession, submit, openLegacyArchive,
         undoCurrentBuild, advanceCurrentBuild, chooseBuildPlacement };
     }
 
@@ -390,6 +431,25 @@ window.__ModuleLoader__.load({
         view.error ? h('p', { role: 'alert' }, view.error) : null,
         h('button', { type: 'button', disabled: view.busy,
           onClick: () => { void flow.open(); } }, '刷新连接'),
+        view.legacyAvailable ? h('section', {
+          'aria-label': '旧项目只读历史' },
+        h('h2', null, '旧项目只读历史'),
+        h('p', null, '这里是旧项目归档，不代表当前 Session、游戏授权或可发送状态。'),
+        view.legacyError ? h('p', { role: 'alert' }, view.legacyError) : null,
+        !view.legacyArchives.length && !view.legacyError ?
+          h('p', null, '旧项目归档尚未导入。') : null,
+        ...view.legacyArchives.map(item => h('button', {
+          key: `${item.projectId}:${item.creationSessionId}`, type: 'button',
+          onClick: () => { void flow.openLegacyArchive(item.projectId,
+            item.creationSessionId); },
+        }, `打开旧项目 ${item.projectId}（${item.turnCount} 轮）`)),
+        view.legacyArchive ? h('ol', { 'aria-label': '旧项目原始轮次' },
+          ...view.legacyArchive.turns.map(turn => h('li', { key: turn.seq },
+            h('p', { 'aria-label': '旧轮次原文' }, turn.utterance),
+            h('pre', { 'aria-label': '旧轮次结构化回复' },
+              JSON.stringify(turn.response, null, 2)),
+            h('p', null, `来源：旧项目事件 ${turn.source.seq}；证据摘要 ${turn.source.clientRequestIdDigest}`))))
+          : null) : null,
         view.sessions.length ? h('div', null,
           h('label', { htmlFor: 'hanaworlds-workshop-session' }, '已绑定的 Session'),
           h('select', { id: 'hanaworlds-workshop-session',
@@ -463,6 +523,8 @@ window.__ModuleLoader__.load({
       const invoke = typeof transport?.invoke === 'function'
         ? (command, args) => transport.invoke(command, args) : desktopInvoke;
       const flow = createWorkshopFlow({ invoke,
+        legacyHistory: typeof transport?.legacyHistory === 'function'
+          ? (action, input) => transport.legacyHistory(action, input) : null,
         currentSessionRef: () => {
           try { return ctx.sessions?.list?.getSnapshot?.()?.current ?? null; }
           catch { return null; }

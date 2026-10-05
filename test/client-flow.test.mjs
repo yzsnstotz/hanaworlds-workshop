@@ -21,6 +21,8 @@ function clientModule({ tauri = true, tauriInvoke = () => {}, transport } = {}) 
 }
 
 test('Electron panel uses an injected host transport for its own service without dsh-tauri', async () => {
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(manifest.dsh.client.inject.includes('dsh-tauri'), false);
   const calls = [];
   const client = clientModule({ tauri: false, transport: {
     async invoke(command, args) {
@@ -60,6 +62,34 @@ test('Tauri panel retains its host transport when no Electron transport is injec
   await panel().props.flow.open();
   assert.equal(calls[0].command, 'hanaworlds_request');
   assert.equal(calls[0].args.operation, 'context');
+});
+
+test('legacy archive opens without a live binding but never enables sending', async () => {
+  const calls = [];
+  const archive = { kind: 'LEGACY_PROJECT_ARCHIVE', readOnly: true,
+    projectId: 'proj-old', creationSessionId: 'cs-old',
+    turns: [{ seq: 201, utterance: '旧请求', response: { summary: { text: '旧回复' } },
+      source: { seq: 201, clientRequestIdDigest: 'digest', evidenceSha256: 'hash' } }] };
+  const client = clientModule({ tauri: false, transport: {
+    async invoke(_command, args) { calls.push(args); return { sessions: [] }; },
+    async legacyHistory(action, input) {
+      calls.push({ action, input });
+      return action === 'list' ? [{ projectId: 'proj-old', creationSessionId: 'cs-old',
+        turnCount: 1, readOnly: true }] : archive;
+    },
+  } });
+  let panel;
+  client.apply({ slots: { inject(_name, register) { register(); }, register(meta, component) {
+    if (meta.name === 'main') panel = component;
+  } } });
+  const flow = panel().props.flow;
+  await flow.open();
+  assert.equal(flow.snapshot().ready, false);
+  assert.equal(flow.snapshot().legacyArchives.length, 1);
+  await flow.openLegacyArchive('proj-old', 'cs-old');
+  assert.equal(flow.snapshot().legacyArchive.turns[0].utterance, '旧请求');
+  assert.equal(await flow.submit('新请求'), false);
+  assert.equal(calls.some(item => item.input?.operation === 'AppendMultimodalTurn'), false);
 });
 
 function packet(requestId, result, error = null) {
