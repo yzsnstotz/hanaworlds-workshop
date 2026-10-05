@@ -96,8 +96,43 @@ the live Core Session ID and awaits the table write before acknowledging a
 state change. It reads the Core JSONL Session for identity and confirmed user
 messages without taking the live Session's write handle or creating another
 Core Session. Shell currently pins `@deepseek-ai/dsh-session` `0.2.0-rc.2`.
-A world switch verifies the world through Canvas inventory and
-clears old selection and placement. A turn sends user-selected text and
+A world switch uses the Contracts 0.3.8 `ReadWorldSelectionContext` capability
+to obtain Canvas's current binding, exact CAS and target connection inventory.
+Confirmed UNBOUND selects the one available target connection; a different
+bound world switches using Canvas's old world and CAS. Multiple candidates
+without an existing target binding fail closed; Workshop never chooses the
+first candidate. An already bound target reuses its confirmed connection.
+Select/Switch success is followed by a fresh context read, then ListObjects,
+then another current-context read. Correlation, selection and inventory drift
+are checked before Workshop saves readiness. No connection or revision is
+derived from Workshop state. Old peer advertisements are rejected, without
+fallback to the old inventory-only flow.
+
+The trusted `hanaworldsAuthority.verify(request, 'SwitchWorldContext')` callback
+must verify the captured parent against its original grant and live Session.
+Besides current actor/session/authorization/world and SELECT, it returns
+`sessionIncarnationRef`, `nativeGrantRef`, `invocationRef`,
+`invocationStatus: 'ACTIVE'` and `grantStatus: 'CURRENT'`. Workshop snapshots
+and rechecks these facts around each await and durable acknowledgement; a
+missing incarnation, ended/cancelled invocation or changed grant fails closed.
+These are authenticated Host service results, never renderer credentials.
+The Host captures each exact Canvas child in the active parent invocation;
+Canvas independently authorizes the exact operation. The Contracts
+`validateWorldContextDelegation` checker describes that narrow association,
+including old-world metadata on Switch versus the grant's target world; it
+does not issue a grant. Host must implement that association from current
+original binding, Adapter and live Session facts. The component fixture
+tests the association; formal Desktop issuance is not established here.
+
+Before dispatching Canvas selection, Workshop durably clears its own ready
+world, selection and placement. A failed/uncertain child therefore leaves no
+old-world readiness. This advances Workshop's own CAS even on a later error;
+reopen StartOrResumeSession for the current revision and use a new request ID.
+A lost Canvas receipt is recovered by a subsequent public current-context
+query, without replaying a guessed Select. A cancellation during the final
+save clears the exact saved Workshop revision before returning an error.
+Typed dependency errors are preserved and self-validated with 0.3.8.
+A turn sends user-selected text and
 authorized, digest-checked image attachments through the host model route.
 Ambiguous output requests clarification; later user corrections are sent
 through the model again with the accumulated answers, and a concrete proposal
@@ -139,15 +174,17 @@ Canvas history itself.
 
 ## Build and lifecycle
 
-Use Node 24.13.1, isolated HOME, npm cache and DSH profile. `npm ci`,
+Use Node 24.13.1, a card-local npm cache and isolated DSH profile. `npm ci`,
 `npm run build`, `npm test`, and `npm pack --ignore-scripts` operate from a
-fresh public clone. The 17-module v4 runtime closure and placement fixture
-under `vendor/contracts/` are byte-identical to the Contracts 0.3.2
-public source pack at revision `3d64364782181c8b5abc3150f8fa9f7ae20bf101`.
+fresh public clone. Current runtime uses the fixed public Contracts 0.3.8 URL
+at revision `ef681148fc4fd6e7871fcc8417baf102abf01b28` with lock integrity.
+The prior v4 closure and placement fixture under `vendor/contracts/` remain
+byte-identical to the Contracts 0.3.5 source pack at revision
+`295cbc7fd0d8a1e56a0d89e651947e668f2ad658`.
 `npm run build` verifies the pinned source/artifact, every file digest,
 runtime import closure and permitted external imports. `canonicalize@5.1.0`
-is an ordinary registry dependency. No sibling path, `file:` dependency,
-exotic transitive URL or local tarball is needed for default pnpm 11 install.
+is an ordinary registry dependency. No sibling path, development symlink,
+`file:` production dependency or local tarball is needed for installation.
 For a real DSH installation, preserve the Core Session and required resource
 stores across uninstall/reinstall; package rollback requires the compatible
 contracts consumer set and must preserve any unresolved Canvas transaction.

@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
 import { WorkshopV1, apply } from '../src/index.mjs';
-import * as contractsV4 from '../vendor/contracts/dist/v4/index.mjs';
+import * as contractsV4 from 'hanaworlds-contracts/v4';
+import { worldFixture } from './helpers/world-context.mjs';
 
 class CoreSessions {
   logs = new Map();
@@ -71,10 +72,28 @@ function setup(overrides = {}) {
   const calls = [];
   const workshop = new WorkshopV1({
     sessionPersistence: sessions, projectionStore,
-    authority: { async verify(request) { return { current: true, actorRef: request.actorRef, sessionRef: request.sessionRef, authorizationRef: request.authorizationRef, surface: 'SHELL', allowedActions: ['READ', 'APPEND', 'INSPECT', 'SELECT', 'ANALYZE', 'APPLY_RECOVERABLE'] }; } },
+    authority: { async verify(request) { return { current: true, actorRef: request.actorRef, sessionRef: request.sessionRef, authorizationRef: request.authorizationRef, surface: 'SHELL', worldRef: request.worldRef, sessionIncarnationRef: 'inc-1', nativeGrantRef: 'native-1', invocationRef: 'invoke-1', invocationStatus: 'ACTIVE', grantStatus: 'CURRENT', allowedActions: ['READ', 'APPEND', 'INSPECT', 'SELECT', 'ANALYZE', 'APPLY_RECOVERABLE'] }; } },
     capabilities: { providerRef: 'core', capabilityRevision: '1', worldRef: null, engineBounds: null, limits: [], recoveryGuarantee: null, stateProfile: null, regionProtectionWriters: [], sessionDeleteSupported: false, imageMediaTypes: ['image/png'], model: 'gpt-5.6-luna' },
     ...overrides,
   });
+  if (workshop.canvas) {
+    // Existing model/build tests use a typed external world-selection fixture;
+    // their original Canvas callback still owns all later build operations.
+    const selection = worldFixture();
+    const authority = workshop.authority;
+    const canvas = workshop.canvas;
+    workshop.authority = { async verify(body, operation) {
+      const proof = await authority.verify(body, operation);
+      if (operation !== 'SwitchWorldContext') return proof;
+      if (selection.parent?.requestId !== body.requestId) selection.capture(body);
+      return { ...await selection.authority.verify(body, operation), ...proof };
+    } };
+    workshop.canvas = { ...canvas, async call(operation, body) {
+      if (['ReadWorldSelectionContext', 'SelectWorldConnection',
+        'SwitchWorldConnection'].includes(operation)) return selection.canvas.call(operation, body);
+      return canvas.call(operation, body);
+    } };
+  }
   return { workshop, sessions, projectionStore, calls };
 }
 

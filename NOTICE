@@ -6,6 +6,10 @@ revision 295cbc7fd0d8a1e56a0d89e651947e668f2ad658 (npm pack SHA256
 4cee3e9067072d86c95799334a623bd278a5b995da0b9316934fb0722e837f62).
 That source is MIT; its LICENSE, NOTICE, per-file hashes, import closure and
 canonicalize Apache-2.0 license text are retained under vendor/contracts/.
+Current v4 runtime imports hanaworlds-contracts@0.3.8 (MIT), pinned to public
+https://codeload.github.com/yzsnstotz/hanaworlds-contracts/tar.gz/ef681148fc4fd6e7871fcc8417baf102abf01b28
+with package-lock integrity. The prior vendor bytes remain unchanged; they
+are retained for provenance and regression fixtures, not advertised as 0.3.8.
 The package installs canonicalize@5.1.0 separately from the public registry;
 its Apache-2.0 license remains with that dependency. Workshop does not embed
 the upstream canonicalize implementation.
