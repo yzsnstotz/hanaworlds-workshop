@@ -322,7 +322,7 @@ export function checkContractHandshake(advertisedInput, requiredInput) {
  * operation. Reject an older package peer before issuing this operation. */
 export function checkSessionReadbackHandshake(advertisedInput) {
   const { advertised } = checkContractHandshake(advertisedInput, { wires: ['session/v2'], factProfiles: [] });
-  requireFact(['hanaworlds-contracts@0.3.1', 'hanaworlds-contracts@0.3.2', 'hanaworlds-contracts@0.3.3', 'hanaworlds-contracts@0.3.4'].includes(advertised.contracts) &&
+  requireFact(['hanaworlds-contracts@0.3.1', 'hanaworlds-contracts@0.3.2', 'hanaworlds-contracts@0.3.3', 'hanaworlds-contracts@0.3.4', 'hanaworlds-contracts@0.3.5'].includes(advertised.contracts) &&
     operationContracts['session/v2'].some(op => op.operation === 'ReadSessionTurnDetails'),
     'UNSUPPORTED_VERSION', 'VERSION_UNSUPPORTED', 'decode');
   return deepFreeze({ result: 'HANDSHAKE_OPERATION_MATCH', advertised });
@@ -331,7 +331,7 @@ export function checkSessionReadbackHandshake(advertisedInput) {
  * canvas/v4 and session/v2 majors do not advertise these added operations. */
 export function checkSessionUndoHandshake(advertisedInput) {
   const { advertised } = checkContractHandshake(advertisedInput, { wires: ['canvas/v4', 'session/v2'], factProfiles: [] });
-  requireFact(['hanaworlds-contracts@0.3.2', 'hanaworlds-contracts@0.3.3', 'hanaworlds-contracts@0.3.4'].includes(advertised.contracts) &&
+  requireFact(['hanaworlds-contracts@0.3.2', 'hanaworlds-contracts@0.3.3', 'hanaworlds-contracts@0.3.4', 'hanaworlds-contracts@0.3.5'].includes(advertised.contracts) &&
     ['ReadCurrentUndoStatus', 'UndoCurrentBuild'].every(name =>
       operationContracts['session/v2'].some(op => op.operation === name)),
     'UNSUPPORTED_VERSION', 'VERSION_UNSUPPORTED', 'decode');
@@ -339,7 +339,7 @@ export function checkSessionUndoHandshake(advertisedInput) {
 }
 export function checkScopedWorldHandshake(advertisedInput) {
   const { advertised } = checkContractHandshake(advertisedInput, { wires: ['world-adapter/v5'], factProfiles: [] });
-  requireFact(['hanaworlds-contracts@0.3.3', 'hanaworlds-contracts@0.3.4'].includes(advertised.contracts) &&
+  requireFact(['hanaworlds-contracts@0.3.3', 'hanaworlds-contracts@0.3.4', 'hanaworlds-contracts@0.3.5'].includes(advertised.contracts) &&
     ['PrepareRecoverableTransaction', 'ApplyCompiledTransaction', 'QueryPreparedTransaction'].every(name =>
       operationContracts['world-adapter/v5'].some(op => op.operation === name)),
     'UNSUPPORTED_VERSION', 'VERSION_UNSUPPORTED', 'decode');
@@ -350,12 +350,49 @@ export function checkScopedWorldHandshake(advertisedInput) {
 export function checkUndoRecoveryHandshake(advertisedInput) {
   const { advertised } = checkContractHandshake(advertisedInput,
     { wires: ['canvas/v4', 'session/v2'], factProfiles: [] });
-  requireFact(advertised.contracts === 'hanaworlds-contracts@0.3.4' &&
+  requireFact(['hanaworlds-contracts@0.3.4', 'hanaworlds-contracts@0.3.5'].includes(advertised.contracts) &&
     operationContracts['session/v2'].some(op => op.operation === 'RecoverPendingUndo') &&
     ['RecoverPendingUndo', 'ReadPendingUndoResult'].every(name =>
       operationContracts['canvas/v4'].some(op => op.operation === name)),
     'UNSUPPORTED_VERSION', 'VERSION_UNSUPPORTED', 'decode');
   return deepFreeze({ result: 'HANDSHAKE_OPERATION_MATCH', advertised });
+}
+/** An unchanged session/v2 wire is insufficient to advertise this added action. */
+export function checkBuildEntryHandshake(advertisedInput) {
+  const { advertised } = checkContractHandshake(advertisedInput,
+    { wires: ['session/v2'], factProfiles: [] });
+  requireFact(advertised.contracts === 'hanaworlds-contracts@0.3.5' &&
+    operationContracts['session/v2'].some(op => op.operation === 'AdvanceCurrentBuild'),
+    'UNSUPPORTED_VERSION', 'VERSION_UNSUPPORTED', 'decode');
+  return deepFreeze({ result: 'HANDSHAKE_OPERATION_MATCH', advertised });
+}
+/** Fixture coherence only. Providers obtain these facts from the authenticated host
+ * and their own durable stores, never from caller JSON. */
+export function validateBuildEntryContext(requestInput, providerFactsInput) {
+  const request = validateRequest('session/v2', 'AdvanceCurrentBuild', requestInput);
+  const facts = validateType('BuildEntryProviderFacts', providerFactsInput);
+  for (const field of ['actorRef', 'sessionRef', 'worldRef', 'authorizationRef'])
+    requireFact(request[field] === facts[field], 'PERMISSION_DENIED', 'IDENTITY_UNVERIFIED', 'authorize');
+  requireFact(facts.grantStatus === 'CURRENT', 'AUTHORIZATION_REVOKED', 'GRANT_REVOKED', 'authorize');
+  requireFact(facts.turnStatus !== 'UNCONFIRMED', 'INTENT_UNCONFIRMED', 'REQUIRED_FACT_UNKNOWN');
+  requireFact(facts.turnStatus === 'CURRENT_CONFIRMED' &&
+    request.expectedTurnRevision === facts.currentTurnRevision,
+    'TURN_REVISION_MISMATCH', 'REVISION_CHANGED');
+  requireFact(facts.replay !== 'CONFLICT', 'TRANSACTION_CONFLICT', 'REVISION_CHANGED');
+  return deepFreeze({ request, replay: facts.replay, stage: facts.stage });
+}
+/** Correlation only; the provider must verify the durable phase and Canvas receipt. */
+export function validateBuildEntryResponse(requestInput, responseInput) {
+  const request = validateRequest('session/v2', 'AdvanceCurrentBuild', requestInput);
+  const response = validateResponse('session/v2', 'AdvanceCurrentBuild', responseInput);
+  requireFact(response.requestId === request.requestId, 'SCHEMA_INVALID', 'INVALID_SHAPE');
+  if (response.result !== null) {
+    for (const [resultField, requestField] of [['sessionRef', 'sessionRef'],
+      ['worldRef', 'worldRef'], ['turnRevision', 'expectedTurnRevision']])
+      requireFact(response.result[resultField] === request[requestField],
+        'PERMISSION_DENIED', 'IDENTITY_UNVERIFIED', 'authorize');
+  }
+  return response;
 }
 /** Coherence only: the record MUST come from the provider's own durable store
  * after independent service authentication. Caller JSON is never that record. */
