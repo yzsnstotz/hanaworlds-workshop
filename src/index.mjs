@@ -277,7 +277,7 @@ export class WorkshopV1 {
       if (!this.canvas?.call)
         failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
       const result = await this.#withLock(body.sessionRef, async () => {
-        const { state } = await this.#load(body.sessionRef);
+        const { log, state } = await this.#load(body.sessionRef);
         const pending = state.pendingUndo;
         if (!pending)
           failure('TRANSACTION_CONFLICT', 'validate', 'POLICY_UNAVAILABLE');
@@ -295,7 +295,7 @@ export class WorkshopV1 {
             pending.beforeHead?.headTransactionId !== original.historyTransactionId ||
             !Array.isArray(pending.affectedObjectRefs) ||
             !pending.affectedObjectRefs.includes(original.objectRef) ||
-            !['RESERVED', 'CANVAS_VERIFIED', 'VERIFIED'].includes(pending.status))
+            !['RESERVED', 'CANVAS_VERIFIED', 'VERIFIED', 'ROLLED_BACK'].includes(pending.status))
           failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
         const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
           sessionRef: body.sessionRef, requestId: body.requestId,
@@ -305,6 +305,8 @@ export class WorkshopV1 {
         const unknown = () => ({ sessionRef: body.sessionRef,
           worldRef: body.worldRef, originalUndoRequestId: original.requestId,
           status: 'UNKNOWN', receipt: null });
+        if (pending.status === 'ROLLED_BACK')
+          return { ...unknown(), status: 'ROLLED_BACK' };
         let result;
         let canvasOperation = 'ReadPendingUndoResult';
         try { result = await this.#canvasRead(canvasOperation, request); }
@@ -324,8 +326,9 @@ export class WorkshopV1 {
         }
         validateUndoRecoveryResponse('canvas/v4', canvasOperation,
           request, packet('canvas/v4', request.requestId, result));
-        if (pending.receipt?.status === 'VERIFIED' &&
-            result.status === 'ROLLED_BACK')
+        if ((pending.receipt?.status === 'VERIFIED' &&
+             result.status === 'ROLLED_BACK') ||
+            (pending.status === 'ROLLED_BACK' && result.status === 'VERIFIED'))
           failure('READBACK_FAILED', 'readback', 'READBACK_ERROR');
         if (result.originalUndoRequestId !== original.requestId ||
             result.sessionRef !== body.sessionRef || result.worldRef !== body.worldRef ||
@@ -334,6 +337,16 @@ export class WorkshopV1 {
                (pending.receipt &&
                 recordedDigest(result.receipt) !== recordedDigest(pending.receipt)))))
           failure('READBACK_FAILED', 'readback', 'READBACK_ERROR');
+        if (result.status === 'VERIFIED' && pending.status === 'RESERVED') {
+          // Canvas has settled the original transaction. A visible Undo still
+          // needs an independently authorized HistoryQuery through #finishUndo.
+          state.pendingUndo = { ...pending, status: 'CANVAS_VERIFIED',
+            receipt: result.receipt };
+          await this.#save(body.sessionRef, log, state);
+        } else if (result.status === 'ROLLED_BACK') {
+          state.pendingUndo = { ...pending, status: 'ROLLED_BACK' };
+          await this.#save(body.sessionRef, log, state);
+        }
         return result;
       });
       return validateUndoRecoveryResponse(VERSION, 'RecoverPendingUndo', body,
@@ -927,18 +940,23 @@ export class WorkshopV1 {
       const { log, state } = await this.#load(body.sessionRef);
       const pending = state.pendingUndo;
       if (pending) {
-        if (pending.request.requestId !== body.requestId)
-          failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-        if (pending.expectedTurnRevision !== body.expectedTurnRevision ||
-            pending.expectedHistoryRevision !== body.expectedHistoryRevision ||
-            pending.request.actorRef !== body.actorRef ||
-            pending.request.authorizationRef !== body.authorizationRef ||
-            pending.request.worldRef !== body.worldRef)
-          failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
-        if (pending.status === 'VERIFIED') return pending.result;
-        if (pending.status === 'RESERVED')
-          return this.#sendReservedUndo(body, pending);
-        return this.#finishUndo(body, log, state, pending);
+        if (pending.status === 'ROLLED_BACK' &&
+            pending.request.requestId === body.requestId)
+          failure('UNDO_CONFLICT', 'validate', 'EXTERNAL_EDIT_CONFLICT');
+        if (pending.status !== 'ROLLED_BACK') {
+          if (pending.request.requestId !== body.requestId)
+            failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
+          if (pending.expectedTurnRevision !== body.expectedTurnRevision ||
+              pending.expectedHistoryRevision !== body.expectedHistoryRevision ||
+              pending.request.actorRef !== body.actorRef ||
+              pending.request.authorizationRef !== body.authorizationRef ||
+              pending.request.worldRef !== body.worldRef)
+            failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
+          if (pending.status === 'VERIFIED') return pending.result;
+          if (pending.status === 'RESERVED')
+            return this.#sendReservedUndo(body, pending);
+          return this.#finishUndo(body, log, state, pending);
+        }
       }
       const current = await this.#currentUndo(body, state);
       if (current.status.availability !== 'AVAILABLE')
@@ -1051,7 +1069,8 @@ export class WorkshopV1 {
       const { log, state } = await this.#load(body.sessionRef);
       if (state.pendingUndo?.status === 'CANVAS_VERIFIED')
         await this.#finishUndo(body, log, state, state.pendingUndo);
-      else if (state.pendingUndo && state.pendingUndo.status !== 'VERIFIED')
+      else if (state.pendingUndo &&
+          !['VERIFIED', 'ROLLED_BACK'].includes(state.pendingUndo.status))
         failure('READBACK_FAILED', 'validate', 'REQUIRED_FACT_UNKNOWN');
       return (await this.#currentUndo(body, state)).status;
     }

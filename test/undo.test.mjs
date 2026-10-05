@@ -115,6 +115,7 @@ function fixture() {
   const create = () => new WorkshopV1({ sessionPersistence: persistence,
     projectionStore, canvas, authority, capabilities: {} });
   return { create, calls, revoke: () => { allowed = false; },
+    reauthorize: () => { allowed = true; },
     revokeService: () => { serviceAllowed = false; },
     serviceResult: (status, receipt = null) => { serviceStatus = status; serviceReceipt = receipt; },
     failService: error => { serviceFailure = error; },
@@ -122,6 +123,7 @@ function fixture() {
     setPeer: handshake => { canvas.contractHandshake = handshake; },
     denyUndo: error => { undoDenial = error; },
     interruptUndo: () => { undoTransportFailure = true; },
+    resumeUndo: () => { undoTransportFailure = false; },
     keepHead: () => { moveHead = false; },
     omitUndoEntry: () => { linkUndo = false; },
     failNextAfterRead: () => { afterReadFailures = 1; },
@@ -164,9 +166,18 @@ test('revoked player can recover only the original durable Undo through authenti
   assert.equal(result.result.status, 'VERIFIED');
   assert.equal(result.result.originalUndoRequestId, 'request-uncertain-read');
   assert.equal(result.result.receipt.transactionId, receipt.transactionId);
+  assert.equal(f.state().pendingUndo.status, 'CANVAS_VERIFIED');
+  assert.equal(digest(f.state().pendingUndo.receipt), digest(receipt));
   assert.equal(f.calls.at(-1).operation, 'ReadPendingUndoResult');
   assert.equal(f.calls.at(-1).body.originalUndoRequestId, 'request-uncertain-read');
   assert.equal('transactionId' in f.calls.at(-1).body, false);
+  f.reauthorize();
+  const reopened = await f.create().call('ReadCurrentUndoStatus', request('after-recovery'));
+  assert.equal(reopened.error, null);
+  assert.equal(reopened.result.availability, 'NO_UNDO_AT_HEAD');
+  assert.equal(f.state().pendingUndo.status, 'VERIFIED');
+  assert.equal(f.calls.filter(row => row.operation === 'Undo').length, 1);
+  f.revoke();
   assert.equal((await f.create().call('UndoCurrentBuild', request('new', {
     expectedTurnRevision: 'turn-1', expectedHistoryRevision: 'history-1' }))).error.code,
   'AUTHORIZATION_REVOKED');
@@ -182,10 +193,12 @@ test('pending and unknown service outcomes never turn an unverified receipt into
   f.revoke();
   const pending = await f.create().recoverPendingUndo(recovery());
   assert.equal(pending.result.status, 'RECOVERY_PENDING');
+  assert.equal(f.state().pendingUndo.status, 'CANVAS_VERIFIED');
   assert.equal(f.calls.at(-1).operation, 'RecoverPendingUndo');
   f.serviceResult('UNKNOWN');
   const unknown = await f.create().recoverPendingUndo(recovery());
   assert.equal(unknown.result.status, 'UNKNOWN');
+  assert.equal(f.state().pendingUndo.status, 'CANVAS_VERIFIED');
   f.serviceResult('VERIFIED', { ...f.state().pendingUndo.receipt,
     transactionId: 'foreign-tx' });
   const forged = await f.create().recoverPendingUndo(recovery());
@@ -193,7 +206,7 @@ test('pending and unknown service outcomes never turn an unverified receipt into
   assert.equal(forged.result, null);
 });
 
-test('rolled back and unavailable Canvas recovery stay minimal after player revocation', async () => {
+test('rolled back Canvas recovery stays durable and minimal after player revocation', async () => {
   const f = fixture(); f.interruptUndo();
   await f.create().call('UndoCurrentBuild', request('uncertain-read', {
     expectedTurnRevision: 'turn-1', expectedHistoryRevision: 'history-1' }));
@@ -205,10 +218,26 @@ test('rolled back and unavailable Canvas recovery stay minimal after player revo
     { sessionRef: 'session-a', worldRef: 'world-a',
     originalUndoRequestId: 'request-uncertain-read', status: 'ROLLED_BACK',
     receipt: null });
+  assert.equal(f.state().pendingUndo.status, 'ROLLED_BACK');
+  f.reauthorize();
+  const status = await f.create().call('ReadCurrentUndoStatus', request('after-rollback'));
+  assert.equal(status.error, null);
+  assert.equal(status.result.availability, 'AVAILABLE');
+  const old = await f.create().call('UndoCurrentBuild', request('uncertain-read', {
+    expectedTurnRevision: 'turn-1', expectedHistoryRevision: 'history-1' }));
+  assert.equal(old.error.code, 'UNDO_CONFLICT');
+  assert.equal(f.calls.filter(row => row.operation === 'Undo').length, 1);
   f.failService(Error('Canvas transport lost'));
-  const unknown = await f.create().recoverPendingUndo(recovery());
-  assert.equal(unknown.result.status, 'UNKNOWN');
-  assert.equal(unknown.result.receipt, null);
+  const repeated = await f.create().recoverPendingUndo(recovery());
+  assert.equal(repeated.result.status, 'ROLLED_BACK');
+  assert.equal(repeated.result.receipt, null);
+  f.resumeUndo();
+  const fresh = await f.create().call('UndoCurrentBuild', request('fresh-after-rollback', {
+    expectedTurnRevision: 'turn-1', expectedHistoryRevision: 'history-1' }));
+  assert.equal(fresh.error, null);
+  assert.equal(fresh.result.status, 'VERIFIED');
+  assert.deepEqual(f.calls.filter(row => row.operation === 'Undo').map(row =>
+    row.body.requestId), ['request-uncertain-read', 'request-fresh-after-rollback']);
 });
 
 test('a reserved Undo recovers the same Canvas transaction without resending ordinary Undo', async () => {
@@ -218,14 +247,22 @@ test('a reserved Undo recovers the same Canvas transaction without resending ord
   const pending = f.state().pendingUndo;
   assert.equal(pending.status, 'RESERVED');
   f.revoke();
+  const stillPending = await f.create().recoverPendingUndo(recovery());
+  assert.equal(stillPending.result.status, 'RECOVERY_PENDING');
+  assert.equal(f.state().pendingUndo.status, 'RESERVED');
   f.serviceResult('VERIFIED', { ...applyReceipt,
     transactionId: pending.request.transactionId });
   const recovered = await f.create().recoverPendingUndo(recovery());
   assert.equal(recovered.error, null);
   assert.equal(recovered.result.status, 'VERIFIED');
+  assert.equal(f.state().pendingUndo.status, 'CANVAS_VERIFIED');
+  assert.equal(f.calls.at(-1).body.originalUndoRequestId, 'request-crashed-send');
+  f.reauthorize();
+  const unverifiedHead = await f.create().call('ReadCurrentUndoStatus', request('head-unverified'));
+  assert.equal(unverifiedHead.error.code, 'READBACK_FAILED');
+  assert.equal(f.state().pendingUndo.status, 'CANVAS_VERIFIED');
   assert.deepEqual(f.calls.filter(row => row.operation === 'Undo').map(row =>
     row.body.requestId), ['request-crashed-send']);
-  assert.equal(f.calls.at(-1).body.originalUndoRequestId, 'request-crashed-send');
 });
 
 test('Canvas rollback cannot contradict a locally recorded VERIFIED Undo receipt', async () => {
