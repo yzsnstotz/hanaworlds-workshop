@@ -8,14 +8,18 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const vendor = join(root, 'vendor', 'contracts');
 
-test('Workshop package uses a pinned admitted Contracts runtime closure without exotic subdependencies', async () => {
+test('Workshop uses the exact public Contracts 0.3.8 pin and preserves its prior vendor closure', async () => {
   const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
   const lock = JSON.parse(await readFile(join(root, 'package-lock.json'), 'utf8'));
-  assert.equal(pkg.dependencies['hanaworlds-contracts'], undefined);
+  const source = 'https://codeload.github.com/yzsnstotz/hanaworlds-contracts/tar.gz/ef681148fc4fd6e7871fcc8417baf102abf01b28';
+  assert.equal(pkg.dependencies['hanaworlds-contracts'], source);
   assert.equal(pkg.dependencies.canonicalize, '5.1.0');
   assert.equal(pkg.files.includes('vendor/contracts/'), true);
-  assert.equal(lock.packages['node_modules/hanaworlds-contracts'], undefined);
-  assert.equal(JSON.stringify(lock).includes('codeload.github.com'), false);
+  assert.equal(lock.packages['node_modules/hanaworlds-contracts'].resolved, source);
+  assert.equal(lock.packages['node_modules/hanaworlds-contracts'].version, '0.3.8');
+  assert.match(lock.packages['node_modules/hanaworlds-contracts'].integrity, /^sha512-/);
+  const runtime = await import('hanaworlds-contracts/v4');
+  assert.equal(runtime.contractHandshake.contracts, 'hanaworlds-contracts@0.3.8');
   const { verifyVendoredContracts } = await import('../scripts/verify-vendored-contracts.mjs');
   const proof = await verifyVendoredContracts();
   assert.equal(proof.sourceRevision, '295cbc7fd0d8a1e56a0d89e651947e668f2ad658');

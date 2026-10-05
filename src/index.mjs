@@ -10,7 +10,8 @@ import {
   checkSessionUndoHandshake, checkUndoRecoveryHandshake,
   validateUndoRecoveryResponse, checkBuildEntryHandshake,
   validateBuildEntryContext, validateBuildEntryResponse,
-} from '../vendor/contracts/dist/v4/index.mjs';
+  checkWorldContextHandshake, validateWorldSelectionContextResponse,
+} from 'hanaworlds-contracts/v4';
 
 const VERSION = 'session/v2';
 const ACTION_VERSION = 'interaction-surface/v3';
@@ -128,6 +129,137 @@ export class WorkshopV1 {
     return proof;
   }
 
+  async #worldContextProof(body, initial = null) {
+    const proof = await this.#authorized(body, 'SwitchWorldContext');
+    const ref = value => typeof value === 'string' && value.length > 0;
+    if (!ref(proof.sessionIncarnationRef))
+      failure('SESSION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
+    if (proof.grantStatus !== 'CURRENT' || !ref(proof.nativeGrantRef))
+      failure('AUTHORIZATION_REVOKED', 'authorize', 'GRANT_REVOKED');
+    if (proof.worldRef !== body.worldRef || !ref(proof.invocationRef) ||
+        proof.invocationStatus !== 'ACTIVE')
+      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    if (initial) {
+      if (proof.nativeGrantRef !== initial.nativeGrantRef)
+        failure('AUTHORIZATION_REVOKED', 'authorize', 'GRANT_REVOKED');
+      if (proof.sessionIncarnationRef !== initial.sessionIncarnationRef ||
+          proof.invocationRef !== initial.invocationRef)
+        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    }
+    // Snapshot the trusted callback's facts: it may reuse a mutable object.
+    return copy(proof);
+  }
+
+  async #switchWorldContext(body, log, state, initial) {
+    if (state.context.sessionRevision !== body.expectedRevision)
+      failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
+    if (state.pendingApply?.status === 'RESERVED' || state.pendingUndo &&
+        !['VERIFIED', 'ROLLED_BACK'].includes(state.pendingUndo.status))
+      failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
+    const peer = requirePeer(this.canvas,
+      { wires: ['canvas/v4', 'session/v2'], factProfiles: [] });
+    checkWorldContextHandshake(peer.advertised);
+    if (!this.canvas?.call)
+      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+    const current = () => this.#worldContextProof(body, initial);
+    await current();
+    const common = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
+      sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
+      worldRef: body.worldRef };
+    const requestId = step => `${body.requestId}:world-context:${step}`;
+    const call = async (operation, request) => {
+      validateBoundRequest('canvas/v4', operation, request);
+      await current();
+      // The trusted Host captures this exact child within the active parent
+      // invocation. Canvas authorizes each operation independently; Workshop
+      // neither mints a proof nor broadens SELECT to world-write operations.
+      const raw = await this.canvas.call(operation, request);
+      await current();
+      const response = operation === 'ReadWorldSelectionContext' ?
+        validateWorldSelectionContextResponse(request, raw) :
+        validateResponse('canvas/v4', operation, raw);
+      if (response.requestId !== request.requestId)
+        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+      if (response.error) {
+        const error = new Error(response.error.code); error.publicError = response.error; throw error;
+      }
+      return response.result;
+    };
+    const read = step => call('ReadWorldSelectionContext', { ...common, requestId: requestId(step) });
+    const clear = value => {
+      const next = copy(value);
+      next.context.activeWorldRef = null;
+      next.context.orderedSelectedObjectRefs = [];
+      next.offeredInventory = null;
+      next.pendingPlacement = null;
+      next.lastPlacement = null;
+      return next;
+    };
+    // A subsequent error/uncertain Canvas receipt must not leave the previous
+    // Workshop world marked ready. This changes only our own projection CAS.
+    state = await this.#save(body.sessionRef, log, clear(state));
+    await current();
+    let context = await read('before');
+    const selection = context.selection;
+    const sameWorld = selection.status === 'BOUND' &&
+      selection.context.activeWorldRef === body.worldRef;
+    const candidates = context.inventory.connections;
+    const candidate = sameWorld ? candidates.find(row => row.connectionRef === selection.connectionRef) :
+      candidates.length === 1 ? candidates[0] : null;
+    if (!candidate) {
+      if (candidates.length === 0 || sameWorld)
+        failure('CONNECTION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
+      failure('CAPABILITY_UNAVAILABLE', 'validate', 'REQUIRED_FACT_UNKNOWN');
+    }
+    if (candidate.readiness !== 'READY')
+      failure(candidate.readiness, 'validate', 'POLICY_UNAVAILABLE');
+    if (!sameWorld) {
+      const unbound = selection.status === 'UNBOUND';
+      const request = unbound ? { ...common, requestId: requestId('select'),
+        connectionRef: candidate.connectionRef, expectedRevision: selection.sessionRevision } :
+        { ...common, requestId: requestId('switch'),
+          worldRef: selection.context.activeWorldRef, fromWorldRef: selection.context.activeWorldRef,
+          toWorldRef: body.worldRef, toConnectionRef: candidate.connectionRef,
+          expectedRevision: selection.context.sessionRevision };
+      const selected = await call(unbound ? 'SelectWorldConnection' : 'SwitchWorldConnection', request);
+      if (selected.currentSession !== body.sessionRef || selected.activeWorldRef !== body.worldRef)
+        failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
+      context = await read('selected');
+      if (context.selection.status !== 'BOUND' ||
+          context.selection.connectionRef !== candidate.connectionRef ||
+          canonicalize(context.selection.context) !== canonicalize(selected))
+        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
+    }
+    const selectedCandidate = context.inventory.connections.find(row =>
+      row.connectionRef === context.selection.connectionRef);
+    if (!selectedCandidate)
+      failure('CONNECTION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
+    if (selectedCandidate.readiness !== 'READY')
+      failure(selectedCandidate.readiness, 'validate', 'POLICY_UNAVAILABLE');
+    const inventory = await call('ListObjects', { ...common,
+      requestId: requestId('objects'), expectedRevision: null });
+    if (inventory.worldRef !== body.worldRef)
+      failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
+    const released = await read('release');
+    if (canonicalize(released) !== canonicalize(context))
+      failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
+    await current();
+    state.context.activeWorldRef = body.worldRef;
+    state.context.selectionRevision = body.selectionRevision;
+    state = await this.#save(body.sessionRef, log, state, current);
+    try { await current(); }
+    catch (error) {
+      // Authorization may change while storage awaits durable completion.
+      // Clear only the projection revision we just saved, before rejecting.
+      const cleared = clear(state);
+      cleared.context.sessionRevision = revision();
+      await this.projectionStore.replace(body.sessionRef, log.coreIdentity,
+        state.context.sessionRevision, cleared);
+      throw error;
+    }
+    return this.#snapshot(state);
+  }
+
   async #readCore(id) {
     if (!this.sessionPersistence?.open) failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
     let handle;
@@ -158,7 +290,7 @@ export class WorkshopV1 {
     return { log, state };
   }
 
-  async #save(id, log, state) {
+  async #save(id, log, state, beforeWrite = null) {
     const next = copy(state);
     const expectedRevision = next.context.sessionRevision;
     next.context.sessionRevision = revision();
@@ -168,6 +300,7 @@ export class WorkshopV1 {
     if (current.events.length !== log.events.length ||
         JSON.stringify(current.coreIdentity) !== JSON.stringify(log.coreIdentity))
       failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
+    if (beforeWrite) await beforeWrite();
     await this.projectionStore.replace(id, log.coreIdentity, expectedRevision, next);
     return next;
   }
@@ -377,7 +510,8 @@ export class WorkshopV1 {
       body = raw instanceof Uint8Array || typeof raw === 'string' ?
         admitRequest(version, operation, Buffer.from(raw)) :
         validateRequest(version, operation, raw);
-      const proof = await this.#authorized(body, operation);
+      const proof = operation === 'SwitchWorldContext' ?
+        await this.#worldContextProof(body) : await this.#authorized(body, operation);
       if (relayPrincipal && (operation !== 'InvokeAction' ||
           proof.surface !== 'LUANTI' || proof.worldRef !== relayPrincipal.worldRef ||
           proof.engineActorName !== relayPrincipal.engineActorName))
@@ -396,7 +530,7 @@ export class WorkshopV1 {
       const denied = packet(version, body?.requestId ?? null, null,
         operation === 'ReadSessionTurnDetails' ? readbackPublic(error) : toPublic(error));
       return ['ReadSessionTurnDetails', 'ReadCurrentUndoStatus', 'UndoCurrentBuild',
-        'AdvanceCurrentBuild'].includes(operation) && body?.requestId
+        'AdvanceCurrentBuild', 'SwitchWorldContext'].includes(operation) && body?.requestId
         ? validateResponse(version, operation, denied) : denied;
     }
   }
@@ -1352,31 +1486,7 @@ export class WorkshopV1 {
         model: 'gpt-5.6-luna', resultText: '已记录已验证的操作回执。', clarification: null };
     }
     if (operation === 'SwitchWorldContext') {
-      if (state.context.sessionRevision !== body.expectedRevision)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      if (state.pendingApply?.status === 'RESERVED')
-        failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-      requirePeer(this.canvas,
-        { wires: ['canvas/v4'], factProfiles: [] });
-      if (!this.canvas?.call)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const inventoryRequest = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: `world-proof-${body.requestId}`,
-        authorizationRef: body.authorizationRef, worldRef: body.worldRef,
-        expectedRevision: null };
-      validateBoundRequest('canvas/v4', 'ListObjects', inventoryRequest);
-      const inventory = validateResponse('canvas/v4', 'ListObjects',
-        await this.canvas.call('ListObjects', inventoryRequest));
-      if (inventory.error) { const error = new Error(inventory.error.code); error.publicError = inventory.error; throw error; }
-      if (inventory.result.worldRef !== body.worldRef)
-        failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      state.context.activeWorldRef = body.worldRef;
-      state.context.orderedSelectedObjectRefs = [];
-      state.context.selectionRevision = body.selectionRevision;
-      state.offeredInventory = null;
-      state.pendingPlacement = null;
-      state.lastPlacement = null;
-      return this.#snapshot(await this.#save(body.sessionRef, log, state));
+      return this.#switchWorldContext(body, log, state, proof);
     }
     if (operation === 'AppendMultimodalTurn') {
       if (state.context.sessionRevision !== body.expectedRevision)
