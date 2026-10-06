@@ -1,0 +1,8 @@
+{
+  "label": "project-root",
+  "chunk_id": "c36829",
+  "wall_time_seconds": 7.583e-06,
+  "exit_code": 0,
+  "original_token_count": 233,
+  "output": "{\n  \"receiptPath\": \"/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/admission-codex-20261007/project-root-receipt.json\",\n  \"receipt\": {\n    \"card\": \"S1-WS-WRITE-TOOLS-01\",\n    \"stage\": \"ADMISSION_ONLY\",\n    \"workerThreadId\": \"01a11392-fae1-7862-8968-676841044b15\",\n    \"timestampUTC\": \"2026-10-06T23:37:00.354384+00:00\",\n    \"nativeTool\": \"exec_command\",\n    \"actualCwd\": \"/Users/yzliu/work/projects/hana-world-mvp\",\n    \"probeDirectory\": \"/Users/yzliu/work/projects/hana-world-mvp/.hw-ws-admission-duhin0qe\",\n    \"directoryMode\": \"0o700\",\n    \"fileMode\": \"0o600\",\n    \"bytes\": 32,\n    \"writeSHA256\": \"242677b7c6841f95ca1c5b7e40e61cca00b78bfb6428dc2735385e8600f538f5\",\n    \"readSHA256\": \"242677b7c6841f95ca1c5b7e40e61cca00b78bfb6428dc2735385e8600f538f5\",\n    \"shaMatch\": true,\n    \"fileDeleted\": true,\n    \"directoryDeleted\": true,\n    \"sudoUsed\": false,\n    \"sourceChanged\": false,\n    \"gatesRun\": false\n  }\n}\n"
+}

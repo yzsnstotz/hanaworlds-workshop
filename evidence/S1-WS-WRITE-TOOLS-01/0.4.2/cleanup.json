@@ -1,0 +1,19 @@
+{
+  "deleted": [
+    "source/node_modules",
+    "npm-cache",
+    "brush-codex-dev",
+    "runtime-codex-red",
+    "runtime-codex-green"
+  ],
+  "gateRuntimeRemoved": true,
+  "cleanupVerificationCorrection": "First verification matched retained runtime.txt; corrected to directory entries only. No additional deletion.",
+  "kept": [
+    "source",
+    "_evidence (all old evidence/admission/fixed baseline tar inputs)",
+    "_evidence/final-042/hanaworlds-workshop-0.4.2.tgz"
+  ],
+  "sourceBranch": "codex/s1-ws-write-tools-01",
+  "sourceCommit": "947231b92488e2c38c29977d11ad3135f0df7117",
+  "sourceClean": true
+}

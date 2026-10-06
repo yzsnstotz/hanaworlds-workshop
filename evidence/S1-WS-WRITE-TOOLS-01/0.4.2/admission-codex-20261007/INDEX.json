@@ -1,0 +1,51 @@
+{
+  "files": [
+    {
+      "name": "native-exec-receipts.json",
+      "bytes": 6347,
+      "mode": "0o600",
+      "sha256": "d2031e72912f8e0164b804b529782276e10f4e87d0ceb95d37a0729f770b0398"
+    },
+    {
+      "name": "private-tmp-native-command.txt",
+      "bytes": 1706,
+      "mode": "0o600",
+      "sha256": "836ca7ad58c3a4cf0267157c1fe01574532b4a36bf7b24ae8764889cf53b03fe"
+    },
+    {
+      "name": "private-tmp-native-output.json",
+      "bytes": 1110,
+      "mode": "0o600",
+      "sha256": "7c266ea3c250d22db3b9d5c872d208b1ab7c0ef0036441f7c72da50104254f11"
+    },
+    {
+      "name": "private-tmp-receipt.json",
+      "bytes": 679,
+      "mode": "0o600",
+      "sha256": "ccd790a635812bb7c6ab08e8c43667708b92c985e4b829f1218859a265aabc67"
+    },
+    {
+      "name": "project-root-native-command.txt",
+      "bytes": 1736,
+      "mode": "0o600",
+      "sha256": "7194d4fd6d2ec333e6e2e583a8f1ae89e32d05ec1fa55f69f019c299f86437fa"
+    },
+    {
+      "name": "project-root-native-output.json",
+      "bytes": 1170,
+      "mode": "0o600",
+      "sha256": "c9671f8fe7f78d6c759288ff86397bd7d03cd00eca3a10502149b69a5094800f"
+    },
+    {
+      "name": "project-root-receipt.json",
+      "bytes": 737,
+      "mode": "0o600",
+      "sha256": "3bece6b6eb86d6223f57b157ac31b04f3604c659c7ff860143bc89d27a6f7c9c"
+    }
+  ],
+  "nativeChunks": [
+    "c36829",
+    "670352"
+  ],
+  "admissionOnly": true
+}

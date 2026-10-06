@@ -1,0 +1,29 @@
+python3 - <<'PY'
+import os, pathlib, tempfile, hashlib, json, stat, datetime
+cwd=pathlib.Path.cwd().resolve()
+expected=pathlib.Path("/Users/yzliu/work/projects/hana-world-mvp").resolve()
+assert cwd == expected, (cwd,expected)
+evidence=pathlib.Path('/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/admission-codex-20261007')
+evidence.mkdir(mode=0o700,parents=True,exist_ok=True)
+os.chmod(evidence,0o700)
+probe=pathlib.Path(tempfile.mkdtemp(prefix='.hw-ws-admission-',dir=cwd))
+os.chmod(probe,0o700)
+file=probe/'payload.bin'
+payload=os.urandom(32)
+with file.open('xb') as f: f.write(payload)
+os.chmod(file,0o600)
+written=hashlib.sha256(payload).hexdigest()
+readback=file.read_bytes()
+readsha=hashlib.sha256(readback).hexdigest()
+mode=stat.S_IMODE(file.stat().st_mode)
+dirmode=stat.S_IMODE(probe.stat().st_mode)
+assert len(readback)==32 and mode==0o600 and dirmode==0o700 and written==readsha
+file.unlink()
+probe.rmdir()
+assert not file.exists() and not probe.exists()
+receipt={'card':'S1-WS-WRITE-TOOLS-01','stage':'ADMISSION_ONLY','workerThreadId':os.environ.get('CODEX_THREAD_ID'),'timestampUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'nativeTool':'exec_command','actualCwd':str(cwd),'probeDirectory':str(probe),'directoryMode':oct(dirmode),'fileMode':oct(mode),'bytes':len(readback),'writeSHA256':written,'readSHA256':readsha,'shaMatch':written==readsha,'fileDeleted':not file.exists(),'directoryDeleted':not probe.exists(),'sudoUsed':False,'sourceChanged':False,'gatesRun':False}
+receiptpath=evidence/'project-root-receipt.json'
+receiptpath.write_text(json.dumps(receipt,indent=2)+'\n')
+os.chmod(receiptpath,0o600)
+print(json.dumps({'receiptPath':str(receiptpath),'receipt':receipt},indent=2))
+PY
