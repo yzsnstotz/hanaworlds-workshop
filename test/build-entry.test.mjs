@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { WorkshopV1 } from '../src/index.mjs';
-import * as contracts from '../vendor/contracts/dist/v4/index.mjs';
+import * as contracts from 'hanaworlds-contracts/v4';
+import { buildAuthority } from './helpers/build-authority.mjs';
 
 function fixture() {
   const chain = JSON.parse(readFileSync(new URL(
@@ -109,15 +110,7 @@ function fixture() {
       workshop.compilerConfig = { async read() { return {
         compilationConfig: chain.brushRequest.compilationConfig,
         compilerRevision: chain.brushRequest.compilerRevision }; } };
-      workshop.applyAuthority = { async issue(binding) { return {
-        contractVersion: 'world-adapter/v2', authorizerRef: 'engine-authorizer',
-        actorRef: binding.actorRef, grantEpoch: 'epoch-1', bindingRef: 'verified-binding',
-        worldRef: binding.worldRef, sessionRef: binding.sessionRef,
-        turnRevision: binding.turnRevision, intentDigest: binding.intentDigest,
-        surfaceActionDigest: 'b'.repeat(64), allowedAction: 'APPLY_RECOVERABLE',
-        transactionId: binding.transactionId, operationDigest: binding.operationDigest,
-        worldRevision: binding.worldRevision, selectionRevision: binding.selectionRevision,
-        analysisDigest: binding.analysisDigest, decisionRevision: null }; } };
+      workshop.applyAuthority = buildAuthority(request());
     } };
 }
 

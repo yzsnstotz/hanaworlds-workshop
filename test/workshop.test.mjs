@@ -674,14 +674,6 @@ test('passes the recorded RegionInspection unchanged into painter/v3 and require
   const proposal = { kind: 'BUILD_STRUCTURE', text: '小石屋', purpose: 'first building',
     dimensions: { width: 1, depth: 1, height: 1, unit: 'node' }, entrancePortalRefs: [] };
   const base = { canvas, painter, brush,
-    applyAuthority: { async issue(binding) { return { contractVersion: 'world-adapter/v2',
-      authorizerRef: 'engine-authorizer', actorRef: binding.actorRef, grantEpoch: 'epoch-1',
-      bindingRef: 'verified-binding', worldRef: binding.worldRef, sessionRef: binding.sessionRef,
-      turnRevision: binding.turnRevision, intentDigest: binding.intentDigest,
-      surfaceActionDigest: 'b'.repeat(64), allowedAction: 'APPLY_RECOVERABLE',
-      transactionId: binding.transactionId, operationDigest: binding.operationDigest,
-      worldRevision: binding.worldRevision, selectionRevision: binding.selectionRevision,
-      analysisDigest: binding.analysisDigest, decisionRevision: null }; } },
     catalogue: { async read() { return chain.painterRequest.catalogue; } },
     safety: { async read() { return chain.painterRequest.safetyProfile; } },
     compilerConfig: { async read() { return { compilationConfig: chain.brushRequest.compilationConfig,
@@ -729,19 +721,12 @@ test('passes the recorded RegionInspection unchanged into painter/v3 and require
   const analysis = await withImage.analyzeCurrentBuild({ actorRef: 'user', sessionRef: 's1',
     authorizationRef: 'grant', turnRef: 'turn-1', requestId: 'analyze' });
   assert.deepEqual(JSON.parse(JSON.stringify(analysis.affectedObjectRefs)), []);
-  const applied = await withImage.applyCurrentBuild({ actorRef: 'user', sessionRef: 's1',
-    authorizationRef: 'grant', turnRef: 'turn-1', requestId: 'apply' });
-  assert.equal(applied.status, 'VERIFIED');
-  const applyRequest = canvasCalls.find(call => call.operation === 'ApplyRecoverableCommit').request;
-  assert.equal(applyRequest.regionInspectionBinding.inspectionId, chain.adapterInspectResponse.result.inspection.inspectionId);
-  assert.deepEqual(JSON.parse(JSON.stringify(applyRequest.regionInspectionBinding.build)), chain.painterResponse.result.build);
-  const current = await withImage.call('StartOrResumeSession', { ...start(), requestId: 'after-apply' });
-  const recorded = await withImage.call('RecordActionReceipt', { contractVersion: 'session/v2',
-    actorRef: 'user', sessionRef: 's1', requestId: 'record', authorizationRef: 'grant',
-    turnRef: 'turn-1', expectedRevision: current.result.context.sessionRevision,
-    actionId: 'confirmed-apply', domainReceiptDigest: contracts.digestValue('receipt', applied).sha256 });
-  assert.equal(recorded.error, null);
-  assert.equal(recorded.result.briefDigest, painterCalls[0].request.referenceBriefDigest);
+  // Applying without a durable public AdvanceCurrentBuild parent and the new
+  // Host issuance capability fails closed; full public flow is tested separately.
+  await assert.rejects(() => withImage.applyCurrentBuild({ actorRef: 'user', sessionRef: 's1',
+    authorizationRef: 'grant', turnRef: 'turn-1', requestId: 'apply' }));
+  assert.equal(canvasCalls.some(call => call.operation === 'ApplyRecoverableCommit'), false);
+
 });
 
 test('uses fresh Canvas inventory names for object selection and refuses an unoffered ref', async () => {
@@ -773,42 +758,17 @@ test('uses fresh Canvas inventory names for object selection and refuses an unof
   assert.equal(operations.filter(x => x === 'SetObjectSelection').length, 1);
 });
 
-test('an uncertain Apply reuses its durable Canvas request after Workshop restart', async () => {
-  const fixtures = JSON.parse(readFileSync(new URL('../vendor/contracts/fixtures/v4/candidate/placement-region-chain-v4.json', import.meta.url)));
-  const request = fixtures.validCases[0].materializedChain.applyRequest;
-  const contracts = contractsV4;
-  const calls = [];
-  const canvas = { contractHandshake: contracts.contractHandshake,
-    async call(operation, actual) {
-      assert.equal(operation, 'ApplyRecoverableCommit');
-      calls.push(structuredClone(actual));
-      if (calls.length === 1) throw Error('connection lost after possible effect');
-      return { contractVersion: 'canvas/v4', requestId: actual.requestId, error: null,
-        result: { contractVersion: 'canvas/v2', transactionId: actual.transactionId,
-          operationDigest: actual.operationDigest, transactionPayloadDigest: 'a'.repeat(64),
-          status: 'VERIFIED', previousWorldRevision: actual.expectedWorldRevision,
-          observedWorldRevision: 'world-after', readbackDigest: 'c'.repeat(64),
-          restoreStatus: 'NOT_REQUIRED', error: null } };
-    } };
-  const { workshop, sessions, projectionStore } = setup({ canvas });
-  sessions.logs.set(request.sessionRef, { meta: { version: SESSION_FORMAT_VERSION,
-    id: request.sessionRef, createdAt: 2, isSeeded: false },
-  events: [], owned: true, flushes: 0 });
-  await workshop.call('StartOrResumeSession', start(request.sessionRef));
-  const state = structuredClone(projectionStore.state(request.sessionRef));
-  state.pendingApply = { request, turnRef: 'turn-1', status: 'RESERVED' };
-  projectionStore.rows.get(request.sessionRef).state = state;
-  const body = { actorRef: request.actorRef, sessionRef: request.sessionRef,
-    authorizationRef: request.authorizationRef, turnRef: 'turn-1', requestId: 'retry-1' };
-  await assert.rejects(() => workshop.applyCurrentBuild(body));
-  const restarted = new WorkshopV1({ sessionPersistence: sessions, projectionStore,
-    authority: workshop.authority, canvas });
-  const recovered = await restarted.applyCurrentBuild({ ...body, requestId: 'retry-2' });
-  assert.equal(recovered.status, 'VERIFIED');
-  assert.deepEqual(calls, [request, request]);
-  const cached = await restarted.applyCurrentBuild({ ...body, requestId: 'retry-3' });
-  assert.equal(cached.status, 'VERIFIED');
-  assert.equal(calls.length, 2);
+test('an unproven reserved Apply cannot bypass current Host authorization', async () => {
+  const { workshop, projectionStore } = setup();
+  await workshop.call('StartOrResumeSession', start());
+  projectionStore.state().pendingApply = { turnRef: 'turn-1', status: 'RESERVED',
+    request: { actorRef: 'user', authorizationRef: 'grant' } };
+  let calls = 0;
+  workshop.canvas = { contractHandshake: contractsV4.contractHandshake,
+    call() { calls++; throw Error('must not dispatch'); } };
+  await assert.rejects(() => workshop.applyCurrentBuild({ actorRef: 'user', sessionRef: 's1',
+    authorizationRef: 'grant', turnRef: 'turn-1', requestId: 'arbitrary-retry' }), { code: 'CAPABILITY_UNAVAILABLE' });
+  assert.equal(calls, 0);
 });
 
 test('fixed Core delete seam fails honestly and resource reopen does not depend on old Session log', async () => {

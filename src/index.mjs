@@ -11,6 +11,9 @@ import {
   validateUndoRecoveryResponse, checkBuildEntryHandshake,
   validateBuildEntryContext, validateBuildEntryResponse,
   checkWorldContextHandshake, validateWorldSelectionContextResponse,
+  checkCurrentBuildAuthorizationHandshake, validateCurrentBuildAuthorizationFacts,
+  validateCurrentBuildAuthorizedApply,
+  operationContracts,
 } from 'hanaworlds-contracts/v4';
 
 const VERSION = 'session/v2';
@@ -527,8 +530,14 @@ export class WorkshopV1 {
         validateBuildEntryResponse(body, response) :
         validateResponse(version, operation, response);
     } catch (error) {
+      let publicError = operation === 'ReadSessionTurnDetails' ? readbackPublic(error) : toPublic(error);
+      if (operation === 'AdvanceCurrentBuild' && !operationContracts[VERSION]
+          .find(row => row.operation === operation).failureCodes.includes(publicError.code)) {
+        publicError = { ...publicError, causeCode: publicError.code,
+          code: publicError.code === 'CONNECTION_UNAUTHORIZED' ? 'PERMISSION_DENIED' : 'CAPABILITY_UNAVAILABLE' };
+      }
       const denied = packet(version, body?.requestId ?? null, null,
-        operation === 'ReadSessionTurnDetails' ? readbackPublic(error) : toPublic(error));
+        publicError);
       return ['ReadSessionTurnDetails', 'ReadCurrentUndoStatus', 'UndoCurrentBuild',
         'AdvanceCurrentBuild', 'SwitchWorldContext'].includes(operation) && body?.requestId
         ? validateResponse(version, operation, denied) : denied;
@@ -651,7 +660,7 @@ export class WorkshopV1 {
           'CONFLICT' : 'NEW' });
       if (prior?.outcome) return prior.outcome;
       if (!prior) {
-        entries[body.requestId] = { payloadDigest, turnRef: current.turnRef,
+        entries[body.requestId] = { payloadDigest, parentRequest: copy(body), turnRef: current.turnRef,
           worldRef: body.worldRef, authorizationRef: body.authorizationRef,
           outcome: null };
         state = await this.#save(body.sessionRef, log, state);
@@ -713,7 +722,8 @@ export class WorkshopV1 {
         catch (error) {
           await refresh();
           if (state.pendingApply?.turnRef === current.turnRef &&
-              state.pendingApply.status === 'RESERVED' && !error?.publicError)
+              state.pendingApply.status === 'RESERVED' &&
+              (!error?.publicError || error.buildApplyDispatched))
             return pending('APPLY');
           throw error;
         }
@@ -1048,83 +1058,111 @@ export class WorkshopV1 {
     });
   }
 
+  #currentBuildAuthorizationFacts(body, state) {
+    const entry = Object.values(state.buildEntries ?? {}).find(row =>
+      row.parentRequest?.requestId + ':apply' === body.requestId);
+    if (!entry) failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    const parent = validateRequest(VERSION, 'AdvanceCurrentBuild', entry.parentRequest);
+    if (entry.payloadDigest !== hash(canonicalize(parent)))
+      failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
+    const turn = state.turns.at(-1), saved = state.confirmedIntents[body.turnRef];
+    const compiled = state.lastCompiled, analysis = state.lastAnalysis;
+    if (!turn || turn.turnRef !== body.turnRef || turn.turnRevision !== parent.expectedTurnRevision ||
+        !saved?.confirmationInputId || state.pendingClarification?.turnRef === body.turnRef)
+      failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
+    if (!compiled || !analysis || compiled.turnRef !== body.turnRef ||
+        analysis.turnRef !== body.turnRef || state.context.activeWorldRef !== compiled.worldRef ||
+        state.context.activeWorldRef !== parent.worldRef)
+      failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
+    const facts = validateCurrentBuildAuthorizationFacts({
+      contractVersion: 'current-build-authorization/v1', parentRequest: parent,
+      turnRef: body.turnRef, confirmationInputId: saved.confirmationInputId,
+      intent: saved.intent, analysis: analysis.analysis,
+      apply: { contractVersion: 'canvas/v4', actorRef: body.actorRef,
+        sessionRef: body.sessionRef, requestId: body.requestId,
+        authorizationRef: body.authorizationRef, worldRef: compiled.worldRef,
+        transactionId: analysis.transactionId, operations: compiled.compiled.projection,
+        operationDigest: compiled.compiled.operationDigest, analysisDigest: analysis.analysisDigest,
+        decisionRevision: null, expectedWorldRevision: analysis.analysis.worldRevision,
+        expectedObjectRevisions: {}, guarantee: 'RECOVERABLE_VERIFIED',
+        regionInspectionBinding: { inspectionId: compiled.inspection.inspectionId, build: compiled.build } },
+    });
+    if (entry.authorizationFacts && canonicalize(entry.authorizationFacts) !== canonicalize(facts))
+      failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
+    return facts;
+  }
+
+  async #verifyCurrentBuildUse(body, issued, request) {
+    const canvas = this.canvas, host = this.applyAuthority;
+    const initial = await this.#load(body.sessionRef);
+    const facts = this.#currentBuildAuthorizationFacts(body, initial.state);
+    // Host authenticates its callback and independently captures the actual
+    // parent/child, Session incarnation, engine grant and service instances.
+    const context = await host.readCurrentBuildContext(copy(facts), copy(issued), copy(request));
+    await this.#authorized(facts.parentRequest, 'AdvanceCurrentBuild');
+    const latest = await this.#load(body.sessionRef);
+    const fresh = this.#currentBuildAuthorizationFacts(body, latest.state);
+    if (this.canvas !== canvas || this.applyAuthority !== host)
+      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    if (canonicalize(facts) !== canonicalize(fresh))
+      failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
+    validateCurrentBuildAuthorizedApply(request, issued, fresh, context);
+    return latest;
+  }
+
   async applyCurrentBuild(body) {
     await this.#authorized(body, 'ApplyCurrentBuild');
     return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const pending = state.pendingApply;
-      if (pending?.status === 'RESERVED' && pending.turnRef !== body.turnRef)
-        failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-      if (pending?.turnRef === body.turnRef) {
-        if (pending.status === 'VERIFIED') return pending.response.result;
-        if (pending.status !== 'RESERVED')
-          failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-        if (pending.request.actorRef !== body.actorRef ||
-            pending.request.authorizationRef !== body.authorizationRef)
-          failure('AUTHORIZATION_REVOKED', 'authorize', 'GRANT_REVOKED');
-        // Canvas owns durable transaction recovery. Reuse the exact reserved
-        // request and idempotency key after an uncertain transport outcome.
-        requirePeer(this.canvas,
-          { wires: ['canvas/v4'], factProfiles: ['target-facts/v3'] });
-        validateBoundRequest('canvas/v4', 'ApplyRecoverableCommit', pending.request);
-        const retried = validateResponse('canvas/v4', 'ApplyRecoverableCommit',
-          await this.canvas.call('ApplyRecoverableCommit', pending.request));
-        state.pendingApply.status = retried.error?.mutationState === 'NONE' ||
-          retried.error?.mutationState === 'ROLLED_BACK' ? 'FAILED' :
-          retried.error ? 'RESERVED' : retried.result.status;
-        state.pendingApply.response = retried;
-        await this.#save(body.sessionRef, log, state);
-        if (retried.error) { const error = new Error(retried.error.code); error.publicError = retried.error; throw error; }
-        return retried.result;
-      }
-      const compiled = state.lastCompiled, analysis = state.lastAnalysis;
-      const intent = state.confirmedIntents[body.turnRef]?.intent;
-      if (!compiled || !analysis || !intent ||
-          compiled.turnRef !== body.turnRef || analysis.turnRef !== body.turnRef ||
-          state.context.activeWorldRef !== compiled.worldRef ||
-          analysis.analysis.operationDigest !== compiled.compiled.operationDigest)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      if (analysis.analysis.affectedObjectRefs.length > 0)
-        failure('OTHER_OBJECTS_AFFECTED', 'validate', 'SCOPE_DENIED');
-      requirePeer(this.canvas,
+      checkCurrentBuildAuthorizationHandshake(this.contractHandshake);
+      const canvasPeer = requirePeer(this.canvas,
         { wires: ['canvas/v4'], factProfiles: ['target-facts/v3'] });
-      if (!this.applyAuthority?.issue)
+      checkCurrentBuildAuthorizationHandshake(canvasPeer.advertised);
+      const hostPeer = requirePeer(this.applyAuthority,
+        { wires: ['session/v2', 'canvas/v4', 'session-authorization/v1'], factProfiles: [] });
+      checkCurrentBuildAuthorizationHandshake(hostPeer.advertised);
+      if (!this.applyAuthority.issue || !this.applyAuthority.readCurrentBuildContext)
         failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const turnRevision = state.turns.find(row => row.turnRef === body.turnRef)?.turnRevision;
-      const facts = { actorRef: body.actorRef, sessionRef: body.sessionRef,
-        worldRef: compiled.worldRef, turnRevision,
-        intentDigest: digestValue('intent', intent).sha256,
-        transactionId: analysis.transactionId,
-        operationDigest: compiled.compiled.operationDigest,
-        worldRevision: analysis.analysis.worldRevision,
-        selectionRevision: analysis.analysis.selectionRevision,
-        analysisDigest: analysis.analysisDigest,
-        decisionRevision: null, allowedAction: 'APPLY_RECOVERABLE' };
-      const authorizationBinding = validateType('AuthProjection',
-        await this.applyAuthority.issue(facts, body));
-      if (!['actorRef','sessionRef','worldRef','turnRevision','intentDigest','transactionId',
-        'operationDigest','worldRevision','selectionRevision','analysisDigest','decisionRevision',
-        'allowedAction'].every(key => authorizationBinding[key] === facts[key]))
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-      const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: compiled.worldRef,
-        transactionId: analysis.transactionId,
-        operations: compiled.compiled.projection,
-        operationDigest: compiled.compiled.operationDigest,
-        authorizationBinding,
-        authorizationBindingDigest: digestValue('authorization-binding', authorizationBinding).sha256,
-        analysisDigest: analysis.analysisDigest, decisionRevision: null,
-        expectedWorldRevision: analysis.analysis.worldRevision,
-        expectedObjectRevisions: {}, guarantee: 'RECOVERABLE_VERIFIED',
-        regionInspectionBinding: { inspectionId: compiled.inspection.inspectionId,
-          build: compiled.build } };
-      validateBoundRequest('canvas/v4', 'ApplyRecoverableCommit', request);
-      state.pendingApply = { request, turnRef: body.turnRef, status: 'RESERVED' };
-      await this.#save(body.sessionRef, log, state);
-      const response = validateResponse('canvas/v4', 'ApplyRecoverableCommit',
-        await this.canvas.call('ApplyRecoverableCommit', request));
-      const latest = await this.#load(body.sessionRef);
+      let { log, state } = await this.#load(body.sessionRef);
+      const facts = this.#currentBuildAuthorizationFacts(body, state);
+      let pending = state.pendingApply;
+      if (pending && pending.turnRef !== body.turnRef) {
+        if (!['VERIFIED', 'FAILED', 'ROLLED_BACK'].includes(pending.status))
+          failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
+        pending = null;
+      }
+      if (pending && pending.request.requestId !== body.requestId)
+        failure('TRANSACTION_CONFLICT', 'replay', 'PAYLOAD_CHANGED');
+      if (pending?.status === 'VERIFIED') return pending.response.result;
+      if (pending && pending.status !== 'RESERVED')
+        failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
+      if (!pending) {
+        // Preserve the exact parent and unsigned child before async issuance;
+        // a lost response retries those same durable facts, never a new tx.
+        state.buildEntries[facts.parentRequest.requestId].authorizationFacts = copy(facts);
+        await this.#save(body.sessionRef, log, state);
+        const issued = validateType('CurrentBuildAuthorization', await this.applyAuthority.issue(copy(facts), copy(body)));
+        const request = { ...facts.apply, authorizationBinding: issued.authorizationBinding,
+          authorizationBindingDigest: issued.authorizationBindingDigest };
+        ({ log, state } = await this.#verifyCurrentBuildUse(body, issued, request));
+        pending = { request, authorization: copy(issued), turnRef: body.turnRef, status: 'RESERVED' };
+        state.pendingApply = pending;
+        await this.#save(body.sessionRef, log, state);
+      }
+      // Includes retries after restart and the interval after durable reservation.
+      await this.#verifyCurrentBuildUse(body, pending.authorization, pending.request);
+      let response, latest;
+      // An async late response cannot publish success after revocation or a
+      // changed current turn. Keep RESERVED for the owning recovery path.
+      try {
+        response = validateResponse('canvas/v4', 'ApplyRecoverableCommit',
+          await this.canvas.call('ApplyRecoverableCommit', copy(pending.request)));
+        latest = await this.#verifyCurrentBuildUse(body, pending.authorization, pending.request);
+      } catch (error) {
+        // This attempt may already have written. Surface PENDING, never a
+        // pre-dispatch NONE failure, until authoritative recovery/readback.
+        error.buildApplyDispatched = true;
+        throw error;
+      }
       latest.state.pendingApply.status = response.error?.mutationState === 'NONE' ||
         response.error?.mutationState === 'ROLLED_BACK' ? 'FAILED' :
         response.error ? 'RESERVED' : response.result.status;
