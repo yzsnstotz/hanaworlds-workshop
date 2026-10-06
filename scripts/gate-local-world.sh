@@ -24,7 +24,7 @@ cd "$TASK_TEMP/source"
 npm ci --ignore-scripts --cache "$TASK_TEMP/npm-cache" --no-audit --no-fund > "$TASK_EVIDENCE/npm-ci.log" 2>&1
 npm run build > "$TASK_EVIDENCE/build.log" 2>&1
 HW_RUNTIME_ROOT="$TASK_TEMP/source-runtime" npm test > "$TASK_EVIDENCE/source-tests.log" 2>&1
-npm pack --ignore-scripts --json --pack-destination "$TASK_EVIDENCE" > "$TASK_EVIDENCE/pack.json"
+npm pack --ignore-scripts --cache "$TASK_TEMP/npm-cache" --json --pack-destination "$TASK_EVIDENCE" > "$TASK_EVIDENCE/pack.json"
 PACK_NAME=$(node --input-type=module -e 'import fs from "node:fs"; console.log(JSON.parse(fs.readFileSync(process.argv[1]))[0].filename)' "$TASK_EVIDENCE/pack.json")
 cp test/local-world-runtime.test.mjs "$TASK_TEMP/consumer/test/"
 cd "$TASK_TEMP/consumer"
