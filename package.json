@@ -1,6 +1,6 @@
 {
   "name": "hanaworlds-workshop",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -45,7 +45,8 @@
     "build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs && node --check src/image-attachment.mjs",
     "test": "node --test test/local-world-runtime.test.mjs test/image-attachment.test.mjs",
     "test:image": "node --test test/image-attachment.test.mjs",
-    "test:text-normal": "node --test --test-name-pattern='local text proposal' test/local-world-runtime.test.mjs"
+    "test:text-normal": "node --test --test-name-pattern='local text proposal' test/local-world-runtime.test.mjs",
+    "test:contracts-042": "node --test test/contracts-042-consumption.test.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -55,7 +56,7 @@
     "@deepseek-ai/dsh-storage-domain": "0.2.0-rc.2",
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
     "canonicalize": "5.1.0",
-    "hanaworlds-contracts": "https://codeload.github.com/yzsnstotz/hanaworlds-contracts/tar.gz/8cfb18f8e13aa33d7a942f230ec6117914322cdd",
+    "hanaworlds-contracts": "https://codeload.github.com/yzsnstotz/hanaworlds-contracts/tar.gz/aad7c0ea2a4a9a93dfb13555c46cd98b9b5da777",
     "zod": "4.6.5"
   },
   "devDependencies": {

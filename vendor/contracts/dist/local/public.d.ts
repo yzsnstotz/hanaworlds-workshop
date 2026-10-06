@@ -1,6 +1,6 @@
 export * from './contracts.js';
 import type {TypeMap,TypeName,OperationMap,ProjectionMap,ContractHandshake,LocalRequestFacts,CurrentBuildSubmission,ValidateBuildProposalRequest,ValidateBuildProposalResponse,BuildProposalProviderFacts,ScopedPreparedTransaction,ScopedPreparedTransactionResult,RegionInspection,MaterialMap,Catalogue,BuildProjection,FinalEffects,TargetFacts,SafetyProfile,Coverage} from './contracts.js';
-export declare const version: '0.4.0';
+export declare const version: '0.4.2';
 export declare const wireVersions: ReadonlyArray<keyof OperationMap>;
 export declare const compiledOperationsVersion: 'operations/v3';
 export declare const contractHandshake: ContractHandshake;
@@ -39,7 +39,7 @@ export declare const placementSettingDescriptors: ReadonlyArray<{readonly name:s
 export declare const placementInvariants: ReadonlyArray<{readonly id:string;readonly owner:string;readonly switchable:false;readonly text:string;readonly consequence:string}>;
 export declare const settingsSurface: {readonly where:string;readonly rule:string;readonly currentEvidence:'NOT_RUN'};
 export declare const canvasEventRules: Readonly<Record<string,unknown>>;
-export declare const digestProfile: Readonly<{domainPrefix:string;domainSuffix:string;projectionTypes:Readonly<Record<keyof ProjectionMap,TypeName>>}>;
+export declare const digestProfile: Readonly<{domainPrefix:string;domainSuffix:string;domainPrefixByKind?:Readonly<Partial<Record<keyof ProjectionMap,string>>>;projectionTypes:Readonly<Record<keyof ProjectionMap,TypeName>>}>;
 export declare const schemaInventory: ReadonlyArray<TypeName>;
 export declare function assertType<K extends TypeName>(name:K,input:unknown):void;
 export declare function validateCanvasEvent<K extends TypeName>(name:K,input:unknown):TypeMap[K];
@@ -65,3 +65,14 @@ export interface LocalEngineControlPort {
  inspect(query:import('./contracts.js').NativeControlQuery):Promise<import('./contracts.js').NativeControlEvidence>;
  withStoppedWorld<T>(query:import('./contracts.js').NativeControlQuery,consume:(facts:import('./contracts.js').NativeControlEvidence)=>Promise<T>):Promise<T>;
 }
+/** Actual asset bytes travel only on the in-process typed channel, never JSON.
+ * validateMaterialSources returns owned copies; typed array elements remain mutable. */
+export interface MaterialTextureBytes {readonly bytesDigest:import('./contracts.js').Digest;readonly bytes:Uint8Array;}
+export interface MaterialSources {readonly snapshot:import('./contracts.js').MaterialSourcesSnapshot;readonly textures:ReadonlyArray<MaterialTextureBytes>;}
+/** Additive subset of the existing hanaworldsLuantiNativeFacts service.
+ * Provider must verify the paired world/incarnation and source stability across
+ * the read. Host supplies a fresh Catalogue and fresh connection to validation. */
+export interface MaterialSourceFactsPort {readMaterialSources(worldRef:import('./contracts.js').Ref):Promise<MaterialSources>;}
+/** Checks association and content integrity, not provider authenticity, image
+ * decoding or static build eligibility. Call validateStaticMaterials as usual. */
+export declare function validateMaterialSources(input:unknown,catalogue:Catalogue,currentConnection:import('./contracts.js').MaterialSourceConnection):MaterialSources;

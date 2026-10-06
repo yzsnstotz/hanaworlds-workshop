@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://hanaworlds.invalid/contracts/0.4.0/schema.json",
+  "$id": "https://hanaworlds.invalid/contracts/0.4.2/schema.json",
   "definitions": {
     "AbortPreparedHistoryTransactionRequest": {
       "type": "object",
@@ -10124,6 +10124,257 @@
       ],
       "additionalProperties": false,
       "x-typeName": "WorldSelectionContext"
+    },
+    "MaterialSourceConnection": {
+      "x-typeName": "MaterialSourceConnection",
+      "type": "object",
+      "properties": {
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "connectionRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "connectionIncarnationRef": {
+          "$ref": "#/definitions/Ref"
+        }
+      },
+      "required": [
+        "worldRef",
+        "connectionRef",
+        "connectionIncarnationRef"
+      ],
+      "additionalProperties": false
+    },
+    "MaterialTextureSource": {
+      "x-typeName": "MaterialTextureSource",
+      "type": "object",
+      "properties": {
+        "textureName": {
+          "$ref": "#/definitions/Ref"
+        },
+        "sourceKind": {
+          "enum": [
+            "GAME",
+            "MOD"
+          ]
+        },
+        "sourceRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "interpretation": {
+          "const": "SIMPLE_UNIFORM_NODE_TILES"
+        },
+        "mediaType": {
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/webp"
+          ]
+        },
+        "bytesDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "byteLength": {
+          "$ref": "#/definitions/PositiveInt"
+        }
+      },
+      "required": [
+        "textureName",
+        "sourceKind",
+        "sourceRef",
+        "interpretation",
+        "mediaType",
+        "bytesDigest",
+        "byteLength"
+      ],
+      "additionalProperties": false
+    },
+    "MaterialSourceUnknownReason": {
+      "x-typeName": "MaterialSourceUnknownReason",
+      "enum": [
+        "UNKNOWN_PARAM2",
+        "UNKNOWN_DEFINITION",
+        "MISSING_TEXTURE",
+        "UNRESOLVED_SOURCE",
+        "UNSUPPORTED_APPEARANCE"
+      ]
+    },
+    "KnownMaterialSource": {
+      "x-typeName": "KnownMaterialSource",
+      "type": "object",
+      "properties": {
+        "availability": {
+          "const": "KNOWN"
+        },
+        "nodeName": {
+          "$ref": "#/definitions/Ref"
+        },
+        "param2": {
+          "$ref": "#/definitions/Byte"
+        },
+        "definitionRevision": {
+          "$ref": "#/definitions/Revision"
+        },
+        "texture": {
+          "$ref": "#/definitions/MaterialTextureSource"
+        }
+      },
+      "required": [
+        "availability",
+        "nodeName",
+        "param2",
+        "definitionRevision",
+        "texture"
+      ],
+      "additionalProperties": false
+    },
+    "UnknownMaterialSource": {
+      "x-typeName": "UnknownMaterialSource",
+      "type": "object",
+      "properties": {
+        "availability": {
+          "const": "UNKNOWN"
+        },
+        "nodeName": {
+          "$ref": "#/definitions/Ref"
+        },
+        "param2": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Byte"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "definitionRevision": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Revision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "texture": {
+          "type": "null"
+        },
+        "reason": {
+          "$ref": "#/definitions/MaterialSourceUnknownReason"
+        }
+      },
+      "required": [
+        "availability",
+        "nodeName",
+        "param2",
+        "definitionRevision",
+        "texture",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "MaterialSource": {
+      "x-typeName": "MaterialSource",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/KnownMaterialSource"
+        },
+        {
+          "$ref": "#/definitions/UnknownMaterialSource"
+        }
+      ],
+      "x-discriminator": "availability",
+      "x-variantKeys": [
+        "KNOWN",
+        "UNKNOWN"
+      ]
+    },
+    "MaterialSourcesProjection": {
+      "x-typeName": "MaterialSourcesProjection",
+      "type": "object",
+      "properties": {
+        "profileVersion": {
+          "const": "material-sources/v1"
+        },
+        "connection": {
+          "$ref": "#/definitions/MaterialSourceConnection"
+        },
+        "catalogueDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "gameId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "gameRevision": {
+          "$ref": "#/definitions/Revision"
+        },
+        "sourceBasis": {
+          "const": "SERVER_ASSET_ONLY"
+        },
+        "materials": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MaterialSource"
+          }
+        }
+      },
+      "required": [
+        "profileVersion",
+        "connection",
+        "catalogueDigest",
+        "gameId",
+        "gameRevision",
+        "sourceBasis",
+        "materials"
+      ],
+      "additionalProperties": false
+    },
+    "MaterialSourcesSnapshot": {
+      "x-typeName": "MaterialSourcesSnapshot",
+      "type": "object",
+      "properties": {
+        "profileVersion": {
+          "const": "material-sources/v1"
+        },
+        "connection": {
+          "$ref": "#/definitions/MaterialSourceConnection"
+        },
+        "catalogueDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "gameId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "gameRevision": {
+          "$ref": "#/definitions/Revision"
+        },
+        "sourceBasis": {
+          "const": "SERVER_ASSET_ONLY"
+        },
+        "materials": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MaterialSource"
+          }
+        },
+        "sourceRevision": {
+          "$ref": "#/definitions/Digest"
+        }
+      },
+      "required": [
+        "profileVersion",
+        "connection",
+        "catalogueDigest",
+        "gameId",
+        "gameRevision",
+        "sourceBasis",
+        "materials",
+        "sourceRevision"
+      ],
+      "additionalProperties": false
     }
   }
 }

@@ -1,9 +1,9 @@
-HanaWorlds Workshop 0.2.1 local-world component candidate.
+HanaWorlds Workshop 0.2.2 local-world component candidate.
 
 HanaWorlds-owned source is MIT; see LICENSE. Runtime imports
-hanaworlds-contracts@0.4.0 (MIT), pinned to public revision
-8cfb18f8e13aa33d7a942f230ec6117914322cdd and package-lock integrity.
-Admitted package SHA256 d7b22e76de5e161abe7525596df608b3f00445fb4237808941cb5ef8328e9bc4.
+hanaworlds-contracts@0.4.2 (MIT), pinned to public revision
+aad7c0ea2a4a9a93dfb13555c46cd98b9b5da777 and package-lock integrity.
+Admitted package SHA256 c3528a4fc3f0cdf94245c4d2d8b1cfa5d28db96d1cd00ae74737bdbdfcd26ec6.
 The development vendor is copied verbatim from that public package including
 its LICENSE/NOTICE/licenses; scripts/generate-vendored-contracts.py reproduces
 it without editing generated modules. Vendor and deferred sources do not ship.

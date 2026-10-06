@@ -1,6 +1,6 @@
-# Workshop 0.2.1 — local-world skill business component
+# Workshop 0.2.2 — local-world skill business component
 
-Fresh profile only. Exact contracts 0.4.0 / source 8cfb18f8e13aa33d7a942f230ec6117914322cdd; root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
+Fresh profile only. Exact contracts 0.4.2 / source aad7c0ea2a4a9a93dfb13555c46cd98b9b5da777; root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
 ## Host assembly
 

@@ -325,6 +325,14 @@ export type WorldConnectionSelectedReceipt = { readonly "contractVersion": "canv
 export type WorldConnectionSelectionChanged = { readonly "contractVersion": "canvas/v5"; readonly "event": "WorldConnectionSelectionChanged"; readonly "operation": "SelectWorldConnection"; readonly "receipt": WorldConnectionSelectedReceipt };
 export type WorldConnectionSwitchedReceipt = { readonly "contractVersion": "canvas/v5"; readonly "requestId": Ref; readonly "result": CurrentContext | null; readonly "error": Error | null };
 export type WorldSelectionContext = { readonly "sessionRef": Ref; readonly "worldRef": Ref; readonly "inventory": ConnectionInventory; readonly "selection": CanvasWorldSelection };
+export type MaterialSourceConnection = { readonly "worldRef": Ref; readonly "connectionRef": Ref; readonly "connectionIncarnationRef": Ref };
+export type MaterialTextureSource = { readonly "textureName": Ref; readonly "sourceKind": "GAME" | "MOD"; readonly "sourceRef": Ref; readonly "interpretation": "SIMPLE_UNIFORM_NODE_TILES"; readonly "mediaType": "image/png" | "image/jpeg" | "image/webp"; readonly "bytesDigest": Digest; readonly "byteLength": PositiveInt };
+export type MaterialSourceUnknownReason = "UNKNOWN_PARAM2" | "UNKNOWN_DEFINITION" | "MISSING_TEXTURE" | "UNRESOLVED_SOURCE" | "UNSUPPORTED_APPEARANCE";
+export type KnownMaterialSource = { readonly "availability": "KNOWN"; readonly "nodeName": Ref; readonly "param2": Byte; readonly "definitionRevision": Revision; readonly "texture": MaterialTextureSource };
+export type UnknownMaterialSource = { readonly "availability": "UNKNOWN"; readonly "nodeName": Ref; readonly "param2": Byte | null; readonly "definitionRevision": Revision | null; readonly "texture": null; readonly "reason": MaterialSourceUnknownReason };
+export type MaterialSource = KnownMaterialSource | UnknownMaterialSource;
+export type MaterialSourcesProjection = { readonly "profileVersion": "material-sources/v1"; readonly "connection": MaterialSourceConnection; readonly "catalogueDigest": Digest; readonly "gameId": Ref; readonly "gameRevision": Revision; readonly "sourceBasis": "SERVER_ASSET_ONLY"; readonly "materials": ReadonlyArray<MaterialSource> };
+export type MaterialSourcesSnapshot = { readonly "profileVersion": "material-sources/v1"; readonly "connection": MaterialSourceConnection; readonly "catalogueDigest": Digest; readonly "gameId": Ref; readonly "gameRevision": Revision; readonly "sourceBasis": "SERVER_ASSET_ONLY"; readonly "materials": ReadonlyArray<MaterialSource>; readonly "sourceRevision": Digest };
 export interface TypeMap {
 AbortPreparedHistoryTransactionRequest: AbortPreparedHistoryTransactionRequest;
 AbortPreparedHistoryTransactionResponse: AbortPreparedHistoryTransactionResponse;
@@ -652,6 +660,14 @@ WorldConnectionSelectedReceipt: WorldConnectionSelectedReceipt;
 WorldConnectionSelectionChanged: WorldConnectionSelectionChanged;
 WorldConnectionSwitchedReceipt: WorldConnectionSwitchedReceipt;
 WorldSelectionContext: WorldSelectionContext;
+MaterialSourceConnection: MaterialSourceConnection;
+MaterialTextureSource: MaterialTextureSource;
+MaterialSourceUnknownReason: MaterialSourceUnknownReason;
+KnownMaterialSource: KnownMaterialSource;
+UnknownMaterialSource: UnknownMaterialSource;
+MaterialSource: MaterialSource;
+MaterialSourcesProjection: MaterialSourcesProjection;
+MaterialSourcesSnapshot: MaterialSourcesSnapshot;
 }
 export type TypeName=keyof TypeMap;
 export interface OperationMap {
@@ -746,5 +762,6 @@ export interface ProjectionMap {
 "history-operation": HistoryOperationProjection;
 "scoped-world": ScopedWorldBinding;
 "scoped-transaction-payload": ScopedTxProjection;
+"material-sources": MaterialSourcesProjection;
 }
 
