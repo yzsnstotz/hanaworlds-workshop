@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import * as C from 'hanaworlds-contracts';
 import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, mediaBinding, imageRef, imageDigest } from './image-attachment.mjs';
+import { WRITE_MODES, writeToolDescriptors, writeToolSkillGuidance, evaluateWriteMode } from './write-tools.mjs';
+export { WRITE_MODES, REGION_CAPABILITY, writeToolDescriptors, writeToolSkillGuidance, evaluateWriteMode, regionCapabilityUnmet, capabilityMatch } from './write-tools.mjs';
 const VERSION = 'session/v3', CANVAS = 'canvas/v5';
 const copy = structuredClone, revision = () => `rev-${randomUUID()}`;
 const same = (a,b) => C.canonicalJSON(a) === C.canonicalJSON(b);
@@ -218,21 +220,44 @@ export class WorkshopV3 {
   C.validateBuildProposalContext(request,facts);
   return copy(facts);
  }
- async submitBuildProposal(raw) {
-  let request;
+ /** Existing proposal entry: the per-node (cells) write mode. */
+ async submitBuildProposal(raw) {return (await this.#submit(raw,'cells')).response;}
+ /** Same skill, either self-described write mode. Returns a Workshop business
+  * envelope around the exact painter/v4 response; unmet needs are explained and
+  * nothing is sent to Painter. No mode switch, truncation or target rewrite. */
+ async submitWriteProposal(mode,raw) {const {availability,response}=await this.#submit(raw,mode);return {mode,availability,response};}
+ #writeFacts() {return {ownHandshake:C.contractHandshake,peers:{painter:this.painter,brush:this.brush,canvas:this.canvas}};}
+ /** Self-description of both write tools plus current availability; read-only. */
+ async describeWriteTools(sessionRef=null) {
+  const facts=this.#writeFacts();let current=null;
+  if(sessionRef!==null){
+   let state=null;try{state=(await this.#load(sessionRef)).state;}catch(error){if(error?.code!=='SESSION_NOT_FOUND'&&error?.name!=='SessionPersistenceNotFoundError')throw error;}
+   facts.session={found:!!state};
+   if(state){let confirmed=true;try{this.#turn(state);}catch(error){if(error?.code!=='INTENT_UNCONFIRMED')throw error;confirmed=false;}
+    facts.session.worldBound=!!state.context.localContext&&state.context.activeWorldRef===state.context.localContext.worldRef;facts.session.intentConfirmed=confirmed;
+    const turn=state.turns.at(-1),build=turn&&state.builds[turn.turnRef];
+    current=build?{turnRef:turn.turnRef,writeMode:build.writeMode,outcome:build.outcome?.outcome??(build.terminal??(build.dispatched?'PENDING':'VALIDATED'))}:null;}
+  }
+  return copy({skillGuidance:writeToolSkillGuidance,tools:WRITE_MODES.map(mode=>({...writeToolDescriptors[mode],availability:evaluateWriteMode(mode,facts)})),currentBuild:current});
+ }
+ async #submit(raw,mode) {
+  let request,availability=null;
   try {request=copy(C.validateBuildProposalRequest(raw));return await this.#lock(request.sessionRef,async()=>{
+   availability=evaluateWriteMode(mode,this.#writeFacts());
+   if(!availability.available)fail('CAPABILITY_UNAVAILABLE');
    const {core,state}=await this.#load(request.sessionRef);const stored=Object.values(state.contexts).find(x=>x.invocationId===request.invocationId);
    const facts=await this.#proposalFacts(request,state,stored);C.validateBuildProposalContext(request,facts);
-   if(stored.response)return copy(stored.response);
+   if((stored.writeMode??'cells')!==mode&&stored.request)fail('REPLAY_MISMATCH');
+   if(stored.response)return {availability,response:copy(stored.response)};
    if(stored.request&&!same(stored.request,request))fail('REPLAY_MISMATCH');
    const {turn}=this.#turn(state);if(state.builds[turn.turnRef]?.dispatched)fail('TRANSACTION_CONFLICT');
-   const painter=this.#peer(this.painter,'painter/v4');stored.request=copy(request);await this.#save(request.sessionRef,core,state);
+   const painter=this.#peer(this.painter,'painter/v4');stored.request=copy(request);stored.writeMode=mode;await this.#save(request.sessionRef,core,state);
    const response=C.validateBuildProposalResponse(request,await painter.call('ValidateBuildProposal',copy(request)));
    C.validateBuildProposalContext(request,await this.#proposalFacts(request,state,stored));
    if(painter!==this.painter)fail('CURRENT_WORLD_MISMATCH');
-   if(!response.error){stored.response=copy(response);state.builds[turn.turnRef]={contextId:state.currentContextId,plan:response.result,compiled:null,submission:null,dispatched:false,outcome:null};await this.#save(request.sessionRef,core,state);}
-   return copy(response);
-  });}catch(error){return packet('painter/v4',request?.requestId??raw?.requestId??null,null,C.publicError(error));}
+   if(!response.error){stored.response=copy(response);state.builds[turn.turnRef]={contextId:state.currentContextId,writeMode:mode,plan:response.result,compiled:null,submission:null,dispatched:false,outcome:null};await this.#save(request.sessionRef,core,state);}
+   return {availability,response:copy(response)};
+  });}catch(error){return {availability,response:packet('painter/v4',request?.requestId??raw?.requestId??null,null,C.publicError(error))};}
  }
  async #advance(body,core,state) {
   const {turn,saved}=this.#turn(state),build=state.builds[turn.turnRef];if(!build)fail('TARGET_REQUIRED');
