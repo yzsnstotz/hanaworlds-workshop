@@ -1,6 +1,6 @@
 export * from './contracts.js';
 import type {TypeMap,TypeName,OperationMap,ProjectionMap,ContractHandshake,LocalRequestFacts,CurrentBuildSubmission,ValidateBuildProposalRequest,ValidateBuildProposalResponse,BuildProposalProviderFacts,ScopedPreparedTransaction,ScopedPreparedTransactionResult,RegionInspection,MaterialMap,Catalogue,BuildProjection,FinalEffects,TargetFacts,SafetyProfile,Coverage} from './contracts.js';
-export declare const version: '0.5.0';
+export declare const version: '0.5.2';
 export declare const wireVersions: ReadonlyArray<keyof OperationMap>;
 export declare const compiledOperationsVersion: 'operations/v3';
 export declare const contractHandshake: ContractHandshake;
@@ -108,3 +108,10 @@ export declare const contractProtocols:ReadonlyArray<C['ProtocolDescriptor']>;
 export declare const protocolPolicy:Readonly<Record<'rule'|'majors'|'minor'|'rejection'|'legacy'|'digestDomain',string>>;
 export declare const regionCapabilities:ReadonlyArray<{readonly id:string;readonly owner:string;readonly meaning:string}>;
 export declare const regionInvariants:ReadonlyArray<{readonly id:string;readonly owner:string;readonly switchable:false;readonly text:string;readonly consequence:string}>;
+/** write-path-init/v1: Catalogue hasCallbacks/hasPersistentState describe only the declared
+ * CALLBACK_FREE_NODE_DATA write/restore path and its initialization; out-of-scope later changes
+ * are caught by full-state readback and same-transaction Undo conflict, not claimed absent. */
+export declare const writePathStateScope:Readonly<{id:'write-path-init/v1';writePath:'CALLBACK_FREE_NODE_DATA';writePathMeaning:string;factsMeaning:Readonly<Record<'hasCallbacks'|'hasPersistentState',string>>;initializationCallbacks:ReadonlyArray<string>;stateIndicatorCallbacks:ReadonlyArray<string>;globalWriteCallbacks:string;outOfScope:ReadonlyArray<string>;guards:string}>;
+export interface WritePathNodeFacts {readonly definitionRevision:string|null;readonly hasCallbacks:boolean|null;readonly hasPersistentState:false|null;readonly initialization:ReadonlyArray<string>;readonly stateIndicators:ReadonlyArray<string>;}
+export declare function writePathStateFacts(evidence:C['WritePathEvidence']):Readonly<Record<string,WritePathNodeFacts>>;
+export declare function validateCatalogueWritePathFacts(catalogue:C['Catalogue'],evidence:C['WritePathEvidence']):{readonly scope:'write-path-init/v1';readonly writePath:'CALLBACK_FREE_NODE_DATA';readonly verified:ReadonlyArray<string>;readonly stricter:ReadonlyArray<string>};

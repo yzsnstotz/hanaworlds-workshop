@@ -1,5 +1,5 @@
 {
-  "version": "0.5.0",
+  "version": "0.5.2",
   "wireVersions": [
     "interaction-surface/v4",
     "session/v3",
@@ -12580,6 +12580,90 @@
         "unavailableReason"
       ],
       "additionalProperties": false
+    },
+    "NodeWritePathHooks": {
+      "x-typeName": "NodeWritePathHooks",
+      "type": "object",
+      "properties": {
+        "nodeName": {
+          "$ref": "#/definitions/Ref"
+        },
+        "definitionRevision": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Revision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "definedCallbacks": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RefSet"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "nodeName",
+        "definitionRevision",
+        "definedCallbacks"
+      ],
+      "additionalProperties": false
+    },
+    "NodeWritePathHooksList": {
+      "x-typeName": "NodeWritePathHooksList",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/NodeWritePathHooks"
+      },
+      "x-order": "nodeName UTF16 ascending",
+      "x-uniqueBy": "nodeName"
+    },
+    "WritePathEvidence": {
+      "x-typeName": "WritePathEvidence",
+      "type": "object",
+      "properties": {
+        "profileVersion": {
+          "const": "write-path-evidence/v1"
+        },
+        "scope": {
+          "const": "write-path-init/v1"
+        },
+        "writePath": {
+          "const": "CALLBACK_FREE_NODE_DATA"
+        },
+        "catalogueDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "globalWriteCallbacks": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RefSet"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodes": {
+          "$ref": "#/definitions/NodeWritePathHooksList"
+        }
+      },
+      "required": [
+        "profileVersion",
+        "scope",
+        "writePath",
+        "catalogueDigest",
+        "globalWriteCallbacks",
+        "nodes"
+      ],
+      "additionalProperties": false
     }
   },
   "placementSettings": [
@@ -12689,8 +12773,9 @@
     "region-voxels": 0,
     "region-build": 0,
     "painter-region": 0,
-    "world-adapter-region": 0,
-    "canvas-region": 0
+    "world-adapter-region": 1,
+    "canvas-region": 0,
+    "world-adapter": 1
   },
   "regionCapabilities": [
     {
@@ -12752,6 +12837,21 @@
       "id": "canvas-region/v1:whole-region-undo",
       "owner": "hanaworlds-canvas",
       "meaning": "Undo restores the whole region of the same transaction after checking current world, history and current summary."
+    },
+    {
+      "id": "world-adapter/v6:callback-free-write",
+      "owner": "hanaworlds-adapter-luanti",
+      "meaning": "Per-cell writes and restores use the CALLBACK_FREE_NODE_DATA path of write-path-init/v1."
+    },
+    {
+      "id": "world-adapter-region/v1:callback-free-write",
+      "owner": "hanaworlds-adapter-luanti",
+      "meaning": "Region writes and restores use the CALLBACK_FREE_NODE_DATA path of write-path-init/v1."
+    },
+    {
+      "id": "world-adapter/v6:write-path-state-facts",
+      "owner": "hanaworlds-adapter-luanti",
+      "meaning": "Catalogue hasCallbacks/hasPersistentState are published under scope write-path-init/v1 and agree with a WritePathEvidence inventory (validateCatalogueWritePathFacts)."
     }
   ],
   "regionInvariants": [
@@ -12789,6 +12889,47 @@
       "switchable": false,
       "text": "Peers are compatible when protocol majors match and required capabilities are present; package hashes are provenance only.",
       "consequence": "Different patch builds interoperate; a different major or missing capability is rejected before writing."
+    },
+    {
+      "id": "MATERIAL-FACT-SCOPE",
+      "owner": "Contracts and Adapter",
+      "switchable": false,
+      "text": "hasCallbacks/hasPersistentState are facts about the declared callback-free write and initialization path only; unknown or side-effecting initialization rejects the write, and UNKNOWN is never treated as false.",
+      "consequence": "Plain nodes such as stone can be written; nodes that need initialization or carry state are refused before writing; later independent changes surface as readback/Undo conflicts."
     }
-  ]
+  ],
+  "writePathStateScope": {
+    "id": "write-path-init/v1",
+    "writePath": "CALLBACK_FREE_NODE_DATA",
+    "writePathMeaning": "The declared write and restore path sets node name and param2 as bulk node data (Luanti VoxelManip set_data/write_to_map; param1 is recomputed light). The engine runs no node-definition callback and creates no metadata, inventory or timer on this path. An Adapter declares that its per-cell and region writes use exactly this path with the capabilities world-adapter/v6:callback-free-write and world-adapter-region/v1:callback-free-write.",
+    "factsMeaning": {
+      "hasCallbacks": "true when the node definition relies on a lifecycle callback that normal engine placement/removal would run and this path skips (initializationCallbacks); false when none is defined and globalWriteCallbacks is known to be empty; null when the definition callback inventory or the global write-path callback inventory is unknown or non-empty.",
+      "hasPersistentState": "false only when neither initializationCallbacks nor stateIndicatorCallbacks are defined and globalWriteCallbacks is known to be empty, i.e. writing (and later restoring) this node on this path can leave no metadata, inventory or timer at the cell. Otherwise null. Never inferred true or false from opaque Lua bodies; UNKNOWN is never defaulted to false."
+    },
+    "initializationCallbacks": [
+      "after_destruct",
+      "after_place_node",
+      "on_construct",
+      "on_destruct",
+      "on_timer"
+    ],
+    "stateIndicatorCallbacks": [
+      "allow_metadata_inventory_move",
+      "allow_metadata_inventory_put",
+      "allow_metadata_inventory_take",
+      "on_metadata_inventory_move",
+      "on_metadata_inventory_put",
+      "on_metadata_inventory_take",
+      "on_receive_fields",
+      "preserve_metadata"
+    ],
+    "globalWriteCallbacks": "Names of engine global callback registries that fire on this path and currently have handlers (e.g. register_on_mapblocks_changed). Must be an empty set for any false fact; null or non-empty forces null for every node.",
+    "outOfScope": [
+      "Player-triggered node callbacks (on_punch, on_dig, after_dig_node, on_rightclick, can_dig, on_rotate and global punch/dig handlers)",
+      "Independent world dynamics (ABM, LBM, on_blast, on_flood, other mods' later actions)",
+      "Mod-private custom fields that the engine never calls on this path",
+      "External effects that a replaced node's skipped on_destruct/after_destruct would have had outside its own cell"
+    ],
+    "guards": "Out-of-scope later changes are not claimed absent. They are detected by the complete RegionState readback (node, param2 and extras) and its summary digest, and by same-transaction Undo rejecting with UNDO_CONFLICT/EXTERNAL_EDIT_CONFLICT when the current summary no longer equals the verified after summary. Canvas still decides every transaction."
+  }
 }

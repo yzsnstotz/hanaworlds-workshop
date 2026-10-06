@@ -35,7 +35,7 @@ function fixture(){
  f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:['image/png'],model:null};
  f.painter={contractHandshake:C.contractHandshake,async call(op,q){f.calls.push(op);C.validateBuildProposalRequest(q);const facts=await f.readFacts(q);C.validateBuildProposalContext(q,facts);f.painterContexts.push(clone(facts.sourceContext));
    const result=clone(sample.response.result);result.invocationId=q.invocationId;return {contractVersion:'painter/v4',requestId:q.requestId,result,error:null};}};
- f.brush={contractHandshake:C.contractHandshake,async compile(q){f.calls.push('BuildDocument');C.validateBoundRequest('BUILD/V3','BuildDocument',q);
+ f.brush={contractHandshake:C.contractHandshake,protocolHandshake:BUILD_PROTOCOL(),async compile(q){f.calls.push('BuildDocument');C.validateBoundRequest('BUILD/V3','BuildDocument',q);
    const effects=[{position:clone(q.build.operations[0].min),...q.build.materials[q.build.operations[0].materialRef]}];
    const projection={contractVersion:'operations/v3',buildDigest:q.buildDigest,compilerRevision:q.compilerRevision,compilationConfigDigest:q.compilationConfigDigest,worldRef:q.worldRef,frameDigest:q.targetFacts.frameDigest,catalogueDigest:q.catalogueDigest,targetFactsDigest:q.targetFactsDigest,effects};
    return {contractVersion:'BUILD/V3',requestId:q.requestId,result:{projection,operationDigest:D('operations',projection),readBounds:q.targetFacts.sampledBounds,writeBounds:q.build.declaredBounds},error:null};}};
@@ -96,6 +96,8 @@ const codes=a=>a.unmet.map(u=>u.code);
 const sha=(k,v)=>C.digestValue(k,v).sha256;
 const caps=wire=>C.regionCapabilities.map(c=>c.id).filter(id=>id.startsWith(`${wire}:`));
 const handshake=(component,protocol,major,minor,capabilities,packageVersion='9.9.9-fixture')=>({profileVersion:'protocol-handshake/v1',component,protocols:[{protocol,major,minor}],capabilities:[...capabilities].sort(),provenance:{packageName:component,packageVersion,sourceRevision:null,artifactDigest:null}});
+// FIXTURE per-cell Brush advertises the public ProtocolHandshake shape the actual BrushV3 publishes.
+function BUILD_PROTOCOL(major=3,capabilities=['BUILD/V3:per-cell-compile','region-build/v1:compile-mapblock-chunks'],packageVersion='0.5.0'){return {profileVersion:'protocol-handshake/v1',component:'hanaworlds-brush',protocols:[{protocol:'BUILD',major,minor:0},{protocol:'region-build',major:1,minor:0}],capabilities:[...capabilities].sort(),provenance:{packageName:'hanaworlds-brush',packageVersion,sourceRevision:null,artifactDigest:null}};}
 const STONE={nodeName:'fixture:stone',param2:0},AIR={nodeName:'air',param2:0};
 const boxOf=b=>({min:[...b.origin],max:b.origin.map((o,a)=>o+b.size[a]-1)});
 const cellsOf=box=>{const out=[];for(let z=box.min[2];z<=box.max[2];z++)for(let y=box.min[1];y<=box.max[1];y++)for(let x=box.min[0];x<=box.max[0];x++)out.push([x,y,z]);return out;};
@@ -279,14 +281,30 @@ test('G2: actual Brush 0.5.0 package BrushV3 drives the PER_CELL path (real comp
  await perCellFlow(f,`ACTUAL hanaworlds-brush@${B.version}`);
  assert.deepEqual(W.peerContractHandshake(f.brush),C.contractHandshake);assert.equal(W.peerProtocolHandshake(f.brush).profileVersion,'protocol-handshake/v1');
 });
-test('G2: real incompatibility through the same methods stays a named rejection',async()=>{
- const f=fixture();const wrongMajor=methodBrush(f,handshake('hanaworlds-brush','BUILD',4,0,['BUILD/V3:per-cell-compile']));
- const oldContracts=methodBrush(f,undefined,{...C.contractHandshake,contracts:'hanaworlds-contracts@0.4.2'});
+test('K3 per-cell Brush check = protocol major + capability: cross patch/hash accepted, wrong major / missing capability / no ProtocolHandshake named',async()=>{
+ const f=fixture();
+ const otherPatch=methodBrush(f,BUILD_PROTOCOL(3,undefined,'0.5.9-other-patch'),{...C.contractHandshake,contracts:'hanaworlds-contracts@0.5.1'});
+ const wrongMajor=methodBrush(f,BUILD_PROTOCOL(4));
+ const noCapability=methodBrush(f,BUILD_PROTOCOL(3,['region-build/v1:compile-mapblock-chunks']));
  const fn=()=>({});const functionOnly={contractHandshake:fn,protocolHandshake:fn};
  const ports=brush=>({painter:{contractHandshake:C.contractHandshake},canvas:{contractHandshake:C.contractHandshake},brush});
- const a=W.evaluateWriteMethod('PER_CELL',{ports:ports(wrongMajor)}),b=W.evaluateWriteMethod('PER_CELL',{ports:ports(oldContracts)}),c=W.evaluateWriteMethod('PER_CELL',{ports:ports(functionOnly)});
- assert.deepEqual(codes(a),['UNSUPPORTED_VERSION']);assert.match(a.unmet[0].need,/BUILD\/V3/);
- assert.deepEqual(codes(b),['UNSUPPORTED_VERSION']);assert.match(b.unmet[0].need,/Brush advertising BUILD\/V3/);
- assert.deepEqual(codes(c),['UNSUPPORTED_VERSION','UNSUPPORTED_VERSION'],'a function-valued property returning {} is not a valid handshake');
- log('G2_NAMED_REJECTIONS',{wrongProtocolMajor:a,oldContractsPackage:b,invalidHandshakeValue:c});
+ const ok=W.evaluateWriteMethod('PER_CELL',{ports:ports(otherPatch)}),a=W.evaluateWriteMethod('PER_CELL',{ports:ports(wrongMajor)}),b=W.evaluateWriteMethod('PER_CELL',{ports:ports(noCapability)}),c=W.evaluateWriteMethod('PER_CELL',{ports:ports(functionOnly)});
+ assert.equal(ok.available,true,JSON.stringify(ok));
+ assert.deepEqual(codes(a),['UNSUPPORTED_VERSION']);assert.deepEqual(codes(b),['CAPABILITY_UNAVAILABLE']);assert.deepEqual(codes(c),['UNSUPPORTED_VERSION']);
+ for(const u of [...a.unmet,...b.unmet,...c.unmet])assert.match(u.need,/Brush ProtocolHandshake with BUILD\/V3/);
+ log('K3_BRUSH_PROTOCOL_CHECK',{crossPatchHash:ok,wrongMajor:a,missingCapability:b,invalidHandshakeValue:c});
+});
+test('K3 per-cell: Brush on another contracts patch/hash (same BUILD major + capability) builds and undoes',async()=>{
+ const f=fixture();f.brush=methodBrush(f,BUILD_PROTOCOL(3,undefined,'0.5.9-other-patch'),{...C.contractHandshake,contracts:'hanaworlds-contracts@0.5.1'});
+ await perCellFlow(f,'FIXTURE other contracts patch, same BUILD major');
+});
+test('K3 per-cell: Brush losing the capability after validation is rejected at Advance with zero writes',async()=>{
+ const f=fixture();let protocol=BUILD_PROTOCOL();f.brush=methodBrush(f);f.brush.protocolHandshake=()=>structuredClone(protocol);
+ await withRuntime(f,async r=>{
+  const {advance}=await imageBrief(r,f);const context=await r.ws.readWriteProposalContext('PER_CELL',{...advance,requestId:'read-context'});
+  assert.equal((await r.ws.submitWriteProposal('PER_CELL',{...context,requestId:'proposal',proposal:clone(sample.request.proposal)})).response.error,null);
+  protocol=BUILD_PROTOCOL(3,[]);
+  const res=await r.ws.call('AdvanceCurrentBuild',advance);assert.equal(res.error?.code,'CAPABILITY_UNAVAILABLE');assert.equal(f.writes,0);assert.equal(f.calls.includes('BuildDocument'),false);
+  log('K3_ADVANCE_BRUSH_CAPABILITY_REJECT',{error:res.error,brushCompiles:0,canvasWrites:f.writes});
+ });
 });

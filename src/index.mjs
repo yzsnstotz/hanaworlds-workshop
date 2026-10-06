@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import * as C from 'hanaworlds-contracts';
 import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, mediaBinding, imageRef, imageDigest } from './image-attachment.mjs';
-import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake } from './write-tools.mjs';
-export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake } from './write-tools.mjs';
+import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH } from './write-tools.mjs';
+export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH } from './write-tools.mjs';
 const VERSION = 'session/v3', CANVAS = 'canvas/v5';
 const copy = structuredClone, revision = () => `rev-${randomUUID()}`;
 const same = (a,b) => C.canonicalJSON(a) === C.canonicalJSON(b);
@@ -39,6 +39,8 @@ export class WorkshopV3 {
   const prior=state.context.sessionRevision;state.context.sessionRevision=nextRevision;
   await this.projectionStore.replace(id,core.identity,prior,state);
  }
+ /** Brush on the K3 per-cell path: public ProtocolHandshake, same BUILD major and capability. */
+ #protocolPeer(port,{wire,capabilities}) {if(!port)fail('CAPABILITY_UNAVAILABLE');C.checkProtocolCompatibility(peerProtocolHandshake(port)??null,[C.protocolRequirement(wire,capabilities)]);return port;}
  #peer(port,wire) {if(!port)fail('CAPABILITY_UNAVAILABLE');C.checkContractHandshake(peerContractHandshake(port),{wires:[wire],factProfiles:['target-facts/v4']});return port;}
  async #canvas(op,request) {
   const port=this.#peer(this.canvas,CANVAS);C.validateBoundRequest(CANVAS,op,request);
@@ -358,7 +360,7 @@ export class WorkshopV3 {
   const stored=state.contexts[build.contextId];C.validateBuildProposalContext(stored.request,await this.#proposalFacts(stored.request,state,stored));
   const ctx=stored.context,settings=await this.compilerConfig.read(body.worldRef);
   const compile={contractVersion:'BUILD/V3',sessionRef:body.sessionRef,requestId:`${body.requestId}:compile`,worldRef:body.worldRef,localContext:body.localContext,build:build.plan.build,buildDigest:build.plan.buildDigest,catalogue:ctx.catalogue,catalogueDigest:digest('catalogue',ctx.catalogue),targetFacts:ctx.targetFacts,targetFactsDigest:ctx.targetFactsDigest,safetyProfile:ctx.safetyProfile,safetyProfileDigest:ctx.safetyProfileDigest,compilationConfig:settings.compilationConfig,compilationConfigDigest:digest('compilation-config',settings.compilationConfig),compilerRevision:settings.compilerRevision};
-  const brush=this.#peer(this.brush,'BUILD/V3');C.validateBoundRequest('BUILD/V3','BuildDocument',compile);
+  const brush=this.#protocolPeer(this.brush,PER_CELL_BRUSH);C.validateBoundRequest('BUILD/V3','BuildDocument',compile);
   const compiled=C.validateBoundResponse('BUILD/V3','BuildDocument',compile,await brush.compile(copy(compile)));
   if(compiled.error){const e=new Error(compiled.error.code);e.publicError=compiled.error;throw e;}
   await this.#current(body,state);build.compiled=compiled.result;

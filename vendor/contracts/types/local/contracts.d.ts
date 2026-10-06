@@ -395,6 +395,9 @@ export type ProtocolRequirement = { readonly "protocol": Ref; readonly "major": 
 export type ProtocolRequirements = ReadonlyArray<ProtocolRequirement>;
 export type WriteMethod = "PER_CELL" | "REGION";
 export type WriteMethodDescriptor = { readonly "method": WriteMethod; readonly "toolName": Ref; readonly "purpose": Text; readonly "inputType": Ref; readonly "typicalScale": Text; readonly "scaleUnit": "cells"; readonly "requiredCapabilities": RefSet; readonly "unavailableReason": Text | null };
+export type NodeWritePathHooks = { readonly "nodeName": Ref; readonly "definitionRevision": Revision | null; readonly "definedCallbacks": RefSet | null };
+export type NodeWritePathHooksList = ReadonlyArray<NodeWritePathHooks>;
+export type WritePathEvidence = { readonly "profileVersion": "write-path-evidence/v1"; readonly "scope": "write-path-init/v1"; readonly "writePath": "CALLBACK_FREE_NODE_DATA"; readonly "catalogueDigest": Digest; readonly "globalWriteCallbacks": RefSet | null; readonly "nodes": NodeWritePathHooksList };
 export interface TypeMap {
 AbortPreparedHistoryTransactionRequest: AbortPreparedHistoryTransactionRequest;
 AbortPreparedHistoryTransactionResponse: AbortPreparedHistoryTransactionResponse;
@@ -792,6 +795,9 @@ ProtocolRequirement: ProtocolRequirement;
 ProtocolRequirements: ProtocolRequirements;
 WriteMethod: WriteMethod;
 WriteMethodDescriptor: WriteMethodDescriptor;
+NodeWritePathHooks: NodeWritePathHooks;
+NodeWritePathHooksList: NodeWritePathHooksList;
+WritePathEvidence: WritePathEvidence;
 }
 export type TypeName=keyof TypeMap;
 export interface OperationMap {

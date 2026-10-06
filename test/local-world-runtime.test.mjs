@@ -22,7 +22,8 @@ function fixture() {
  f.painter={contractHandshake:C.contractHandshake,async call(op,q){assert.equal(op,'ValidateBuildProposal'); f.calls.push(op); C.validateBuildProposalRequest(q); C.validateBuildProposalContext(q,await f.readFacts(q));
    const result=clone(sample.response.result); result.invocationId=q.invocationId;
    return {contractVersion:'painter/v4',requestId:q.requestId,result,error:null};}};
- f.brush={contractHandshake:C.contractHandshake,async compile(q){f.calls.push('BuildDocument'); C.validateBoundRequest('BUILD/V3','BuildDocument',q);
+ // K3: Workshop checks Brush by its public ProtocolHandshake (BUILD major 3 + per-cell capability).
+ f.brush={contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-brush',protocols:[{protocol:'BUILD',major:3,minor:0}],capabilities:['BUILD/V3:per-cell-compile'],provenance:{packageName:'hanaworlds-brush',packageVersion:'fixture',sourceRevision:null,artifactDigest:null}},async compile(q){f.calls.push('BuildDocument'); C.validateBoundRequest('BUILD/V3','BuildDocument',q);
    const effects=[{position:clone(q.build.operations[0].min),...q.build.materials[q.build.operations[0].materialRef]}];
    const projection={contractVersion:'operations/v3',buildDigest:q.buildDigest,compilerRevision:q.compilerRevision,compilationConfigDigest:q.compilationConfigDigest,worldRef:q.worldRef,frameDigest:q.targetFacts.frameDigest,catalogueDigest:q.catalogueDigest,targetFactsDigest:q.targetFactsDigest,effects};
    return {contractVersion:'BUILD/V3',requestId:q.requestId,result:{projection,operationDigest:D('operations',projection),readBounds:q.targetFacts.sampledBounds,writeBounds:q.build.declaredBounds},error:null};}};

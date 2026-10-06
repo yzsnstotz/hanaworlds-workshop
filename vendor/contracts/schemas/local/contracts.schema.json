@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://hanaworlds.invalid/contracts/0.5.0/schema.json",
+  "$id": "https://hanaworlds.invalid/contracts/0.5.2/schema.json",
   "definitions": {
     "AbortPreparedHistoryTransactionRequest": {
       "type": "object",
@@ -11965,6 +11965,90 @@
         "scaleUnit",
         "requiredCapabilities",
         "unavailableReason"
+      ],
+      "additionalProperties": false
+    },
+    "NodeWritePathHooks": {
+      "x-typeName": "NodeWritePathHooks",
+      "type": "object",
+      "properties": {
+        "nodeName": {
+          "$ref": "#/definitions/Ref"
+        },
+        "definitionRevision": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Revision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "definedCallbacks": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RefSet"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "nodeName",
+        "definitionRevision",
+        "definedCallbacks"
+      ],
+      "additionalProperties": false
+    },
+    "NodeWritePathHooksList": {
+      "x-typeName": "NodeWritePathHooksList",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/NodeWritePathHooks"
+      },
+      "x-order": "nodeName UTF16 ascending",
+      "x-uniqueBy": "nodeName"
+    },
+    "WritePathEvidence": {
+      "x-typeName": "WritePathEvidence",
+      "type": "object",
+      "properties": {
+        "profileVersion": {
+          "const": "write-path-evidence/v1"
+        },
+        "scope": {
+          "const": "write-path-init/v1"
+        },
+        "writePath": {
+          "const": "CALLBACK_FREE_NODE_DATA"
+        },
+        "catalogueDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "globalWriteCallbacks": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RefSet"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodes": {
+          "$ref": "#/definitions/NodeWritePathHooksList"
+        }
+      },
+      "required": [
+        "profileVersion",
+        "scope",
+        "writePath",
+        "catalogueDigest",
+        "globalWriteCallbacks",
+        "nodes"
       ],
       "additionalProperties": false
     }

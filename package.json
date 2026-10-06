@@ -58,7 +58,7 @@
     "@deepseek-ai/dsh-storage-domain": "0.2.0-rc.2",
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
     "canonicalize": "5.1.0",
-    "hanaworlds-contracts": "https://codeload.github.com/yzsnstotz/hanaworlds-contracts/tar.gz/c006a839a6e6c2c63d57a14b72e4e6b26fa717f1",
+    "hanaworlds-contracts": "https://codeload.github.com/yzsnstotz/hanaworlds-contracts/tar.gz/6185622e977ef5136e9ef12219e0ba89dbba29db",
     "zod": "4.6.5"
   },
   "devDependencies": {
