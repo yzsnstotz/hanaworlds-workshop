@@ -142,6 +142,38 @@ footprint. It offers only Canvas candidate players or typed in-game point
 picking. Its recorded `RegionInspection` is passed to Exterior unchanged and
 is carried into Canvas Apply with the matching BUILD/V2 document.
 
+### Explicit text plan source
+
+For a confirmed structure whose real Brief has `media: []`, Host may inject
+`hanaworldsTextPlanSource` (constructor field `textPlanSource`). This is a
+local domain planning function, not a new remote wire or a model loop. It
+advertises the public `BUILD/V2` and `target-facts/v3` handshake and implements
+`createBuildPlan(facts) -> BuildPlan`. There is no built-in plan, image fallback
+or implicit source. Missing capability fails `CAPABILITY_UNAVAILABLE`.
+
+`facts` contains `actorRef`, `sessionRef`, `requestId`, `authorizationRef`,
+`worldRef`, `turnRevision`, a fresh `invocationId`, and these existing public
+contract values: `intent`/`intentDigest`, `referenceBrief`/`referenceBriefDigest`,
+`catalogue`, `targetFacts`/`targetFactsDigest`,
+`safetyProfile`/`safetyProfileDigest`, and `regionInspection`. Workshop derives
+them from its durable confirmed turn and the unchanged Canvas inspection.
+There is no `painterId`, invented attachment, authorization projection or
+caller-supplied plan in this interface. The source is proposal-only and must
+return the same invocation ID with a strictly decoded public `BuildPlan`.
+Workshop checks its build digest, catalogue/facts/safety digests, exact frame
+and protection/body evidence, then rechecks live authority/world before saving.
+Brush still owns compilation and witness/geometry checks; Canvas still owns
+analysis, authorization, transaction and world write decisions.
+
+Image-bearing Briefs continue through the existing `painter/v3` picture-blocks
+port with text and verified image bound to the same Brief. A text source is
+never used to recover from an image validation or image Painter failure.
+The component text test uses explicit model/plan/Brush/Canvas/authority
+fixtures with real DSH/Core/Workshop persistence. It stops at the unavailable
+default-build authorization source with zero Canvas Apply; this is not a
+real-model, image-understanding or Luanti build claim. Host must separately
+install an explicit text source and the admitted public authorization bridge.
+
 Workshop never mutates a world. Canvas owns atomic Apply and recovery.
 For first-building `DEFAULT_PLAYER`, the explicit `AnswerClarification`
 confirmation must correspond to one durable Core Session `user/message` after

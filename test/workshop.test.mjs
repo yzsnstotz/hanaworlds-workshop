@@ -637,7 +637,7 @@ test('first building rejects a different same-Session relay before Canvas', asyn
     { kind: 'DEFAULT_PLAYER', invocationId: 'relay-alice' });
 });
 
-test('passes the recorded RegionInspection unchanged into painter/v3 and rejects image-free structure planning', async () => {
+test('passes the recorded RegionInspection unchanged into painter/v3 and requires a separate text plan source', async () => {
   const fixtures = JSON.parse(readFileSync(new URL('../vendor/contracts/fixtures/v4/candidate/placement-region-chain-v4.json', import.meta.url)));
   const chain = fixtures.validCases[0].materializedChain;
   const contracts = contractsV4;
@@ -712,7 +712,7 @@ test('passes the recorded RegionInspection unchanged into painter/v3 and rejects
   }
   const withoutImage = await ready([]);
   await assert.rejects(() => withoutImage.createBuildPlan({ actorRef: 'user', sessionRef: 's1',
-    authorizationRef: 'grant', turnRef: 'turn-1', requestId: 'paint' }), { code: 'IMAGE_REQUIRED' });
+    authorizationRef: 'grant', turnRef: 'turn-1', requestId: 'paint' }), { code: 'CAPABILITY_UNAVAILABLE' });
   const media = [{ attachmentRef: 'img-1', storedBytesDigest: sha(bytes), projectionVariantId: null,
     projectionBytesDigest: null, mediaType: 'image/png', bytes: bytes.length, width: 1, height: 1 }];
   const withImage = await ready(media);

@@ -94,10 +94,10 @@ function confirmingSessionInputId(log, pending, body) {
 /** Workshop state is durable in its own domain; Core JSONL is read for confirmation facts. */
 export class WorkshopV1 {
   constructor({ sessionPersistence, projectionStore, attachments, llm, authority, capabilities,
-    canvas, painter, brush, resources, mediaAuthority, modelRoute,
+    canvas, painter, textPlanSource, brush, resources, mediaAuthority, modelRoute,
     catalogue, safety, compilerConfig, applyAuthority } = {}) {
     Object.assign(this, { sessionPersistence, projectionStore, attachments, llm, authority,
-      capabilities, canvas, painter, brush, resources, mediaAuthority, modelRoute,
+      capabilities, canvas, painter, textPlanSource, brush, resources, mediaAuthority, modelRoute,
       catalogue, safety, compilerConfig, applyAuthority });
     this.locks = new Map();
     this.lockContext = new AsyncLocalStorage();
@@ -851,23 +851,25 @@ export class WorkshopV1 {
           placement.turnRef !== body.turnRef ||
           saved.intent.confirmedIntent.kind !== 'BUILD_STRUCTURE')
         failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      if (turn.media.length === 0) failure('IMAGE_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
+      const textOnly = turn.media.length === 0;
       if (saved.intent.intendedWorldRef !== state.context.activeWorldRef ||
           placement.inspection.targetFacts.worldRef !== state.context.activeWorldRef)
         failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      requirePeer(this.painter,
-        { wires: ['painter/v3'], factProfiles: ['target-facts/v3'] });
-      if (!this.catalogue?.read || !this.safety?.read || !this.painter?.call)
+      const source = textOnly ? this.textPlanSource : this.painter;
+      requirePeer(source, { wires: [textOnly ? 'BUILD/V2' : 'painter/v3'],
+        factProfiles: ['target-facts/v3'] });
+      if (!this.catalogue?.read || !this.safety?.read ||
+          !(textOnly ? source?.createBuildPlan : source?.call))
         failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
       const catalogue = validateType('Catalogue', await this.catalogue.read(state.context.activeWorldRef));
       const safetyProfile = validateType('SafetyProfile', await this.safety.read(state.context.activeWorldRef));
       if (digestValue('catalogue', catalogue).sha256 !==
           placement.inspection.targetFacts.catalogueDigest)
         failure('CATALOGUE_MISMATCH', 'validate', 'REVISION_CHANGED');
-      const request = { contractVersion: 'painter/v3', actorRef: body.actorRef,
+      const facts = { actorRef: body.actorRef,
         sessionRef: body.sessionRef, requestId: body.requestId,
         authorizationRef: body.authorizationRef, worldRef: state.context.activeWorldRef,
-        turnRevision: turn.turnRevision, painterId: 'picture-blocks',
+        turnRevision: turn.turnRevision,
         invocationId: `paint-${randomUUID()}`, intent: saved.intent,
         intentDigest: digestValue('intent', saved.intent).sha256,
         referenceBrief: saved.brief,
@@ -876,14 +878,43 @@ export class WorkshopV1 {
         targetFactsDigest: placement.inspection.targetFactsDigest,
         safetyProfile, safetyProfileDigest: digestValue('safety-profile', safetyProfile).sha256,
         regionInspection: placement.inspection };
-      validateBoundRequest('painter/v3', 'CreateBuildPlan', request);
-      const response = validateResponse('painter/v3', 'CreateBuildPlan',
-        await this.painter.call('CreateBuildPlan', request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
+      let plan;
+      if (textOnly) {
+        // Host-injected domain plan source, not the image-only picture Painter
+        // wire. It receives real public projections, never invented media.
+        const brief = validateType('BriefProjection', facts.referenceBrief);
+        const intent = validateType('IntentProjection', facts.intent);
+        if (brief.sessionRef !== body.sessionRef || brief.turnRevision !== turn.turnRevision ||
+            brief.media.length !== 0 || intent.referenceBriefDigest !== facts.referenceBriefDigest ||
+            intent.confirmedIntent.confirmedTurnRevision !== turn.turnRevision)
+          failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
+        plan = validateType('BuildPlan', await source.createBuildPlan(copy(facts)));
+        if (plan.invocationId !== facts.invocationId)
+          failure('TRANSACTION_CONFLICT', 'replay', 'PAYLOAD_CHANGED');
+        const build = plan.build;
+        if (digestValue('build', build).sha256 !== plan.buildDigest ||
+            build.catalogueDigest !== digestValue('catalogue', catalogue).sha256 ||
+            build.targetFactsDigest !== facts.targetFactsDigest ||
+            build.safetyProfileDigest !== facts.safetyProfileDigest ||
+            canonicalize(build.coordinateFrame) !== canonicalize(facts.regionInspection.frame) ||
+            build.witnesses.some(w => ['PROTECTION', 'BODY_CLEARANCE'].includes(w.predicate) &&
+              canonicalize(w.facts.evidence) !== canonicalize(facts.regionInspection.evidence)))
+          failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
+        const live = await this.#authorized(body, 'CreateBuildPlan');
+        if (live.worldRef !== state.context.activeWorldRef)
+          failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
+      } else {
+        const request = { contractVersion: 'painter/v3', ...facts, painterId: 'picture-blocks' };
+        validateBoundRequest('painter/v3', 'CreateBuildPlan', request);
+        const response = validateResponse('painter/v3', 'CreateBuildPlan',
+          await source.call('CreateBuildPlan', request));
+        if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
+        plan = response.result;
+      }
       state.lastBuild = { turnRef: body.turnRef, worldRef: state.context.activeWorldRef,
-        plan: response.result, catalogue, safetyProfile, inspection: placement.inspection };
+        plan, catalogue, safetyProfile, inspection: placement.inspection };
       await this.#save(body.sessionRef, log, state);
-      return response.result;
+      return plan;
     });
   }
 
@@ -1600,6 +1631,7 @@ export function apply(ctx) {
     llm: 'llm', authority: 'hanaworldsAuthority',
     capabilities: 'hanaworldsCapabilities', canvas: 'hanaworldsCanvasV4',
     painter: 'hanaworldsPainterV2PictureBlocks', brush: 'hanaworldsBrushV2',
+    textPlanSource: 'hanaworldsTextPlanSource',
     resources: 'hanaworldsRequiredResources', catalogue: 'hanaworldsCatalogue',
     safety: 'hanaworldsSafetyProfile', compilerConfig: 'hanaworldsCompilerConfig',
     applyAuthority: 'hanaworldsApplyAuthority',
