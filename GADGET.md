@@ -1,4 +1,4 @@
-# Workshop 0.4.0 — local-world skill business component
+# Workshop 0.4.1 — local-world skill business component
 
 Fresh profile only. Contracts 0.5.0 / source c006a839a6e6c2c63d57a14b72e4e6b26fa717f1 (tar 7fb42f1e…); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
@@ -120,6 +120,14 @@ provenance only recorded). PER_CELL keeps the existing exact
 `ContractHandshake` check (contracts: K1/K2 unchanged); if Brush also advertises
 a `ProtocolHandshake` it must carry `BUILD/V3:per-cell-compile`.
 
+Peer handshakes are read from each peer's public shape (0.4.1, G2): a plain
+value property, or the public methods `handshake()` / `protocolHandshake()` /
+`status().contractHandshake|protocolHandshake` — BrushV3 publishes only these
+methods. The returned values go to the unchanged exact `checkContractHandshake`
+and `checkProtocolCompatibility`; a function is never treated as a handshake and
+the Host needs no alias property. Exported helpers: `peerContractHandshake`,
+`peerProtocolHandshake`.
+
 Ports consumed (Host assembles; names are Workshop's consumption choice):
 `hanaworldsPainterRegionV1`, `hanaworldsBrushRegionV1`, `hanaworldsCanvasRegionV1`,
 each `{protocolHandshake, call(operation, request)}` with the contract operation
@@ -150,6 +158,8 @@ Service methods:
 `npm run test:write-tools`: real Workshop, Cordis, Core JSONL, domain storage,
 attachments, Tools and HTTP; Painter/Brush/Canvas (cell and region) and the world
 are FIXTURE built with the contract's own region helpers.
-`scripts/gate-write-tools.sh <evidence-dir> <contracts-0.5.0-tar>` repeats it and
-the affected text/image regression on a clean archive and on the packed tarball.
+`scripts/gate-write-tools.sh <evidence-dir> <contracts-0.5.0-tar> <brush-0.5.0-tar> <workshop-0.4.0-tar>`
+repeats it and the affected per-cell regression on a clean archive and the packed
+tarball, uses the actual Brush 0.5.0 `BrushV3` as the external public seam, and
+requires the previous 0.4.0 package to fail that path with UNSUPPORTED_VERSION.
 Real peers, Luanti world, model choice and UI are NOT_RUN here.

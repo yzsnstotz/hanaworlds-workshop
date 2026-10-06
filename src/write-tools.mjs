@@ -37,10 +37,25 @@ const BASE = C.deepFreeze({
  },
 });
 export const writeToolSkillGuidance = `Two write methods reach the same Painter → Brush → Canvas path. PER_CELL (${BASE.PER_CELL.toolName}) is for exact small edits; REGION (${BASE.REGION.toolName}) is for large fill or dig, where explicit air digs and unspecified cells stay unchanged. Choose by the current goal and its volume, combine them when useful (REGION first, then PER_CELL to refine) and improve the choice from results. The typical scales are guidance, not limits. If a method reports unmet needs, tell the user what is missing and offer the listed remedy; do not silently switch methods or shrink the target.`;
+/** A peer's advertised handshakes, read from its public shape: a plain value
+ * property, or the public methods `handshake()` / `protocolHandshake()` /
+ * `status().contractHandshake|protocolHandshake` (e.g. BrushV3). The returned
+ * value is what the compatibility checks see; a function is never a handshake. */
+const value = v => (v !== null && typeof v === 'object' ? v : undefined);
+const statusOf = port => (typeof port?.status === 'function' ? value(port.status()) : undefined);
+export function peerContractHandshake(port) {
+ if (!port) return undefined;
+ return value(port.contractHandshake) ?? (typeof port.handshake === 'function' ? value(port.handshake()) : undefined) ?? value(statusOf(port)?.contractHandshake);
+}
+export function peerProtocolHandshake(port) {
+ if (!port) return undefined;
+ if (typeof port.protocolHandshake === 'function') return value(port.protocolHandshake());
+ return value(port.protocolHandshake) ?? value(statusOf(port)?.protocolHandshake);
+}
 const need = (code, needText, remedy) => ({ code, need: needText, remedy });
 function protocolUnmet(port, spec) {
  if (!port) return [need('PEER_UNAVAILABLE', `${spec.label} service ${spec.service} (${spec.wire})`, `Install/enable a ${spec.label} plugin providing ${spec.wire} in this Host.`)];
- try { C.checkProtocolCompatibility(port.protocolHandshake ?? null, [C.protocolRequirement(spec.wire, spec.capabilities)]); return []; }
+ try { C.checkProtocolCompatibility(peerProtocolHandshake(port) ?? null, [C.protocolRequirement(spec.wire, spec.capabilities)]); return []; }
  catch (error) {
   if (!(error instanceof C.ContractError)) throw error;
   return [need(error.code, `${spec.label} ProtocolHandshake with ${spec.wire} (same major) and ${spec.capabilities.join(', ')}`, `Install a ${spec.label} build advertising that protocol major and capabilities.`)];
@@ -53,12 +68,12 @@ export function evaluateWriteMethod(method, facts) {
  if (method === 'PER_CELL') for (const [field, wire, label] of LEGACY_EXACT) {
   const port = ports[field];
   if (!port) { unmet.push(need('PEER_UNAVAILABLE', `${label} service (${wire})`, `Install/enable the ${label} plugin in this Host.`)); continue; }
-  try { C.checkContractHandshake(port.contractHandshake, { wires: [wire], factProfiles: ['target-facts/v4'] }); }
+  try { C.checkContractHandshake(peerContractHandshake(port), { wires: [wire], factProfiles: ['target-facts/v4'] }); }
   catch (error) { if (!(error instanceof C.ContractError)) throw error; unmet.push(need('UNSUPPORTED_VERSION', `${label} advertising ${wire} on ${C.contractHandshake.contracts}`, `Install a ${label} build on the same contracts package.`)); }
  }
  // PER_CELL keeps the exact ContractHandshake semantics (contracts: K1/K2 unchanged);
  // a Brush that also advertises a ProtocolHandshake must carry BUILD/V3:per-cell-compile.
- for (const spec of WRITE_METHOD_PORTS[method]) if (method === 'REGION' || ports[spec.field]?.protocolHandshake !== undefined) unmet.push(...protocolUnmet(ports[spec.field], spec));
+ for (const spec of WRITE_METHOD_PORTS[method]) if (method === 'REGION' || peerProtocolHandshake(ports[spec.field]) !== undefined) unmet.push(...protocolUnmet(ports[spec.field], spec));
  if (facts.session) {
   if (!facts.session.found) unmet.push(need('SESSION_NOT_FOUND', 'an existing Workshop Session', 'Start or resume the Session first.'));
   else {

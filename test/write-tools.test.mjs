@@ -246,3 +246,47 @@ test('wrong current world connection rejects a REGION proposal before Painter',a
   log('REGION_WRONG_CONNECTION',{error:sent.response.error,regionCalls:0,regionWrites:0});
  });
 });
+
+// G2: BrushV3 publishes its handshakes only as methods (handshake(), protocolHandshake(),
+// status().contractHandshake|protocolHandshake). Workshop must read those values, never
+// require a Host alias property. FIXTURE = method-shaped object matching the public BrushV3
+// types; ACTUAL = the real Brush 0.5.0 package BrushV3 when HW_BRUSH_PACKAGE_ENTRY is set.
+const methodBrush=(f,protocol=handshake('hanaworlds-brush','BUILD',3,0,['BUILD/V3:per-cell-compile','region-build/v1:compile-mapblock-chunks']),contract=C.contractHandshake)=>{
+ const compile=f.brush.compile;const brush={handshake:()=>structuredClone(contract),protocolHandshake:()=>structuredClone(protocol),status:()=>({component:'hanaworlds-brush',contractHandshake:structuredClone(contract),protocolHandshake:structuredClone(protocol)}),compile:q=>compile(q)};
+ return brush;
+};
+async function perCellFlow(f,label){
+ await withRuntime(f,async r=>{
+  const {media,advance}=await imageBrief(r,f);
+  const described=await r.ws.describeWriteTools('s1');const [cells,region]=described.tools;
+  assert.equal(cells.availability.available,true,JSON.stringify(cells.availability));assert.equal(cells.descriptor.unavailableReason,null);
+  assert.equal(region.descriptor.method,'REGION');assert.deepEqual(codes(region.availability),['PEER_UNAVAILABLE','PEER_UNAVAILABLE','PEER_UNAVAILABLE'],'REGION description and its public check are kept');
+  const context=await r.ws.readWriteProposalContext('PER_CELL',{...advance,requestId:'read-context'});
+  const sent=await r.ws.submitWriteProposal('PER_CELL',{...context,requestId:'proposal',proposal:clone(sample.request.proposal)});assert.equal(sent.response.error,null,JSON.stringify(sent.response));
+  assert.deepEqual(structuredClone(f.painterContexts[0].referenceBrief.media),[media]);
+  const built=await call(r,'AdvanceCurrentBuild',advance);assert.equal(built.outcome,'VERIFIED');assert.equal(f.writes,1);
+  const undo=await call(r,'UndoCurrentBuild',{requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:'history-1'});
+  assert.equal(undo.status,'VERIFIED');assert.equal(f.undoWrites,1);assert.equal(f.modelCalls,0);
+  log('G2_PER_CELL_METHOD_SHAPED_BRUSH',{brush:label,brushHasProperty:{contractHandshake:'contractHandshake' in f.brush,protocolHandshake:typeof f.brush.protocolHandshake},perCell:cells.availability,regionDescriptor:region.descriptor,outcome:built.outcome,undo:undo.status,canvasWrites:f.writes,undoWrites:f.undoWrites,media});
+ });
+}
+test('G2: method-shaped BrushV3 (handshake()/protocolHandshake()/status()) makes PER_CELL available; proposal → AdvanceCurrentBuild → Undo',async()=>{
+ const f=fixture();f.brush=methodBrush(f);assert.equal(f.brush.contractHandshake,undefined);await perCellFlow(f,'FIXTURE method-shaped');
+});
+test('G2: actual Brush 0.5.0 package BrushV3 drives the PER_CELL path (real compile)',{skip:!process.env.HW_BRUSH_PACKAGE_ENTRY&&'HW_BRUSH_PACKAGE_ENTRY not set'},async()=>{
+ const B=await import(process.env.HW_BRUSH_PACKAGE_ENTRY);const f=fixture();f.brush=new B.BrushV3();
+ assert.equal(B.version,'0.5.0');assert.equal(Object.hasOwn(f.brush,'contractHandshake'),false);
+ await perCellFlow(f,`ACTUAL hanaworlds-brush@${B.version}`);
+ assert.deepEqual(W.peerContractHandshake(f.brush),C.contractHandshake);assert.equal(W.peerProtocolHandshake(f.brush).profileVersion,'protocol-handshake/v1');
+});
+test('G2: real incompatibility through the same methods stays a named rejection',async()=>{
+ const f=fixture();const wrongMajor=methodBrush(f,handshake('hanaworlds-brush','BUILD',4,0,['BUILD/V3:per-cell-compile']));
+ const oldContracts=methodBrush(f,undefined,{...C.contractHandshake,contracts:'hanaworlds-contracts@0.4.2'});
+ const fn=()=>({});const functionOnly={contractHandshake:fn,protocolHandshake:fn};
+ const ports=brush=>({painter:{contractHandshake:C.contractHandshake},canvas:{contractHandshake:C.contractHandshake},brush});
+ const a=W.evaluateWriteMethod('PER_CELL',{ports:ports(wrongMajor)}),b=W.evaluateWriteMethod('PER_CELL',{ports:ports(oldContracts)}),c=W.evaluateWriteMethod('PER_CELL',{ports:ports(functionOnly)});
+ assert.deepEqual(codes(a),['UNSUPPORTED_VERSION']);assert.match(a.unmet[0].need,/BUILD\/V3/);
+ assert.deepEqual(codes(b),['UNSUPPORTED_VERSION']);assert.match(b.unmet[0].need,/Brush advertising BUILD\/V3/);
+ assert.deepEqual(codes(c),['UNSUPPORTED_VERSION','UNSUPPORTED_VERSION'],'a function-valued property returning {} is not a valid handshake');
+ log('G2_NAMED_REJECTIONS',{wrongProtocolMajor:a,oldContractsPackage:b,invalidHandshakeValue:c});
+});

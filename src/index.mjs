@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import * as C from 'hanaworlds-contracts';
 import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, mediaBinding, imageRef, imageDigest } from './image-attachment.mjs';
-import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod } from './write-tools.mjs';
-export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod } from './write-tools.mjs';
+import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake } from './write-tools.mjs';
+export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake } from './write-tools.mjs';
 const VERSION = 'session/v3', CANVAS = 'canvas/v5';
 const copy = structuredClone, revision = () => `rev-${randomUUID()}`;
 const same = (a,b) => C.canonicalJSON(a) === C.canonicalJSON(b);
@@ -39,7 +39,7 @@ export class WorkshopV3 {
   const prior=state.context.sessionRevision;state.context.sessionRevision=nextRevision;
   await this.projectionStore.replace(id,core.identity,prior,state);
  }
- #peer(port,wire) {if(!port)fail('CAPABILITY_UNAVAILABLE');C.checkContractHandshake(port.contractHandshake,{wires:[wire],factProfiles:['target-facts/v4']});return port;}
+ #peer(port,wire) {if(!port)fail('CAPABILITY_UNAVAILABLE');C.checkContractHandshake(peerContractHandshake(port),{wires:[wire],factProfiles:['target-facts/v4']});return port;}
  async #canvas(op,request) {
   const port=this.#peer(this.canvas,CANVAS);C.validateBoundRequest(CANVAS,op,request);
   const response=C.validateBoundResponse(CANVAS,op,request,await port.call(op,copy(request)));
