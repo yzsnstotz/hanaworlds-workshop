@@ -162,6 +162,18 @@ export class WorkshopV3 {
   const requestFacts=await this.#facts(request,state,record);
   return C.validateType('BuildProposalProviderFacts',{sourceContext:stored.context,currentContext,requestFacts});
  }
+ /** Host-only read port for Painter local facts. It deliberately does not take
+  * the mutation lock: Painter calls back while submitBuildProposal holds it.
+  * Only already-reserved exact public requests can read these own facts. */
+ async readBuildProposalProviderFacts(raw) {
+  const request=copy(C.validateBuildProposalRequest(raw));
+  const {state}=await this.#load(request.sessionRef);
+  const stored=Object.values(state.contexts).find(x=>x.invocationId===request.invocationId);
+  if(!stored?.request||!same(stored.request,request))fail('TRANSACTION_CONFLICT');
+  const facts=await this.#proposalFacts(request,state,stored);
+  C.validateBuildProposalContext(request,facts);
+  return copy(facts);
+ }
  async submitBuildProposal(raw) {
   let request;
   try {request=copy(C.validateBuildProposalRequest(raw));return await this.#lock(request.sessionRef,async()=>{
@@ -267,7 +279,7 @@ export function apply(ctx) {
  const projectionStore=new WorkshopProjectionStore(()=>ctx.get('storageDomain'));
  ctx.effect?.(()=>()=>projectionStore.close(),'hanaworlds-workshop.projection-close');
  const service=new WorkshopV3({projectionStore});
- for(const [field,port] of Object.entries({sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV4PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
+ for(const [field,port] of Object.entries({sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
  ctx.provide('hanaworldsWorkshop',service);ctx.provide('hanaworldsWorkshopV3',service);
 }
 export default {name,inject,apply};

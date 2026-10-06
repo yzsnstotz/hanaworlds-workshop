@@ -19,7 +19,7 @@ function fixture() {
  const f={local:clone(sample.request.localContext),calls:[],writes:0,undoWrites:0,modelCalls:0,history:[],receipt:null,rolledBack:false};
  f.context=()=>({currentSession:'s1',activeWorldRef:f.local.worldRef,orderedSelectedObjectRefs:[],sessionRevision:'canvas-selection-1',selectionRevision:f.local.selectionRevision,localContext:clone(f.local)});
  f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:[],model:null};
- f.painter={contractHandshake:C.contractHandshake,async call(op,q){assert.equal(op,'ValidateBuildProposal'); f.calls.push(op); C.validateBuildProposalRequest(q);
+ f.painter={contractHandshake:C.contractHandshake,async call(op,q){assert.equal(op,'ValidateBuildProposal'); f.calls.push(op); C.validateBuildProposalRequest(q); C.validateBuildProposalContext(q,await f.readFacts(q));
    const result=clone(sample.response.result); result.invocationId=q.invocationId;
    return {contractVersion:'painter/v4',requestId:q.requestId,result,error:null};}};
  f.brush={contractHandshake:C.contractHandshake,async compile(q){f.calls.push('BuildDocument'); C.validateBoundRequest('BUILD/V3','BuildDocument',q);
@@ -55,8 +55,8 @@ function fixture() {
 async function mount(root,f) {
  const ctx=new Context(); await ctx.plugin(JsonlSessionPersistence,{root:join(root,'core'),compression:'none'}).await();
  await ctx.plugin(Storage).await();await ctx.plugin(StorageJson,{root:join(root,'projection')}).await();await ctx.plugin(StorageDomain,{backend:'json'}).await();
- for(const [k,v] of Object.entries({hanaworldsCanvasV5:f.canvas,hanaworldsPainterV4PictureBlocks:f.painter,hanaworldsBrushV3:f.brush,hanaworldsCatalogue:{read:async()=>clone(sample.request.catalogue)},hanaworldsSafetyProfile:{read:async()=>clone(sample.request.safetyProfile)},hanaworldsCompilerConfig:{read:async()=>({compilationConfig:config,compilerRevision:'fixture-compiler'})},hanaworldsCapabilities:f.capabilities,llm:{async *stream(){f.modelCalls++;throw Error('second model forbidden');}}}))ctx.provide(k,v);
- await ctx.plugin(plugin).await();const workshop=ctx.get('hanaworldsWorkshop');
+ for(const [k,v] of Object.entries({hanaworldsCanvasV5:f.canvas,hanaworldsPainterV2PictureBlocks:f.painter,hanaworldsBrushV3:f.brush,hanaworldsCatalogue:{read:async()=>clone(sample.request.catalogue)},hanaworldsSafetyProfile:{read:async()=>clone(sample.request.safetyProfile)},hanaworldsCompilerConfig:{read:async()=>({compilationConfig:config,compilerRevision:'fixture-compiler'})},hanaworldsCapabilities:f.capabilities,llm:{async *stream(){f.modelCalls++;throw Error('second model forbidden');}}}))ctx.provide(k,v);
+ await ctx.plugin(plugin).await();const workshop=ctx.get('hanaworldsWorkshop');f.readFacts=q=>workshop.readBuildProposalProviderFacts(q);
  return {ctx,workshop,async close(){await workshop.projectionStore.close();await ctx.fiber.dispose();}};
 }
 async function withRuntime(f,fn){const base=process.env.HW_RUNTIME_ROOT??new URL('../../local-world/runtime/',import.meta.url).pathname;await mkdir(base,{recursive:true});const root=await mkdtemp(join(base,'run-'));const r=await mount(root,f);try{await fn(r,root);}finally{await r.close();await rm(root,{recursive:true,force:true});}}

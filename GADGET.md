@@ -4,11 +4,13 @@ Fresh profile only. Exact contracts 0.4.0 / source 8cfb18f8e13aa33d7a942f230ec61
 
 ## Host assembly
 
-Cordis services: `hanaworldsWorkshop` and `hanaworldsWorkshopV3` refer to the same service. Inject real `sessionPersistence`, `storageDomain`, `hanaworldsCanvasV5`, `hanaworldsPainterV4PictureBlocks`, `hanaworldsBrushV3`, `hanaworldsCatalogue.read(worldRef)`, `hanaworldsSafetyProfile.read(worldRef)`, `hanaworldsCompilerConfig.read(worldRef)` and `hanaworldsCapabilities`. Compiler settings return `{compilationConfig,compilerRevision}`. Peer services advertise exact `contractHandshake`. No other plugin import, model loop, MCP or world mutator is included.
+Cordis services: `hanaworldsWorkshop` and `hanaworldsWorkshopV3` refer to the same service. Inject real `sessionPersistence`, `storageDomain`, `hanaworldsCanvasV5`, `hanaworldsPainterV2PictureBlocks`, `hanaworldsBrushV3`, `hanaworldsCatalogue.read(worldRef)`, `hanaworldsSafetyProfile.read(worldRef)`, `hanaworldsCompilerConfig.read(worldRef)` and `hanaworldsCapabilities`. Compiler settings return `{compilationConfig,compilerRevision}`. Peer services advertise exact `contractHandshake`. No other plugin import, model loop, MCP or world mutator is included.
 
 Host must keep these ports in its internal runtime. Register only the three business categories as agent tools and derive the real Core Session and selected local context in Host. A model does not choose a service or call Canvas/Adapter mutators. `LocalRequestFacts` is generated from Workshop's own durable journal/current brief and fresh Canvas `ReadWorldSelectionContext`; it is never a tool input or a permission assertion.
 
 The Host first selects the actual connection through Canvas `SelectWorldConnection` using the real transport incarnation and expectedContext. Then `call('SwitchWorldContext', session/v3 request)` reads that selection back and binds Workshop to it. It does not create an incarnation or assume selection from JSON. Session, world, connection and incarnation must agree. Unbound/current mismatch is an explicit rejection.
+
+The delivered Painter0.3.0 retains service name `hanaworldsPainterV2PictureBlocks` while accepting only new painter/v4. Desktop supplies `hanaworldsPainterLocalFacts.read(request, operation, {signal})`; for ValidateBuildProposal it can call Workshop's **read-only internal** `readBuildProposalProviderFacts(request)`. This returns public BuildProposalProviderFacts from the exact reserved request, durable source/current brief and fresh Canvas connection readback. No private state access or model-supplied facts. The read method is reentrant during Painter validation and never acquires the mutation lock. Host remains responsible for its real Session/connection dispatch and cancellation; this accessor is not a fourth agent tool. CreateBuildPlan's Host LocalRequestFacts port belongs to the deferred fixed/image route, not this text-only getter.
 
 ## Three business actions
 
