@@ -1,8 +1,8 @@
 {
   "sourceOrigin": "https://github.com/yzsnstotz/hanaworlds-contracts",
-  "sourceRevision": "295cbc7fd0d8a1e56a0d89e651947e668f2ad658",
-  "admittedPackSha256": "4cee3e9067072d86c95799334a623bd278a5b995da0b9316934fb0722e837f62",
-  "sourcePackageVersion": "0.3.5",
+  "sourceRevision": "e66800964726b951a300eb9377b74c318641417f",
+  "admittedPackSha256": "8624bd026815fcdafc5248b21d8bc611baa0569b7b492b66905d2d015a496ce1",
+  "sourcePackageVersion": "0.3.10",
   "runtimeRoots": [
     "dist/v4/index.mjs"
   ],
@@ -12,7 +12,8 @@
     "node:util"
   ],
   "fixtureFiles": [
-    "fixtures/v4/candidate/placement-region-chain-v4.json"
+    "fixtures/v4/candidate/placement-region-chain-v4.json",
+    "fixtures/v4/proposal/text-build-proposal.json"
   ],
   "files": [
     {
@@ -76,6 +77,16 @@
       "sha256": "91ed5128fd33654a8116a06a347d035bd776304e632df36cda8bee14b16abd66"
     },
     {
+      "path": "dist/v4/bindings/session-authorization-v1.mjs",
+      "bytes": 534,
+      "sha256": "0b8b134e11d337fecabc90460c25e6108ee70fec2ad2d4c9a5875214ce13c014"
+    },
+    {
+      "path": "dist/v4/bindings/session-operation-authorization-v1.mjs",
+      "bytes": 544,
+      "sha256": "2c2b99b64cacf6b0226bee4288437f873d5f3ea8a23d8e6d9ca218ee87515cbc"
+    },
+    {
       "path": "dist/v4/bindings/session-v2.mjs",
       "bytes": 520,
       "sha256": "151da6832cdedbe161da883c16e11d53e81cadd354831d60ca4073ae2e87d3ca"
@@ -91,24 +102,29 @@
       "sha256": "6a1645ccb2fa46e278c88bc92fbe420aa42706eb7cb6ab036e63e592da7da9b8"
     },
     {
+      "path": "dist/v4/build-proposal.mjs",
+      "bytes": 9295,
+      "sha256": "c68f9ffea7c16034dc3108911693d506dd6400ce4fe9643e98ef9f626063e491"
+    },
+    {
       "path": "dist/v4/domain.mjs",
-      "bytes": 13485,
-      "sha256": "f56292bfbd824e271494f9321c696bdce04f26103147d9d2fa4edb77791f81b8"
+      "bytes": 14793,
+      "sha256": "38f36b4b533ef3cc88b0326e282e69a7a994ab118f6f7b71a2051d4b5c4eab45"
     },
     {
       "path": "dist/v4/generated/contracts.mjs",
-      "bytes": 311785,
-      "sha256": "9a6e43b0719488b1434e8b831fde261c60357a4bbe53ef99a84acc3f7893cf62"
+      "bytes": 347442,
+      "sha256": "37904bfb4d090a141b408842d6cdef54e424f1a479e8f095e929ee150e3f889a"
     },
     {
       "path": "dist/v4/index.mjs",
-      "bytes": 594,
-      "sha256": "b58c67a10efed6036e2af51209440977fab7f1db4af92704b277ca52cf0b6004"
+      "bytes": 817,
+      "sha256": "ccc5c929e3c7bad899708ca197b07f6344522b83df21789f89adecc6735b1f88"
     },
     {
       "path": "dist/v4/runtime.mjs",
-      "bytes": 32652,
-      "sha256": "2d5d04fb2107ca5446006319296868a0cd45f5c8860caf3f3601c8aff033f54b"
+      "bytes": 48447,
+      "sha256": "60fd537bf49b84ed395240b068155f98342fe2aa2f27ae1795e7547aaf6bd395"
     },
     {
       "path": "dist/v4/schema-validator.mjs",
@@ -119,6 +135,11 @@
       "path": "fixtures/v4/candidate/placement-region-chain-v4.json",
       "bytes": 207850,
       "sha256": "9f9c935186e612921cf186f0ec61f0bd1e27103719311fcf2e9faab7306993b2"
+    },
+    {
+      "path": "fixtures/v4/proposal/text-build-proposal.json",
+      "bytes": 30968,
+      "sha256": "eab251d8eb917f6ed123af7281eb4c07a4446bee60cc326a3ed61f3b786e9b9a"
     },
     {
       "path": "licenses/canonicalize-Apache-2.0.txt",

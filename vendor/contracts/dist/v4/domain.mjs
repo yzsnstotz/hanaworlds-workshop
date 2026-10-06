@@ -98,6 +98,18 @@ export function validateDomain(visits) {
     const schema = schemaBundle.definitions[name];
     if (Array.isArray(v) && schema.type === 'array' && !Array.isArray(schema.items)) validateArrayOrder(name, v, parent);
     if (name === 'Box' || name === 'SetBox') assertBox(v);
+    else if (name === 'OriginalSessionBinding')
+      requireFact(v.allowedActions.length > 0, 'SCHEMA_INVALID', 'INVALID_SHAPE');
+    else if ((name === 'OriginalBindingResult' || name === 'CurrentGrantResult') && v.status === 'CURRENT')
+      requireFact(v.binding.sessionRef === v.sessionRef, 'SCHEMA_INVALID', 'INVALID_SHAPE');
+    else if (name === 'OriginalSessionAuthorityResult' && v.status === 'CURRENT')
+      requireFact(v.authority.binding.sessionRef === v.sessionRef, 'SCHEMA_INVALID', 'INVALID_SHAPE');
+    else if (name === 'CanvasWorldSelection' && v.status === 'BOUND')
+      shape(v.context.activeWorldRef !== null);
+    else if (name === 'WorldSelectionContext') {
+      shape(v.inventory.connections.every(row => row.worldRef === v.worldRef));
+      shape((v.selection.status === 'BOUND' ? v.selection.context.currentSession : v.selection.sessionRef) === v.sessionRef);
+    }
     else if (name === 'Axes') geometry(new Set(v.map(x => x[1])).size === 3);
     else if (name === 'CollisionBox') geometry(v.slice(0, 3).every((x, a) => x <= v[a + 3]));
     else if (name === 'NodeCapability') {
@@ -159,6 +171,12 @@ export function validateDomain(visits) {
     } else if (name === 'BuildEntryVerified' ||
       (name === 'BuildEntryOutcome' && v.outcome === 'VERIFIED')) {
       shape(v.receipt.status === 'VERIFIED');
+    } else if (name === 'BuildProposalBox') {
+      assertBox(v); geometry(v.min.every(x => x >= 0));
+    } else if (name === 'BuildProposalContext' || name === 'ValidateBuildProposalRequest') {
+      decodeShape(v.referenceBrief.media.length === 0);
+    } else if (name === 'ValidateBuildProposalResponse' && v.error !== null) {
+      shape(v.error.mutationState === 'NONE' && v.error.transactionRef === null);
     } else if (name === 'CreateBuildPlanRequest') {
       // Payload-decidable painter/v3 rules in the approved order; digest coherence is in validateBoundRequest.
       if (v.targetFacts.source === 'REGION_INSPECTED') {

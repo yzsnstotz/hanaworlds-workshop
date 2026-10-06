@@ -1,3 +1,10 @@
+> **S1-WS-SKILL-BUSINESS-01 checkpoint only — BLOCKED after owner decision 1dae1b9fc.**
+> The skill changes below were implemented against contracts 0.3.10 before MVP authorization was removed. They are not a current MVP candidate. This branch must receive new public local-world contracts; do not fabricate grant/epoch/capability values or assemble this checkpoint as a delivered component.
+>
+> Work preserved: complete pure-text controls go directly to the original Core-backed intent confirmation; `readBuildProposalContext(AdvanceCurrentBuildRequest)` captures a public immutable context (or `BuildEntryChoiceRequired`); `submitBuildProposal(ValidateBuildProposalRequest)` calls Painter `ValidateBuildProposal`; `call('AdvanceCurrentBuild', ...)` reuses the existing transaction/recovery chain. No new model loop or MCP. Old-scope local Host callbacks `hanaworldsProposalAuthority.capture(context)` and `readProviderFacts(request, {sourceContext,currentContext})` use public `OriginalSessionBinding` / `BuildProposalProviderFacts` and will need replacement under the new owner scope. They cannot be supplied by model JSON.
+>
+> Old-scope component evidence: 21 focused tests use real Cordis/DSH Core JSONL and Workshop persistence with explicit external fixtures; no real model, Host authentication, world, GUI or product Undo. Package execution is NOT_RUN. See `scripts/probe-local-world-contract-gap.mjs` for the public-contract blocker.
+
 # HanaWorlds Workshop 0.1.0
 
 Status: Stage 1 component candidate. This repository owns `session/v2` and

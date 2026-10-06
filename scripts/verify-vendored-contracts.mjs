@@ -3,9 +3,9 @@ import { readFile, readdir } from 'node:fs/promises';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const sourceRevision = '295cbc7fd0d8a1e56a0d89e651947e668f2ad658';
-const admittedPackSha256 = '4cee3e9067072d86c95799334a623bd278a5b995da0b9316934fb0722e837f62';
-const manifestSha256 = '64d07afdc1ee508c9e0c4c4a5eb2b49d31600897477788e4c16e031234abd701';
+const sourceRevision = 'e66800964726b951a300eb9377b74c318641417f';
+const admittedPackSha256 = '8624bd026815fcdafc5248b21d8bc611baa0569b7b492b66905d2d015a496ce1';
+const manifestSha256 = '3a7af7d44f673940cb6094d19f60cf3ab59eb0cd36d09b509ba7b0a47286ece8';
 const defaultRoot = fileURLToPath(new URL('../vendor/contracts/', import.meta.url));
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 
@@ -27,10 +27,9 @@ export async function verifyVendoredContracts(root = defaultRoot) {
   const manifest = JSON.parse(rawManifest);
   if (manifest.sourceRevision !== sourceRevision ||
       manifest.admittedPackSha256 !== admittedPackSha256 ||
-      manifest.sourcePackageVersion !== '0.3.5' ||
+      manifest.sourcePackageVersion !== '0.3.10' ||
       JSON.stringify(manifest.runtimeRoots) !== JSON.stringify(['dist/v4/index.mjs']) ||
-      JSON.stringify(manifest.fixtureFiles) !== JSON.stringify([
-        'fixtures/v4/candidate/placement-region-chain-v4.json']))
+      JSON.stringify(manifest.fixtureFiles) !== JSON.stringify(["fixtures/v4/candidate/placement-region-chain-v4.json", "fixtures/v4/proposal/text-build-proposal.json"]))
     throw new Error('VENDOR_SOURCE_PIN_MISMATCH');
   const listed = new Set();
   for (const file of manifest.files) {

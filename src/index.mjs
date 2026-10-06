@@ -13,7 +13,8 @@ import {
   checkWorldContextHandshake, validateWorldSelectionContextResponse,
   checkCurrentBuildAuthorizationHandshake, validateCurrentBuildAuthorizationFacts,
   validateCurrentBuildAuthorizedApply,
-  operationContracts,
+  checkBuildProposalHandshake, validateBuildProposalRequest,
+  validateBuildProposalContext, validateBuildProposalResponse, operationContracts,
 } from 'hanaworlds-contracts/v4';
 
 const VERSION = 'session/v2';
@@ -98,10 +99,10 @@ function confirmingSessionInputId(log, pending, body) {
 export class WorkshopV1 {
   constructor({ sessionPersistence, projectionStore, attachments, llm, authority, capabilities,
     canvas, painter, textPlanSource, brush, resources, mediaAuthority, modelRoute,
-    catalogue, safety, compilerConfig, applyAuthority } = {}) {
+    catalogue, safety, compilerConfig, applyAuthority, proposalAuthority } = {}) {
     Object.assign(this, { sessionPersistence, projectionStore, attachments, llm, authority,
       capabilities, canvas, painter, textPlanSource, brush, resources, mediaAuthority, modelRoute,
-      catalogue, safety, compilerConfig, applyAuthority });
+      catalogue, safety, compilerConfig, applyAuthority, proposalAuthority });
     this.locks = new Map();
     this.lockContext = new AsyncLocalStorage();
     this.contractHandshake = contractHandshake;
@@ -714,10 +715,13 @@ export class WorkshopV1 {
         await refresh();
       }
       if (stage() === 'ANALYZE') {
+        await this.#checkProposalBuild(stageBody('analyze'), state);
         await this.analyzeCurrentBuild(stageBody('analyze'));
         await refresh();
+        await this.#checkProposalBuild(stageBody('analyze'), state);
       }
       if (stage() === 'APPLY') {
+        if (!state.pendingApply) await this.#checkProposalBuild(stageBody('apply'), state);
         try { await this.applyCurrentBuild(stageBody('apply')); }
         catch (error) {
           await refresh();
@@ -850,6 +854,195 @@ export class WorkshopV1 {
     return copy(state.lastPlacement);
   }
 
+  #proposalLive(body, state) {
+    const turn = state.turns.at(-1);
+    const saved = turn && state.confirmedIntents[turn.turnRef];
+    if (!turn || !saved?.confirmationInputId || state.pendingClarification ||
+        (body.expectedTurnRevision ?? body.turnRevision) !== turn.turnRevision)
+      failure('INTENT_UNCONFIRMED', 'validate', 'REQUIRED_FACT_UNKNOWN');
+    if (state.context.activeWorldRef !== body.worldRef ||
+        state.turnWorldRefs[turn.turnRef] !== body.worldRef ||
+        saved.intent.intendedWorldRef !== body.worldRef ||
+        state.context.orderedSelectedObjectRefs.length)
+      failure('TARGET_FACTS_STALE', 'validate', 'REVISION_CHANGED');
+    if (turn.media.length || state.turnPlanningModes?.[turn.turnRef] !== 'SKILL_PROPOSAL')
+      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+    return { turn, saved };
+  }
+
+  #proposalNotCancelled(signal) {
+    if (signal?.aborted) failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+  }
+
+  async #proposalContext(body, state, invocationId) {
+    const { turn, saved } = this.#proposalLive(body, state);
+    const placement = state.lastPlacement;
+    if (placement?.turnRef !== turn.turnRef || placement.outcome !== 'REGION_INSPECTED')
+      failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
+    if (!this.catalogue?.read || !this.safety?.read)
+      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+    const catalogue = validateType('Catalogue', await this.catalogue.read(body.worldRef));
+    const safetyProfile = validateType('SafetyProfile', await this.safety.read(body.worldRef));
+    const inspection = validateRegionInspection(placement.inspection);
+    if (inspection.targetFacts.catalogueDigest !== digestValue('catalogue', catalogue).sha256)
+      failure('CATALOGUE_MISMATCH', 'validate', 'REVISION_CHANGED');
+    return copy(validateType('BuildProposalContext', { contractVersion: 'painter/v3',
+      actorRef: body.actorRef, sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
+      worldRef: body.worldRef, turnRevision: turn.turnRevision, painterId: 'picture-blocks', invocationId,
+      intent: saved.intent, intentDigest: digestValue('intent', saved.intent).sha256,
+      referenceBrief: saved.brief, referenceBriefDigest: digestValue('reference-brief', saved.brief).sha256,
+      catalogue, targetFacts: inspection.targetFacts, targetFactsDigest: inspection.targetFactsDigest,
+      safetyProfile, safetyProfileDigest: digestValue('safety-profile', safetyProfile).sha256,
+      regionInspection: inspection }));
+  }
+
+  #proposalPort() {
+    const port = this.proposalAuthority;
+    if (!port?.capture || !port?.readProviderFacts)
+      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+    checkBuildProposalHandshake(port.contractHandshake);
+    return port;
+  }
+
+  /** Local authenticated Host service. Input is the existing current-turn request;
+   * output is a public immutable context, or the existing placement choice outcome.
+   * Model data must never supply the identity fields in the outer request. */
+  async readBuildProposalContext(raw, { signal } = {}) {
+    const body = copy(validateBoundRequest(VERSION, 'AdvanceCurrentBuild', raw));
+    this.#proposalNotCancelled(signal);
+    return this.#withLock(body.sessionRef, async () => {
+      const port = this.#proposalPort();
+      const proof = await this.#authorized(body, 'CreateBuildPlan');
+      if (proof.worldRef !== body.worldRef) failure('PERMISSION_DENIED', 'authorize', 'SCOPE_DENIED');
+      let { log, state } = await this.#load(body.sessionRef);
+      const { turn } = this.#proposalLive(body, state);
+      const invocationId = `proposal-${body.requestId}`;
+      if (state.currentProposalInvocation !== invocationId &&
+          (state.lastCompiled?.turnRef === turn.turnRef || state.pendingApply?.turnRef === turn.turnRef))
+        failure('PERMISSION_DENIED', 'authorize', 'SCOPE_DENIED');
+      if (!state.lastPlacement || state.lastPlacement.turnRef !== turn.turnRef) {
+        const placed = await this.beginFirstBuilding({ ...body, turnRef: turn.turnRef,
+          requestId: `${body.requestId}:placement` });
+        ({ log, state } = await this.#load(body.sessionRef));
+        this.#proposalNotCancelled(signal);
+        if (placed.outcome === 'PLACEMENT_CHOICE_REQUIRED') return copy(validateType('BuildEntryChoiceRequired', {
+          sessionRef: body.sessionRef, worldRef: body.worldRef, turnRevision: turn.turnRevision,
+          stage: 'PLACEMENT', outcome: 'CHOICE_REQUIRED', frame: placed.frame }));
+      }
+      const context = await this.#proposalContext(body, state, invocationId);
+      const prior = state.proposalContexts?.[invocationId];
+      if (prior && canonicalize(prior.context) !== canonicalize(context))
+        failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
+      // Host captures exact live Session/service/operation and original native grant
+      // before model generation. Repeated captures must retain that original binding.
+      const binding = copy(validateType('OriginalSessionBinding', await port.capture(copy(context), { signal })));
+      if (!binding.allowedActions.includes('INSPECT') ||
+          !['actorRef', 'sessionRef', 'worldRef', 'authorizationRef'].every(k => binding[k] === context[k]) ||
+          (prior && canonicalize(binding) !== canonicalize(prior.binding)))
+        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+      this.#proposalNotCancelled(signal);
+      const live = await this.#authorized(body, 'CreateBuildPlan');
+      if (live.worldRef !== body.worldRef || this.proposalAuthority !== port ||
+          live.sessionIncarnationRef !== binding.sessionIncarnationRef ||
+          live.nativeGrantRef !== binding.expectedGrantRef)
+        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+      state.currentProposalInvocation = invocationId;
+      state.proposalContexts ??= Object.create(null);
+      state.proposalContexts[invocationId] ??= { context, binding, request: null, response: null };
+      await this.#save(body.sessionRef, log, state);
+      this.#proposalNotCancelled(signal);
+      return copy(context);
+    });
+  }
+
+  async #checkProposal(request, state, signal) {
+    this.#proposalNotCancelled(signal);
+    const stored = state.proposalContexts?.[request.invocationId];
+    if (!stored || stored.invalidated || state.currentProposalInvocation !== request.invocationId) failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    if (stored.request && canonicalize(stored.request) !== canonicalize(request))
+      failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
+    const port = this.#proposalPort();
+    const proof = await this.#authorized(request, 'CreateBuildPlan');
+    if (proof.worldRef !== request.worldRef) failure('PERMISSION_DENIED', 'authorize', 'SCOPE_DENIED');
+    const currentContext = await this.#proposalContext(request, state, request.invocationId);
+    const contexts = { sourceContext: copy(stored.context), currentContext };
+    // Host must independently refresh INSPECT/Session/grant/delegation. These
+    // Workshop projections are coherence inputs, never proof of authenticity.
+    const facts = copy(validateType('BuildProposalProviderFacts',
+      await port.readProviderFacts(copy(request), copy(contexts), { signal })));
+    if (this.proposalAuthority !== port || canonicalize(facts.originalBinding) !== canonicalize(stored.binding) ||
+        canonicalize(facts.sourceContext) !== canonicalize(contexts.sourceContext) ||
+        canonicalize(facts.currentContext) !== canonicalize(currentContext))
+      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    validateBuildProposalContext(request, facts);
+    const live = await this.#authorized(request, 'CreateBuildPlan');
+    const latest = await this.#load(request.sessionRef);
+    const refreshed = await this.#proposalContext(request, latest.state, request.invocationId);
+    if (live.worldRef !== request.worldRef || live.sessionIncarnationRef !== stored.binding.sessionIncarnationRef ||
+        live.nativeGrantRef !== stored.binding.expectedGrantRef ||
+        latest.state.currentProposalInvocation !== request.invocationId ||
+        canonicalize(refreshed) !== canonicalize(currentContext))
+      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    this.#proposalNotCancelled(signal);
+    return stored;
+  }
+
+  async #checkProposalBuild(body, state) {
+    const saved = state.lastBuild;
+    if (saved?.turnRef !== body.turnRef || !saved.proposalRequest) return;
+    const request = saved.proposalRequest;
+    if (!['actorRef', 'sessionRef', 'authorizationRef'].every(k => body[k] === request[k]))
+      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+    await this.#checkProposal(request, state);
+  }
+
+  /** Only the public proposal contains model output. No planner/model call. */
+  async submitBuildProposal(raw, { signal } = {}) {
+    let request;
+    try {
+      request = copy(validateBuildProposalRequest(raw));
+      return await this.#withLock(request.sessionRef, async () => {
+        let { log, state } = await this.#load(request.sessionRef);
+        const stored = await this.#checkProposal(request, state, signal);
+        if (stored.response) return copy(stored.response);
+        const { turn } = this.#proposalLive(request, state);
+        if (state.lastCompiled?.turnRef === turn.turnRef || state.pendingApply?.turnRef === turn.turnRef)
+          failure('PERMISSION_DENIED', 'authorize', 'SCOPE_DENIED');
+        const painter = this.painter;
+        checkBuildProposalHandshake(painter?.contractHandshake);
+        if (!painter?.call) failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
+        stored.request = copy(request); // reserve exact payload before any asynchronous consumer
+        state = await this.#save(request.sessionRef, log, state);
+        await this.#checkProposal(request, state, signal);
+        const response = copy(validateBuildProposalResponse(request,
+          await painter.call('ValidateBuildProposal', copy(request), { signal })));
+        ({ log, state } = await this.#load(request.sessionRef));
+        await this.#checkProposal(request, state, signal);
+        if (this.painter !== painter) failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
+        if (response.error) return response;
+        state.lastBuild = { turnRef: turn.turnRef, worldRef: request.worldRef,
+          plan: response.result, catalogue: request.catalogue, safetyProfile: request.safetyProfile,
+          inspection: request.regionInspection, proposalRequest: request };
+        state.proposalContexts[request.invocationId].response = response;
+        state = await this.#save(request.sessionRef, log, state);
+        try { await this.#checkProposal(request, state, signal); }
+        catch (error) {
+          // A cancellation/revocation during persistence must not leave a
+          // consumable success behind. Retain reservation for replay auditing.
+          ({ log, state } = await this.#load(request.sessionRef));
+          state.proposalContexts[request.invocationId].invalidated = true;
+          state.proposalContexts[request.invocationId].response = null;
+          if (state.lastBuild?.proposalRequest?.invocationId === request.invocationId) state.lastBuild = null;
+          await this.#save(request.sessionRef, log, state);
+          throw error;
+        }
+        return copy(response);
+      });
+    } catch (error) {
+      return packet('painter/v3', request?.requestId ?? raw?.requestId ?? null, null, toPublic(error));
+    }
+  }
+
   async createBuildPlan(body) {
     await this.#authorized(body, 'CreateBuildPlan');
     return this.#withLock(body.sessionRef, async () => {
@@ -860,6 +1053,8 @@ export class WorkshopV1 {
       if (!turn || !saved || !placement || placement.outcome !== 'REGION_INSPECTED' ||
           placement.turnRef !== body.turnRef ||
           saved.intent.confirmedIntent.kind !== 'BUILD_STRUCTURE')
+        failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
+      if (state.turnPlanningModes?.[body.turnRef] === 'SKILL_PROPOSAL')
         failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
       const textOnly = turn.media.length === 0;
       if (saved.intent.intendedWorldRef !== state.context.activeWorldRef ||
@@ -989,6 +1184,7 @@ export class WorkshopV1 {
       if (!saved || saved.turnRef !== body.turnRef ||
           saved.worldRef !== state.context.activeWorldRef)
         failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
+      await this.#checkProposalBuild(body, state);
       requirePeer(this.brush,
         { wires: ['BUILD/V2'], factProfiles: ['target-facts/v3'] });
       if (!this.brush?.compile || !this.compilerConfig?.read)
@@ -1013,6 +1209,7 @@ export class WorkshopV1 {
       const response = validateResponse('BUILD/V2', 'BuildDocument',
         await this.brush.compile(request));
       if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
+      await this.#checkProposalBuild(body, state);
       state.lastCompiled = { turnRef: body.turnRef, worldRef: saved.worldRef,
         compiled: response.result, build: saved.plan.build,
         inspection: saved.inspection };
@@ -1096,6 +1293,7 @@ export class WorkshopV1 {
     const canvas = this.canvas, host = this.applyAuthority;
     const initial = await this.#load(body.sessionRef);
     const facts = this.#currentBuildAuthorizationFacts(body, initial.state);
+    if (!initial.state.pendingApply) await this.#checkProposalBuild(body, initial.state);
     // Host authenticates its callback and independently captures the actual
     // parent/child, Session incarnation, engine grant and service instances.
     const context = await host.readCurrentBuildContext(copy(facts), copy(issued), copy(request));
@@ -1563,7 +1761,10 @@ export class WorkshopV1 {
       if (state.turns.some(turn => turn.turnRef === body.turnRef))
         failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
       const { media, imageBlocks } = await this.#mediaForModel(body);
-      const answer = await this.#modelTurn(body, imageBlocks,
+      const structured = media.length === 0 && parseStructureProposal(JSON.stringify({
+        kind: 'BUILD_STRUCTURE', text: body.text, purpose: body.controls.purpose,
+        dimensions: body.controls.dimensions, entrancePortalRefs: body.controls.entrancePortalRefs }));
+      const answer = structured ? JSON.stringify(structured) : await this.#modelTurn(body, imageBlocks,
         state.turns.filter(turn => state.turnWorldRefs?.[turn.turnRef] ===
           state.context.activeWorldRef));
       const proposal = parseStructureProposal(answer);
@@ -1576,8 +1777,10 @@ export class WorkshopV1 {
         media, referenceBriefDigest: null, intentDigest: null, actionReceiptDigest: null });
       state.turnWorldRefs ??= Object.create(null);
       state.turnWorldRefs[body.turnRef] = state.context.activeWorldRef;
-      state.pendingClarification = { ...clarification, proposal, turnRef: body.turnRef,
+      state.pendingClarification = { ...clarification, proposal, structured: !!structured, turnRef: body.turnRef,
         answers: [], afterSessionEventSeq: log.events.length - 1 };
+      state.turnPlanningModes ??= Object.create(null);
+      state.turnPlanningModes[body.turnRef] = structured ? 'SKILL_PROPOSAL' : 'FIXED';
       state.turnControls[body.turnRef] = body.controls;
       state.turnDetails[body.turnRef] = { resultText: clarification.question,
         confirmedBrief: null };
@@ -1599,9 +1802,9 @@ export class WorkshopV1 {
         if (!original) failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
         const answers = confirmed ? (pending.answers ?? []) :
           [...(pending.answers ?? []), body.answer];
-        let answer = '请补充明确的建造意图和节点尺寸。';
+        let answer = pending.structured ? '请更新建造参数并重新提交，之后再确认。' : '请补充明确的建造意图和节点尺寸。';
         let proposal = null;
-        if (!confirmed) {
+        if (!confirmed && !pending.structured) {
           const { imageBlocks } = await this.#mediaForModel({ ...body, media: original.media });
           answer = await this.#modelTurn({ ...body,
             text: `${original.text}\n${answers.map((value, index) =>
@@ -1672,7 +1875,7 @@ export function apply(ctx) {
     textPlanSource: 'hanaworldsTextPlanSource',
     resources: 'hanaworldsRequiredResources', catalogue: 'hanaworldsCatalogue',
     safety: 'hanaworldsSafetyProfile', compilerConfig: 'hanaworldsCompilerConfig',
-    applyAuthority: 'hanaworldsApplyAuthority',
+    applyAuthority: 'hanaworldsApplyAuthority', proposalAuthority: 'hanaworldsProposalAuthority',
     mediaAuthority: 'hanaworldsMediaAuthority', modelRoute: 'hanaworldsModelRoute',
   };
   for (const [field, port] of Object.entries(ports))
