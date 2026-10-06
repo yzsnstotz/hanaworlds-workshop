@@ -1,6 +1,6 @@
 export * from './contracts.js';
 import type {TypeMap,TypeName,OperationMap,ProjectionMap,ContractHandshake,LocalRequestFacts,CurrentBuildSubmission,ValidateBuildProposalRequest,ValidateBuildProposalResponse,BuildProposalProviderFacts,ScopedPreparedTransaction,ScopedPreparedTransactionResult,RegionInspection,MaterialMap,Catalogue,BuildProjection,FinalEffects,TargetFacts,SafetyProfile,Coverage} from './contracts.js';
-export declare const version: '0.4.2';
+export declare const version: '0.5.0';
 export declare const wireVersions: ReadonlyArray<keyof OperationMap>;
 export declare const compiledOperationsVersion: 'operations/v3';
 export declare const contractHandshake: ContractHandshake;
@@ -76,3 +76,35 @@ export interface MaterialSourceFactsPort {readMaterialSources(worldRef:import('.
 /** Checks association and content integrity, not provider authenticity, image
  * decoding or static build eligibility. Call validateStaticMaterials as usual. */
 export declare function validateMaterialSources(input:unknown,catalogue:Catalogue,currentConnection:import('./contracts.js').MaterialSourceConnection):MaterialSources;
+/** region-voxels/v1. Runs are [count, paletteIndex|null] in Luanti VoxelArea order
+ * (x fastest, then y, then z). null is UNSPECIFIED (keep); only an explicit
+ * {nodeName:'air',param2:0} palette entry carves. Pure helpers over supplied facts. */
+type C=import('./contracts.js').TypeMap;
+export interface ExpandedRegionBlock {readonly box:C['Box'];readonly size:C['RegionSize'];readonly palette:C['RegionPalette'];readonly indices:Int32Array;}
+export declare function regionBlockBox(block:C['RegionVoxelBlock']):C['Box'];
+export declare function mapblockOf(position:C['Position']):C['ChunkPosition'];
+export declare function regionChunksOfBox(box:C['Box']):ReadonlyArray<{readonly chunkPos:C['ChunkPosition'];readonly box:C['Box']}>;
+export declare function expandRegionBlock(block:C['RegionVoxelBlock']):ExpandedRegionBlock;
+export declare function encodeRegionBlock(input:{origin:C['Position'];size:C['RegionSize'];palette:ReadonlyArray<C['NodeSpec']>;indices:ArrayLike<number>}):C['RegionVoxelBlock'];
+export declare function validateRegionPalette(block:C['RegionVoxelBlock'],catalogue:C['Catalogue']):C['RegionVoxelBlock'];
+export declare function expectedRegionState(before:C['RegionState'],ops:C['RegionVoxelBlock']):C['RegionState'];
+export declare function summarizeRegionStates(worldRef:C['Ref'],chunks:ReadonlyArray<{chunkPos:C['ChunkPosition'];state:C['RegionState']}>):C['RegionSummary'];
+export declare function expectedRegionSummary(content:C['RegionSnapshotContent'],operations:C['RegionOperationsProjection']):C['RegionSummary'];
+export declare function validateRegionProposalRequest(input:unknown):C['ValidateRegionProposalRequest'];
+export declare function validateRegionProposalResponse(request:unknown,response:unknown):C['ValidateRegionProposalResponse'];
+export declare function validateCompileRegionBuildRequest(input:unknown):C['CompileRegionBuildRequest'];
+export declare function validateCompiledRegionSet(request:unknown,response:unknown):C['CompileRegionBuildResponse'];
+export declare function validateRegionRead(request:unknown,response:unknown):C['ReadRegionResponse'];
+export declare function requireKnownRegion(result:unknown):C['RegionReadResult'];
+/** Transport facts only: allWritten is never a commit; committed is always false. */
+export declare function validateRegionWrite(request:unknown,response:unknown):{readonly response:C['WriteRegionResponse'];readonly allWritten:boolean;readonly committed:false};
+export declare function validateRegionSnapshotContent(content:unknown,ref:unknown,beforeSummary:unknown):C['RegionSnapshotContent'];
+export declare function validateRegionCommit(request:unknown,response:unknown):C['ApplyRegionCommitResponse'];
+export declare function validateRegionUndo(request:unknown,response:unknown,originResult:unknown):C['UndoRegionCommitResponse'];
+export declare function protocolRequirement(wire:string,capabilities?:ReadonlyArray<string>,minMinor?:number):C['ProtocolRequirement'];
+/** Same major, minor >= minMinor, all capabilities. Provenance is recorded, never compared. */
+export declare function checkProtocolCompatibility(advertised:unknown,requirements:unknown):{readonly result:'PROTOCOL_COMPATIBLE';readonly component:string;readonly matched:ReadonlyArray<{readonly protocol:string;readonly major:number;readonly minor:number;readonly capabilities:ReadonlyArray<string>}>;readonly provenance:C['ProtocolProvenance']};
+export declare const contractProtocols:ReadonlyArray<C['ProtocolDescriptor']>;
+export declare const protocolPolicy:Readonly<Record<'rule'|'majors'|'minor'|'rejection'|'legacy'|'digestDomain',string>>;
+export declare const regionCapabilities:ReadonlyArray<{readonly id:string;readonly owner:string;readonly meaning:string}>;
+export declare const regionInvariants:ReadonlyArray<{readonly id:string;readonly owner:string;readonly switchable:false;readonly text:string;readonly consequence:string}>;

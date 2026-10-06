@@ -1,5 +1,5 @@
 {
-  "version": "0.4.2",
+  "version": "0.5.0",
   "wireVersions": [
     "interaction-surface/v4",
     "session/v3",
@@ -7,7 +7,11 @@
     "ReferenceBrief/v3",
     "BUILD/V3",
     "canvas/v5",
-    "world-adapter/v6"
+    "world-adapter/v6",
+    "region-build/v1",
+    "painter-region/v1",
+    "world-adapter-region/v1",
+    "canvas-region/v1"
   ],
   "compiledOperationsVersion": "operations/v3",
   "operations": {
@@ -300,6 +304,44 @@
         "request": "LocalConnectionReadbackRequest",
         "response": "LocalConnectionReadbackResponse"
       }
+    ],
+    "region-build/v1": [
+      {
+        "operation": "CompileRegionBuild",
+        "request": "CompileRegionBuildRequest",
+        "response": "CompileRegionBuildResponse"
+      }
+    ],
+    "painter-region/v1": [
+      {
+        "operation": "ValidateRegionProposal",
+        "request": "ValidateRegionProposalRequest",
+        "response": "ValidateRegionProposalResponse"
+      }
+    ],
+    "world-adapter-region/v1": [
+      {
+        "operation": "ReadRegion",
+        "request": "ReadRegionRequest",
+        "response": "ReadRegionResponse"
+      },
+      {
+        "operation": "WriteRegion",
+        "request": "WriteRegionRequest",
+        "response": "WriteRegionResponse"
+      }
+    ],
+    "canvas-region/v1": [
+      {
+        "operation": "ApplyRegionCommit",
+        "request": "ApplyRegionCommitRequest",
+        "response": "ApplyRegionCommitResponse"
+      },
+      {
+        "operation": "UndoRegionCommit",
+        "request": "UndoRegionCommitRequest",
+        "response": "UndoRegionCommitResponse"
+      }
     ]
   },
   "digest": {
@@ -326,10 +368,22 @@
       "history-operation": "HistoryOperationProjection",
       "scoped-world": "ScopedWorldBinding",
       "scoped-transaction-payload": "ScopedTxProjection",
-      "material-sources": "MaterialSourcesProjection"
+      "material-sources": "MaterialSourcesProjection",
+      "region-block": "RegionVoxelBlock",
+      "region-state": "RegionState",
+      "region-build": "RegionBuildProjection",
+      "region-operations": "RegionOperationsProjection",
+      "region-summary": "RegionSummary",
+      "region-snapshot-content": "RegionSnapshotContent"
     },
     "domainPrefixByKind": {
-      "material-sources": "HanaWorlds|contracts@0.4.2|"
+      "material-sources": "HanaWorlds|contracts@0.4.2|",
+      "region-block": "HanaWorlds|region-voxels/v1|",
+      "region-state": "HanaWorlds|region-voxels/v1|",
+      "region-build": "HanaWorlds|region-voxels/v1|",
+      "region-operations": "HanaWorlds|region-voxels/v1|",
+      "region-summary": "HanaWorlds|region-voxels/v1|",
+      "region-snapshot-content": "HanaWorlds|region-voxels/v1|"
     }
   },
   "ownership": {
@@ -360,6 +414,22 @@
     "interaction-surface/v4": {
       "domainOwner": "Shell",
       "mutationCaller": "none"
+    },
+    "region-build/v1": {
+      "domainOwner": "Brush",
+      "mutationCaller": "none"
+    },
+    "painter-region/v1": {
+      "domainOwner": "Painter",
+      "mutationCaller": "none"
+    },
+    "world-adapter-region/v1": {
+      "domainOwner": "Adapter transport",
+      "mutationCaller": "Canvas only through internal dispatch"
+    },
+    "canvas-region/v1": {
+      "domainOwner": "Canvas",
+      "mutationCaller": "Canvas only"
     }
   },
   "canvasEventRules": {
@@ -10918,6 +10988,1598 @@
         "sourceRevision"
       ],
       "additionalProperties": false
+    },
+    "ChunkPosition": {
+      "x-typeName": "ChunkPosition",
+      "type": "array",
+      "items": [
+        {
+          "$ref": "#/definitions/SafeInt"
+        },
+        {
+          "$ref": "#/definitions/SafeInt"
+        },
+        {
+          "$ref": "#/definitions/SafeInt"
+        }
+      ],
+      "minItems": 3,
+      "maxItems": 3,
+      "additionalItems": false,
+      "x-order": "mapblock x,y,z = floor(node/16)"
+    },
+    "RegionSize": {
+      "x-typeName": "RegionSize",
+      "type": "array",
+      "items": [
+        {
+          "$ref": "#/definitions/PositiveInt"
+        },
+        {
+          "$ref": "#/definitions/PositiveInt"
+        },
+        {
+          "$ref": "#/definitions/PositiveInt"
+        }
+      ],
+      "minItems": 3,
+      "maxItems": 3,
+      "additionalItems": false,
+      "x-order": "x,y,z extent in nodes"
+    },
+    "RegionRun": {
+      "x-typeName": "RegionRun",
+      "type": "array",
+      "items": [
+        {
+          "$ref": "#/definitions/PositiveInt"
+        },
+        {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/NonNegativeInt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "additionalItems": false,
+      "x-order": "[count, palette index | null=UNSPECIFIED]"
+    },
+    "RegionRuns": {
+      "x-typeName": "RegionRuns",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RegionRun"
+      },
+      "x-order": "VoxelArea index order: x fastest, then y, then z",
+      "minItems": 1
+    },
+    "RegionPalette": {
+      "x-typeName": "RegionPalette",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/NodeSpec"
+      },
+      "x-order": "nodeName UTF16 then param2 numeric",
+      "x-uniqueBy": "nodeName,param2",
+      "minItems": 1
+    },
+    "RegionVoxelBlock": {
+      "x-typeName": "RegionVoxelBlock",
+      "type": "object",
+      "properties": {
+        "profileVersion": {
+          "const": "region-voxels/v1"
+        },
+        "origin": {
+          "$ref": "#/definitions/Position"
+        },
+        "size": {
+          "$ref": "#/definitions/RegionSize"
+        },
+        "indexOrder": {
+          "const": "X_FASTEST_THEN_Y_THEN_Z"
+        },
+        "palette": {
+          "$ref": "#/definitions/RegionPalette"
+        },
+        "runs": {
+          "$ref": "#/definitions/RegionRuns"
+        }
+      },
+      "required": [
+        "profileVersion",
+        "origin",
+        "size",
+        "indexOrder",
+        "palette",
+        "runs"
+      ],
+      "additionalProperties": false
+    },
+    "RegionExtra": {
+      "x-typeName": "RegionExtra",
+      "type": "object",
+      "properties": {
+        "position": {
+          "$ref": "#/definitions/Position"
+        },
+        "metadata": {
+          "$ref": "#/definitions/StringMap"
+        },
+        "inventory": {
+          "$ref": "#/definitions/Inventory"
+        },
+        "timer": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Timer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "position",
+        "metadata",
+        "inventory",
+        "timer"
+      ],
+      "additionalProperties": false
+    },
+    "RegionExtras": {
+      "x-typeName": "RegionExtras",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RegionExtra"
+      },
+      "x-order": "position numeric x,y,z",
+      "x-uniqueBy": "position"
+    },
+    "RegionState": {
+      "x-typeName": "RegionState",
+      "type": "object",
+      "properties": {
+        "profileVersion": {
+          "const": "region-state/v1"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "block": {
+          "$ref": "#/definitions/RegionVoxelBlock"
+        },
+        "extras": {
+          "$ref": "#/definitions/RegionExtras"
+        },
+        "derivedLightMode": {
+          "const": "recompute-with-readback"
+        }
+      },
+      "required": [
+        "profileVersion",
+        "worldRef",
+        "block",
+        "extras",
+        "derivedLightMode"
+      ],
+      "additionalProperties": false
+    },
+    "RegionChunk": {
+      "x-typeName": "RegionChunk",
+      "type": "object",
+      "properties": {
+        "chunkPos": {
+          "$ref": "#/definitions/ChunkPosition"
+        },
+        "block": {
+          "$ref": "#/definitions/RegionVoxelBlock"
+        }
+      },
+      "required": [
+        "chunkPos",
+        "block"
+      ],
+      "additionalProperties": false
+    },
+    "RegionChunks": {
+      "x-typeName": "RegionChunks",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RegionChunk"
+      },
+      "x-order": "chunkPos numeric x,y,z",
+      "x-uniqueBy": "chunkPos",
+      "minItems": 1
+    },
+    "RegionBuildProjection": {
+      "x-typeName": "RegionBuildProjection",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "region-build/v1"
+        },
+        "documentId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "coordinateSpace": {
+          "const": "WORLD_NODE"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "catalogueDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "block": {
+          "$ref": "#/definitions/RegionVoxelBlock"
+        },
+        "declaredBounds": {
+          "$ref": "#/definitions/Box"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "documentId",
+        "coordinateSpace",
+        "worldRef",
+        "catalogueDigest",
+        "block",
+        "declaredBounds"
+      ],
+      "additionalProperties": false
+    },
+    "RegionBuildPlan": {
+      "x-typeName": "RegionBuildPlan",
+      "type": "object",
+      "properties": {
+        "invocationId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "build": {
+          "$ref": "#/definitions/RegionBuildProjection"
+        },
+        "buildDigest": {
+          "$ref": "#/definitions/Digest"
+        }
+      },
+      "required": [
+        "invocationId",
+        "build",
+        "buildDigest"
+      ],
+      "additionalProperties": false
+    },
+    "RegionOperationsProjection": {
+      "x-typeName": "RegionOperationsProjection",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "region-operations/v1"
+        },
+        "buildDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "compilerRevision": {
+          "$ref": "#/definitions/Revision"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "catalogueDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "chunkEdge": {
+          "const": 16
+        },
+        "chunks": {
+          "$ref": "#/definitions/RegionChunks"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "buildDigest",
+        "compilerRevision",
+        "worldRef",
+        "catalogueDigest",
+        "chunkEdge",
+        "chunks"
+      ],
+      "additionalProperties": false
+    },
+    "CompiledRegionSet": {
+      "x-typeName": "CompiledRegionSet",
+      "type": "object",
+      "properties": {
+        "projection": {
+          "$ref": "#/definitions/RegionOperationsProjection"
+        },
+        "operationDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "writeBounds": {
+          "$ref": "#/definitions/Box"
+        }
+      },
+      "required": [
+        "projection",
+        "operationDigest",
+        "writeBounds"
+      ],
+      "additionalProperties": false
+    },
+    "CompileRegionBuildRequest": {
+      "x-typeName": "CompileRegionBuildRequest",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "region-build/v1"
+        },
+        "sessionRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "requestId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "build": {
+          "$ref": "#/definitions/RegionBuildProjection"
+        },
+        "buildDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "catalogue": {
+          "$ref": "#/definitions/Catalogue"
+        },
+        "catalogueDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "compilerRevision": {
+          "$ref": "#/definitions/Revision"
+        },
+        "localContext": {
+          "$ref": "#/definitions/LocalWorldContext"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "sessionRef",
+        "requestId",
+        "worldRef",
+        "build",
+        "buildDigest",
+        "catalogue",
+        "catalogueDigest",
+        "compilerRevision",
+        "localContext"
+      ],
+      "additionalProperties": false
+    },
+    "CompileRegionBuildResponse": {
+      "x-typeName": "CompileRegionBuildResponse",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "region-build/v1"
+        },
+        "requestId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CompiledRegionSet"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "result",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "RegionProposal": {
+      "x-typeName": "RegionProposal",
+      "type": "object",
+      "properties": {
+        "decision": {
+          "const": "REGION"
+        },
+        "block": {
+          "$ref": "#/definitions/RegionVoxelBlock"
+        }
+      },
+      "required": [
+        "decision",
+        "block"
+      ],
+      "additionalProperties": false
+    },
+    "ValidateRegionProposalRequest": {
+      "x-typeName": "ValidateRegionProposalRequest",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "painter-region/v1"
+        },
+        "sessionRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "requestId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "turnRevision": {
+          "$ref": "#/definitions/Revision"
+        },
+        "invocationId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "intent": {
+          "$ref": "#/definitions/IntentProjection"
+        },
+        "intentDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "referenceBrief": {
+          "$ref": "#/definitions/BriefProjection"
+        },
+        "referenceBriefDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "catalogue": {
+          "$ref": "#/definitions/Catalogue"
+        },
+        "catalogueDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "proposal": {
+          "$ref": "#/definitions/RegionProposal"
+        },
+        "localContext": {
+          "$ref": "#/definitions/LocalWorldContext"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "sessionRef",
+        "requestId",
+        "worldRef",
+        "turnRevision",
+        "invocationId",
+        "intent",
+        "intentDigest",
+        "referenceBrief",
+        "referenceBriefDigest",
+        "catalogue",
+        "catalogueDigest",
+        "proposal",
+        "localContext"
+      ],
+      "additionalProperties": false
+    },
+    "ValidateRegionProposalResponse": {
+      "x-typeName": "ValidateRegionProposalResponse",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "painter-region/v1"
+        },
+        "requestId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RegionBuildPlan"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "result",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "RegionReadPurpose": {
+      "x-typeName": "RegionReadPurpose",
+      "enum": [
+        "BEFORE_IMAGE",
+        "READBACK",
+        "INSPECT"
+      ]
+    },
+    "RegionChunkAvailability": {
+      "x-typeName": "RegionChunkAvailability",
+      "enum": [
+        "KNOWN",
+        "UNKNOWN"
+      ]
+    },
+    "RegionLoadMethod": {
+      "x-typeName": "RegionLoadMethod",
+      "enum": [
+        "ALREADY_LOADED",
+        "LOADED_BY_EMERGE"
+      ]
+    },
+    "RegionUnknownReason": {
+      "x-typeName": "RegionUnknownReason",
+      "enum": [
+        "LOAD_FAILED",
+        "NOT_GENERATED",
+        "OUTSIDE_WORLD_LIMITS",
+        "READ_FAILED"
+      ]
+    },
+    "RegionChunkRead": {
+      "x-typeName": "RegionChunkRead",
+      "type": "object",
+      "properties": {
+        "chunkPos": {
+          "$ref": "#/definitions/ChunkPosition"
+        },
+        "box": {
+          "$ref": "#/definitions/Box"
+        },
+        "availability": {
+          "$ref": "#/definitions/RegionChunkAvailability"
+        },
+        "loadMethod": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RegionLoadMethod"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unknownReason": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RegionUnknownReason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RegionState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stateDigest": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "chunkPos",
+        "box",
+        "availability",
+        "loadMethod",
+        "unknownReason",
+        "state",
+        "stateDigest"
+      ],
+      "additionalProperties": false
+    },
+    "RegionChunkReads": {
+      "x-typeName": "RegionChunkReads",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RegionChunkRead"
+      },
+      "x-order": "chunkPos numeric x,y,z",
+      "x-uniqueBy": "chunkPos",
+      "minItems": 1
+    },
+    "ReadRegionRequest": {
+      "x-typeName": "ReadRegionRequest",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "world-adapter-region/v1"
+        },
+        "sessionRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "requestId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "box": {
+          "$ref": "#/definitions/Box"
+        },
+        "purpose": {
+          "$ref": "#/definitions/RegionReadPurpose"
+        },
+        "localContext": {
+          "$ref": "#/definitions/LocalWorldContext"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "sessionRef",
+        "requestId",
+        "worldRef",
+        "box",
+        "purpose",
+        "localContext"
+      ],
+      "additionalProperties": false
+    },
+    "RegionReadResult": {
+      "x-typeName": "RegionReadResult",
+      "type": "object",
+      "properties": {
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "box": {
+          "$ref": "#/definitions/Box"
+        },
+        "chunks": {
+          "$ref": "#/definitions/RegionChunkReads"
+        },
+        "localContext": {
+          "$ref": "#/definitions/LocalWorldContext"
+        }
+      },
+      "required": [
+        "worldRef",
+        "box",
+        "chunks",
+        "localContext"
+      ],
+      "additionalProperties": false
+    },
+    "ReadRegionResponse": {
+      "x-typeName": "ReadRegionResponse",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "world-adapter-region/v1"
+        },
+        "requestId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RegionReadResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "result",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "RegionWritePurpose": {
+      "x-typeName": "RegionWritePurpose",
+      "enum": [
+        "APPLY",
+        "RESTORE"
+      ]
+    },
+    "RegionChunkWrite": {
+      "x-typeName": "RegionChunkWrite",
+      "type": "object",
+      "properties": {
+        "chunkPos": {
+          "$ref": "#/definitions/ChunkPosition"
+        },
+        "expectedCurrentDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "ops": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RegionVoxelBlock"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RegionState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "chunkPos",
+        "expectedCurrentDigest",
+        "ops",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "RegionChunkWrites": {
+      "x-typeName": "RegionChunkWrites",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RegionChunkWrite"
+      },
+      "x-order": "chunkPos numeric x,y,z",
+      "x-uniqueBy": "chunkPos",
+      "minItems": 1
+    },
+    "WriteRegionRequest": {
+      "x-typeName": "WriteRegionRequest",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "world-adapter-region/v1"
+        },
+        "sessionRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "requestId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "transactionId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "purpose": {
+          "$ref": "#/definitions/RegionWritePurpose"
+        },
+        "writes": {
+          "$ref": "#/definitions/RegionChunkWrites"
+        },
+        "localContext": {
+          "$ref": "#/definitions/LocalWorldContext"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "sessionRef",
+        "requestId",
+        "worldRef",
+        "transactionId",
+        "purpose",
+        "writes",
+        "localContext"
+      ],
+      "additionalProperties": false
+    },
+    "RegionChunkWriteStatus": {
+      "x-typeName": "RegionChunkWriteStatus",
+      "enum": [
+        "WRITTEN",
+        "NOT_WRITTEN",
+        "UNKNOWN"
+      ]
+    },
+    "RegionChunkWriteResult": {
+      "x-typeName": "RegionChunkWriteResult",
+      "type": "object",
+      "properties": {
+        "chunkPos": {
+          "$ref": "#/definitions/ChunkPosition"
+        },
+        "status": {
+          "$ref": "#/definitions/RegionChunkWriteStatus"
+        },
+        "readbackDigest": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "chunkPos",
+        "status",
+        "readbackDigest"
+      ],
+      "additionalProperties": false
+    },
+    "RegionChunkWriteResults": {
+      "x-typeName": "RegionChunkWriteResults",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RegionChunkWriteResult"
+      },
+      "x-order": "chunkPos numeric x,y,z",
+      "x-uniqueBy": "chunkPos",
+      "minItems": 1
+    },
+    "RegionLightingStatus": {
+      "x-typeName": "RegionLightingStatus",
+      "enum": [
+        "COMPLETE",
+        "NOT_COMPLETE"
+      ]
+    },
+    "RegionLighting": {
+      "x-typeName": "RegionLighting",
+      "type": "object",
+      "properties": {
+        "status": {
+          "$ref": "#/definitions/RegionLightingStatus"
+        },
+        "box": {
+          "$ref": "#/definitions/Box"
+        },
+        "method": {
+          "$ref": "#/definitions/Ref"
+        }
+      },
+      "required": [
+        "status",
+        "box",
+        "method"
+      ],
+      "additionalProperties": false
+    },
+    "RegionWriteResult": {
+      "x-typeName": "RegionWriteResult",
+      "type": "object",
+      "properties": {
+        "transactionId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "purpose": {
+          "$ref": "#/definitions/RegionWritePurpose"
+        },
+        "chunks": {
+          "$ref": "#/definitions/RegionChunkWriteResults"
+        },
+        "lighting": {
+          "$ref": "#/definitions/RegionLighting"
+        },
+        "localContext": {
+          "$ref": "#/definitions/LocalWorldContext"
+        }
+      },
+      "required": [
+        "transactionId",
+        "worldRef",
+        "purpose",
+        "chunks",
+        "lighting",
+        "localContext"
+      ],
+      "additionalProperties": false
+    },
+    "WriteRegionResponse": {
+      "x-typeName": "WriteRegionResponse",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "world-adapter-region/v1"
+        },
+        "requestId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RegionWriteResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "result",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "RegionSummaryChunk": {
+      "x-typeName": "RegionSummaryChunk",
+      "type": "object",
+      "properties": {
+        "chunkPos": {
+          "$ref": "#/definitions/ChunkPosition"
+        },
+        "box": {
+          "$ref": "#/definitions/Box"
+        },
+        "stateDigest": {
+          "$ref": "#/definitions/Digest"
+        }
+      },
+      "required": [
+        "chunkPos",
+        "box",
+        "stateDigest"
+      ],
+      "additionalProperties": false
+    },
+    "RegionSummaryChunks": {
+      "x-typeName": "RegionSummaryChunks",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RegionSummaryChunk"
+      },
+      "x-order": "chunkPos numeric x,y,z",
+      "x-uniqueBy": "chunkPos",
+      "minItems": 1
+    },
+    "RegionSummary": {
+      "x-typeName": "RegionSummary",
+      "type": "object",
+      "properties": {
+        "profileVersion": {
+          "const": "region-summary/v1"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "chunks": {
+          "$ref": "#/definitions/RegionSummaryChunks"
+        }
+      },
+      "required": [
+        "profileVersion",
+        "worldRef",
+        "chunks"
+      ],
+      "additionalProperties": false
+    },
+    "RegionSnapshotChunk": {
+      "x-typeName": "RegionSnapshotChunk",
+      "type": "object",
+      "properties": {
+        "chunkPos": {
+          "$ref": "#/definitions/ChunkPosition"
+        },
+        "state": {
+          "$ref": "#/definitions/RegionState"
+        },
+        "stateDigest": {
+          "$ref": "#/definitions/Digest"
+        }
+      },
+      "required": [
+        "chunkPos",
+        "state",
+        "stateDigest"
+      ],
+      "additionalProperties": false
+    },
+    "RegionSnapshotChunks": {
+      "x-typeName": "RegionSnapshotChunks",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RegionSnapshotChunk"
+      },
+      "x-order": "chunkPos numeric x,y,z",
+      "x-uniqueBy": "chunkPos",
+      "minItems": 1
+    },
+    "RegionSnapshotContent": {
+      "x-typeName": "RegionSnapshotContent",
+      "type": "object",
+      "properties": {
+        "profileVersion": {
+          "const": "region-snapshot-content/v1"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "chunks": {
+          "$ref": "#/definitions/RegionSnapshotChunks"
+        }
+      },
+      "required": [
+        "profileVersion",
+        "worldRef",
+        "chunks"
+      ],
+      "additionalProperties": false
+    },
+    "RegionSnapshotRef": {
+      "x-typeName": "RegionSnapshotRef",
+      "type": "object",
+      "properties": {
+        "profileVersion": {
+          "const": "region-snapshot/v1"
+        },
+        "contentDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "beforeSummaryDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "compression": {
+          "$ref": "#/definitions/Ref"
+        },
+        "compressedSha256": {
+          "$ref": "#/definitions/Digest"
+        },
+        "compressedByteLength": {
+          "$ref": "#/definitions/PositiveInt"
+        }
+      },
+      "required": [
+        "profileVersion",
+        "contentDigest",
+        "beforeSummaryDigest",
+        "compression",
+        "compressedSha256",
+        "compressedByteLength"
+      ],
+      "additionalProperties": false
+    },
+    "ApplyRegionCommitRequest": {
+      "x-typeName": "ApplyRegionCommitRequest",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "canvas-region/v1"
+        },
+        "sessionRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "requestId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "transactionId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "operations": {
+          "$ref": "#/definitions/RegionOperationsProjection"
+        },
+        "operationDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "guarantee": {
+          "$ref": "#/definitions/Guarantee"
+        },
+        "localContext": {
+          "$ref": "#/definitions/LocalWorldContext"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "sessionRef",
+        "requestId",
+        "worldRef",
+        "transactionId",
+        "operations",
+        "operationDigest",
+        "guarantee",
+        "localContext"
+      ],
+      "additionalProperties": false
+    },
+    "RegionCommitStatus": {
+      "x-typeName": "RegionCommitStatus",
+      "enum": [
+        "VERIFIED",
+        "ROLLED_BACK"
+      ]
+    },
+    "RegionCommitResult": {
+      "x-typeName": "RegionCommitResult",
+      "type": "object",
+      "properties": {
+        "transactionId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "status": {
+          "$ref": "#/definitions/RegionCommitStatus"
+        },
+        "operationDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "beforeSummary": {
+          "$ref": "#/definitions/RegionSummary"
+        },
+        "expectedAfterSummary": {
+          "$ref": "#/definitions/RegionSummary"
+        },
+        "actualSummary": {
+          "$ref": "#/definitions/RegionSummary"
+        },
+        "snapshot": {
+          "$ref": "#/definitions/RegionSnapshotRef"
+        },
+        "historyRevision": {
+          "$ref": "#/definitions/Revision"
+        },
+        "lighting": {
+          "$ref": "#/definitions/RegionLighting"
+        },
+        "affectedObjectRefs": {
+          "$ref": "#/definitions/RefSet"
+        },
+        "localContext": {
+          "$ref": "#/definitions/LocalWorldContext"
+        }
+      },
+      "required": [
+        "transactionId",
+        "worldRef",
+        "status",
+        "operationDigest",
+        "beforeSummary",
+        "expectedAfterSummary",
+        "actualSummary",
+        "snapshot",
+        "historyRevision",
+        "lighting",
+        "affectedObjectRefs",
+        "localContext"
+      ],
+      "additionalProperties": false
+    },
+    "ApplyRegionCommitResponse": {
+      "x-typeName": "ApplyRegionCommitResponse",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "canvas-region/v1"
+        },
+        "requestId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RegionCommitResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "result",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "UndoRegionCommitRequest": {
+      "x-typeName": "UndoRegionCommitRequest",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "canvas-region/v1"
+        },
+        "sessionRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "requestId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "originTransactionId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "undoTransactionId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "expectedHistoryRevision": {
+          "$ref": "#/definitions/Revision"
+        },
+        "localContext": {
+          "$ref": "#/definitions/LocalWorldContext"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "sessionRef",
+        "requestId",
+        "worldRef",
+        "originTransactionId",
+        "undoTransactionId",
+        "expectedHistoryRevision",
+        "localContext"
+      ],
+      "additionalProperties": false
+    },
+    "RegionUndoResult": {
+      "x-typeName": "RegionUndoResult",
+      "type": "object",
+      "properties": {
+        "originTransactionId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "undoTransactionId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "worldRef": {
+          "$ref": "#/definitions/Ref"
+        },
+        "status": {
+          "$ref": "#/definitions/RegionCommitStatus"
+        },
+        "originBeforeSummaryDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "originAfterSummaryDigest": {
+          "$ref": "#/definitions/Digest"
+        },
+        "preUndoSummary": {
+          "$ref": "#/definitions/RegionSummary"
+        },
+        "actualSummary": {
+          "$ref": "#/definitions/RegionSummary"
+        },
+        "historyRevision": {
+          "$ref": "#/definitions/Revision"
+        },
+        "lighting": {
+          "$ref": "#/definitions/RegionLighting"
+        },
+        "localContext": {
+          "$ref": "#/definitions/LocalWorldContext"
+        }
+      },
+      "required": [
+        "originTransactionId",
+        "undoTransactionId",
+        "worldRef",
+        "status",
+        "originBeforeSummaryDigest",
+        "originAfterSummaryDigest",
+        "preUndoSummary",
+        "actualSummary",
+        "historyRevision",
+        "lighting",
+        "localContext"
+      ],
+      "additionalProperties": false
+    },
+    "UndoRegionCommitResponse": {
+      "x-typeName": "UndoRegionCommitResponse",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "const": "canvas-region/v1"
+        },
+        "requestId": {
+          "$ref": "#/definitions/Ref"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RegionUndoResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "result",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "ProtocolDescriptor": {
+      "x-typeName": "ProtocolDescriptor",
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "$ref": "#/definitions/Ref"
+        },
+        "major": {
+          "$ref": "#/definitions/PositiveInt"
+        },
+        "minor": {
+          "$ref": "#/definitions/NonNegativeInt"
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minor"
+      ],
+      "additionalProperties": false
+    },
+    "ProtocolDescriptors": {
+      "x-typeName": "ProtocolDescriptors",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProtocolDescriptor"
+      },
+      "x-order": "protocol UTF16 ascending",
+      "x-uniqueBy": "protocol",
+      "minItems": 1
+    },
+    "ProtocolProvenance": {
+      "x-typeName": "ProtocolProvenance",
+      "type": "object",
+      "properties": {
+        "packageName": {
+          "$ref": "#/definitions/Ref"
+        },
+        "packageVersion": {
+          "$ref": "#/definitions/Ref"
+        },
+        "sourceRevision": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifactDigest": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "packageName",
+        "packageVersion",
+        "sourceRevision",
+        "artifactDigest"
+      ],
+      "additionalProperties": false
+    },
+    "ProtocolHandshake": {
+      "x-typeName": "ProtocolHandshake",
+      "type": "object",
+      "properties": {
+        "profileVersion": {
+          "const": "protocol-handshake/v1"
+        },
+        "component": {
+          "$ref": "#/definitions/Ref"
+        },
+        "protocols": {
+          "$ref": "#/definitions/ProtocolDescriptors"
+        },
+        "capabilities": {
+          "$ref": "#/definitions/RefSet"
+        },
+        "provenance": {
+          "$ref": "#/definitions/ProtocolProvenance"
+        }
+      },
+      "required": [
+        "profileVersion",
+        "component",
+        "protocols",
+        "capabilities",
+        "provenance"
+      ],
+      "additionalProperties": false
+    },
+    "ProtocolRequirement": {
+      "x-typeName": "ProtocolRequirement",
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "$ref": "#/definitions/Ref"
+        },
+        "major": {
+          "$ref": "#/definitions/PositiveInt"
+        },
+        "minMinor": {
+          "$ref": "#/definitions/NonNegativeInt"
+        },
+        "capabilities": {
+          "$ref": "#/definitions/RefSet"
+        }
+      },
+      "required": [
+        "protocol",
+        "major",
+        "minMinor",
+        "capabilities"
+      ],
+      "additionalProperties": false
+    },
+    "ProtocolRequirements": {
+      "x-typeName": "ProtocolRequirements",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProtocolRequirement"
+      },
+      "x-order": "protocol UTF16 ascending",
+      "x-uniqueBy": "protocol",
+      "minItems": 1
+    },
+    "WriteMethod": {
+      "x-typeName": "WriteMethod",
+      "enum": [
+        "PER_CELL",
+        "REGION"
+      ]
+    },
+    "WriteMethodDescriptor": {
+      "x-typeName": "WriteMethodDescriptor",
+      "type": "object",
+      "properties": {
+        "method": {
+          "$ref": "#/definitions/WriteMethod"
+        },
+        "toolName": {
+          "$ref": "#/definitions/Ref"
+        },
+        "purpose": {
+          "$ref": "#/definitions/Text"
+        },
+        "inputType": {
+          "$ref": "#/definitions/Ref"
+        },
+        "typicalScale": {
+          "$ref": "#/definitions/Text"
+        },
+        "scaleUnit": {
+          "const": "cells"
+        },
+        "requiredCapabilities": {
+          "$ref": "#/definitions/RefSet"
+        },
+        "unavailableReason": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Text"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "method",
+        "toolName",
+        "purpose",
+        "inputType",
+        "typicalScale",
+        "scaleUnit",
+        "requiredCapabilities",
+        "unavailableReason"
+      ],
+      "additionalProperties": false
     }
   },
   "placementSettings": [
@@ -11014,5 +12676,119 @@
     "where": "HanaWorlds Shell management interface",
     "rule": "Show each setting name, owner, current value, default, scope and consequence. Show invariants read-only.",
     "currentEvidence": "NOT_RUN"
-  }
+  },
+  "protocolPolicy": {
+    "rule": "Runtime compatibility is decided per protocol by exact major equality, advertised minor >= required minor, and presence of every required capability. Package version, patch, source revision and artifact digest are provenance only and never decide compatibility.",
+    "majors": "Protocol majors are explicit integers >= 1 declared here; they are independent of the 0.x npm package version. A package version alone (0.x or otherwise) never implies compatibility, and a peer that advertises no ProtocolHandshake is not compatible.",
+    "minor": "Within one major a minor may only add new operations, new types or new capability ids. Adding a field or enum value to an existing type of that major, or changing a meaning, requires a new major.",
+    "rejection": "Missing protocol, different major or lower minor: UNSUPPORTED_VERSION/decode/VERSION_UNSUPPORTED. Missing capability: CAPABILITY_UNAVAILABLE/decode/VERSION_UNSUPPORTED. Both are decided before any world write.",
+    "legacy": "checkContractHandshake keeps its exact-package behaviour for the fixed K1/K2 compositions; there is no migration of old wires or profiles.",
+    "digestDomain": "Region projections use the protocol domain 'HanaWorlds|region-voxels/v1|' so a different package patch yields the same digest."
+  },
+  "protocolMinors": {
+    "region-voxels": 0,
+    "region-build": 0,
+    "painter-region": 0,
+    "world-adapter-region": 0,
+    "canvas-region": 0
+  },
+  "regionCapabilities": [
+    {
+      "id": "region-build/v1:compile-mapblock-chunks",
+      "owner": "hanaworlds-brush",
+      "meaning": "Pure compile of RegionBuildProjection into mapblock-aligned RegionChunks; unspecified cells stay unspecified, air stays explicit carve."
+    },
+    {
+      "id": "BUILD/V3:per-cell-compile",
+      "owner": "hanaworlds-brush",
+      "meaning": "Existing per-cell BUILD/V3 compilation to operations/v3 is retained."
+    },
+    {
+      "id": "painter-region/v1:validate-region-proposal",
+      "owner": "hanaworlds-building-exterior-painter",
+      "meaning": "Validates coordinates, extent, palette legality and air carve of a skill region proposal on the existing proposal channel; never writes the world or plans on its own."
+    },
+    {
+      "id": "world-adapter-region/v1:chunked-read",
+      "owner": "hanaworlds-adapter-luanti",
+      "meaning": "Reads RegionState per mapblock with VoxelManip in bulk."
+    },
+    {
+      "id": "world-adapter-region/v1:load-then-know",
+      "owner": "hanaworlds-adapter-luanti",
+      "meaning": "Loads unloaded mapblocks with the engine's emerge mechanism and reads back before reporting KNOWN; anything still unknown is reported UNKNOWN."
+    },
+    {
+      "id": "world-adapter-region/v1:chunked-write",
+      "owner": "hanaworlds-adapter-luanti",
+      "meaning": "Writes per mapblock with VoxelManip after comparing expectedCurrentDigest; returns per-chunk facts and never claims an atomic transaction."
+    },
+    {
+      "id": "world-adapter-region/v1:restore-state",
+      "owner": "hanaworlds-adapter-luanti",
+      "meaning": "Writes a complete RegionState (node, param2, air and extras) for rollback or Undo."
+    },
+    {
+      "id": "world-adapter-region/v1:lighting-complete",
+      "owner": "hanaworlds-adapter-luanti",
+      "meaning": "Returns a COMPLETE lighting fact only after the bulk light recalculation for the written box has finished."
+    },
+    {
+      "id": "canvas-region/v1:single-logical-transaction",
+      "owner": "hanaworlds-canvas",
+      "meaning": "One logical transaction across all chunks; success only after the full region readback summary equals the expected summary."
+    },
+    {
+      "id": "canvas-region/v1:rollback-on-failure",
+      "owner": "hanaworlds-canvas",
+      "meaning": "Any failed, unknown or mismatching chunk restores the whole pre-write region."
+    },
+    {
+      "id": "canvas-region/v1:compressed-before-snapshot",
+      "owner": "hanaworlds-canvas",
+      "meaning": "Durably stores the complete pre-write RegionSnapshotContent with a mature compressor and records RegionSnapshotRef."
+    },
+    {
+      "id": "canvas-region/v1:whole-region-undo",
+      "owner": "hanaworlds-canvas",
+      "meaning": "Undo restores the whole region of the same transaction after checking current world, history and current summary."
+    }
+  ],
+  "regionInvariants": [
+    {
+      "id": "REGION-UNSPECIFIED-IS-KEEP",
+      "owner": "Contracts",
+      "switchable": false,
+      "text": "A null run is UNSPECIFIED: the cell is not written and keeps its current state. Only an explicit palette entry {nodeName:'air',param2:0} carves.",
+      "consequence": "Unspecified cells are never turned into air."
+    },
+    {
+      "id": "REGION-LOAD-THEN-KNOW",
+      "owner": "Adapter and Canvas",
+      "switchable": false,
+      "text": "Unloaded mapblocks are loaded and read back first; a chunk that is still UNKNOWN rejects the write.",
+      "consequence": "Unknown terrain is never overwritten blindly."
+    },
+    {
+      "id": "REGION-SINGLE-TRANSACTION",
+      "owner": "Canvas",
+      "switchable": false,
+      "text": "All chunks of one region form one Canvas transaction; partial chunk success is never a commit and triggers whole rollback.",
+      "consequence": "No partial region remains after a failure."
+    },
+    {
+      "id": "REGION-WHOLE-UNDO",
+      "owner": "Canvas",
+      "switchable": false,
+      "text": "Undo restores the complete pre-write snapshot of the same transaction only when the current summary still equals that transaction's verified after summary.",
+      "consequence": "External edits are not silently overwritten."
+    },
+    {
+      "id": "PROTOCOL-MAJOR-CAPABILITY",
+      "owner": "Contracts",
+      "switchable": false,
+      "text": "Peers are compatible when protocol majors match and required capabilities are present; package hashes are provenance only.",
+      "consequence": "Different patch builds interoperate; a different major or missing capability is rejected before writing."
+    }
+  ]
 }
