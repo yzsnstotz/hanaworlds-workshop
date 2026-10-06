@@ -1,4 +1,4 @@
-HanaWorlds Workshop 0.2.0 local-world component candidate.
+HanaWorlds Workshop 0.2.1 local-world component candidate.
 
 HanaWorlds-owned source is MIT; see LICENSE. Runtime imports
 hanaworlds-contracts@0.4.0 (MIT), pinned to public revision
@@ -21,3 +21,8 @@ public `@deepseek-ai/cordis@4.0.4`, `@deepseek-ai/dsh-scope@0.2.0-rc.2`,
 MIT packages. Workshop also uses `zod@4.6.5` for its durable projection schema.
 Core DSH, its Session/Attachment services, and the PiAiAdapter are reused as
 host services; their source and license are not copied into this package.
+
+The native tool registers through @deepseek-ai/dsh-tools@0.2.0-rc.2 (MIT).
+The image gate uses separately installed public @deepseek-ai/dsh-attachment-local
+and @deepseek-ai/dsh-system-prompt@0.2.0-rc.2 (MIT) as development dependencies;
+no Host source, attachment decoder or image store is copied or bundled.

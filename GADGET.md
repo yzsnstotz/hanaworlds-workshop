@@ -1,4 +1,4 @@
-# Workshop 0.2.0 — local-world skill business component
+# Workshop 0.2.1 — local-world skill business component
 
 Fresh profile only. Exact contracts 0.4.0 / source 8cfb18f8e13aa33d7a942f230ec6117914322cdd; root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
@@ -6,7 +6,7 @@ Fresh profile only. Exact contracts 0.4.0 / source 8cfb18f8e13aa33d7a942f230ec61
 
 Cordis services: `hanaworldsWorkshop` and `hanaworldsWorkshopV3` refer to the same service. Inject real `sessionPersistence`, `storageDomain`, `hanaworldsCanvasV5`, `hanaworldsPainterV2PictureBlocks`, `hanaworldsBrushV3`, `hanaworldsCatalogue.read(worldRef)`, `hanaworldsSafetyProfile.read(worldRef)`, `hanaworldsCompilerConfig.read(worldRef)` and `hanaworldsCapabilities`. Compiler settings return `{compilationConfig,compilerRevision}`. Peer services advertise exact `contractHandshake`. No other plugin import, model loop, MCP or world mutator is included.
 
-Host must keep these ports in its internal runtime. Register only the three business categories as agent tools and derive the real Core Session and selected local context in Host. A model does not choose a service or call Canvas/Adapter mutators. `LocalRequestFacts` is generated from Workshop's own durable journal/current brief and fresh Canvas `ReadWorldSelectionContext`; it is never a tool input or a permission assertion.
+Host must keep these ports in its internal runtime. Keep the three existing business categories as agent tools and derive the real Core Session and selected local context in Host. A model does not choose a service or call Canvas/Adapter mutators. `LocalRequestFacts` is generated from Workshop's own durable journal/current brief and fresh Canvas `ReadWorldSelectionContext`; it is never a tool input or a permission assertion.
 
 The Host first selects the actual connection through Canvas `SelectWorldConnection` using the real transport incarnation and expectedContext. Then `call('SwitchWorldContext', session/v3 request)` reads that selection back and binds Workshop to it. It does not create an incarnation or assume selection from JSON. Session, world, connection and incarnation must agree. Unbound/current mismatch is an explicit rejection.
 
@@ -18,7 +18,7 @@ The delivered Painter0.3.0 retains service name `hanaworldsPainterV2PictureBlock
 2. `submitBuildProposal(ValidateBuildProposalRequest): Promise<ValidateBuildProposalResponse>` — Host joins captured context with the model's pure `BuildProposal`; exact Painter validation, same current context/brief/turn and durable result. No direct plan injection.
 3. `call('AdvanceCurrentBuild', AdvanceCurrentBuildRequest)` — reuses validated plan through Brush BuildDocument, Canvas analysis and CurrentBuildSubmission, durable apply, public Readback and linked object/history. No bypass of Painter/Brush/Canvas.
 
-Request types are from root contracts. Current wires: session/v3, painter/v4, BUILD/V3 and canvas/v5. Session controls use original `AppendMultimodalTurn` with complete text controls and `AnswerClarification`; user intent confirmation is backed by a real subsequent Core `user/message`. It is not a world/range permission confirmation. The skill owns understanding, clarification and proposal; Workshop has zero model calls. Incomplete controls return a question for the skill; corrections resubmit complete parameters. media=[] for this MVP.
+Request types are from root contracts. Current wires: session/v3, painter/v4, BUILD/V3 and canvas/v5. Session controls use original `AppendMultimodalTurn` with complete text controls and `AnswerClarification`; user intent confirmation is backed by a real subsequent Core `user/message`. It is not a world/range permission confirmation. The skill owns understanding, clarification and proposal; Workshop has zero model calls. Incomplete controls return a question for the skill; corrections resubmit complete parameters. Image media may now be included using the same-session binding described below.
 
 `call('StartOrResumeSession')` returns current snapshot; `ReadSessionTurnDetails` provides durable text/briefs. `ReadCurrentUndoStatus` and `UndoCurrentBuild` reuse the original verified build, current object inspection and linked history. Undo stores its actual invocation/action descriptor, original transaction and new Undo request before dispatch; only a VERIFIED receipt plus changed, correctly linked history becomes user-visible success.
 
@@ -32,4 +32,65 @@ Canvas owns actual writes, footprint conflicts, complete readback and whole roll
 
 ## Retained work
 
-Earlier source and tests remain in `deferred/pre-local-world`, existing test files and Git 323bd5fe. They are not shipped as old-profile compatibility. Base plugin repositories are unchanged. Images, resource lifecycle, interior/entity completion and extended recovery remain deferred, not implemented claims. The real skill closed loop has not yet happened, so fixed orchestration is not declared frozen.
+Earlier source and tests remain in `deferred/pre-local-world`, existing test files and Git 323bd5fe. They are not shipped as old-profile compatibility. Base plugin repositories are unchanged. The image attachment transport is restored by S1-WS-IMAGE-ATTACHMENT-01; actual model/image/world/Undo composition is NOT_RUN. Resource lifecycle, interior/entity completion and extended recovery remain deferred. The real skill closed loop has not yet happened, so fixed orchestration is not declared frozen.
+
+## One native image-link tool (S1-WS-IMAGE-ATTACHMENT-01)
+
+Workshop registers `hanaworlds_download_image` when the existing public `tools`
+service is present. Its only model parameter is `{url: string}`. The native Core
+ToolExecution supplies `exec.agent.session.header` and `exec.signal`; session IDs,
+local paths, media facts and bytes are never accepted as tool arguments. The
+Workshop service also exposes `downloadImage(url, exec)` for the same native Host
+adapter, not a new wire operation. No contracts changes or custom media port.
+
+The tool reads the real Core header and user messages, requires the exact HTTP(S)
+URL to occur in a user-authored text block in this Session, and downloads bytes
+with cancellation. It accepts PNG/JPEG/WebP/GIF Content-Type, rejects redirects
+rather than downloading a different URL, sends no credentials, and uses the
+mounted `attachments.imageLimits` encoded byte bounds. `attachments.saveImage`
+fully decodes/verifies MIME and stores the image; `attachments.readImage` reads
+back its normalized bytes. A filename/URL is never treated as image content.
+Malformed bytes, unavailable storage, absent user URL, wrong Core lifecycle and
+cancellation produce errors without a successful image result. Cancellation after
+a content-addressed save may leave an unreferenced immutable store object; the
+existing store's retention owns it, and Workshop does not remove shared media.
+
+Output value:
+
+```
+{sessionRef, sourceMessageId, downloadSha256, downloadBytes,
+ media: {attachmentRef, storedBytesDigest, projectionVariantId: null,
+         projectionBytesDigest: null, mediaType, bytes, width, height},
+ image: {attachmentId, mediaType, bytes, width, height}}
+```
+
+Native output rendering returns a text block containing the binding plus
+`{type: 'image', attachment: image}`. The normal agent loop must persist this
+actual tool result in the same Core conversation and project it through the
+existing model image route. It must not stringify/drop the image block. Workshop
+never opens a Core writer and never calls a model. Host owns imagePolicy, model
+image capability, tool visibility, upload admission and the actual agent loop.
+The model's next step inspects the image and clarifies/proposes using the existing
+skill; image interpretation, pixel material selection and world changes are not
+performed by this tool.
+
+The same `media` enters `AppendMultimodalTurn.media`, persists in its turn, and
+is re-read and digest-checked before confirmation into `ReferenceBrief/v3.media`.
+For an uploaded image, Host uses the existing `attachments.saveImage` /
+`admitPromptContent` path and persists a user image block in the same Core Session.
+Host derives MediaBinding from `readImage` bytes (SHA256, not URL/name). Workshop
+admits media only if the Session owns its download record or a matching Core user
+image block, and `hanaworldsCapabilities.imageMediaTypes` allows it. It rejects
+cross-Session or unreferenced storage objects. These are provenance/correlation
+checks; no actor, grant, construction permission or online protection is restored.
+Projection variant fields are null for the provider-independent stored reference;
+the real model route owns request-image projection via existing attachments APIs.
+
+Reuse: original INPUT `87ad47db` Core provenance/projection design and retained
+pre-local-world media digest code; current base `f5e2f0da` Session/brief flow;
+existing DSH attachments/tools APIs. No second image store/decoder/model loop.
+`npm run test:image` uses real HTTP, Cordis, JSONL, domain storage, Tools and
+AttachmentLocal (0.2.0-rc.2), with a declared agent/Host publication/Canvas fixture.
+`scripts/gate-image-attachment.sh <evidence-dir> <contracts-tar>` runs a clean
+archive and independent installed package, plus the affected text normal flow.
+Actual Desktop/skill/model/image building/UI/world/Undo remains NOT_RUN.

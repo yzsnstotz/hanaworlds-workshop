@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import * as C from 'hanaworlds-contracts';
+import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, mediaBinding, imageRef, imageDigest } from './image-attachment.mjs';
 const VERSION = 'session/v3', CANVAS = 'canvas/v5';
 const copy = structuredClone, revision = () => `rev-${randomUUID()}`;
 const same = (a,b) => C.canonicalJSON(a) === C.canonicalJSON(b);
@@ -87,6 +88,49 @@ export class WorkshopV3 {
    });
   }catch(error){return packet(VERSION,body?.requestId??raw?.requestId??null,null,C.publicError(error));}
  }
+ /** Native tool execution supplies the live Core Session; model args contain only the URL. */
+ async downloadImage(rawURL,exec) {
+  const signal=exec?.signal; if(!signal?.throwIfAborted)throw Error('CANCELLATION_REQUIRED');signal.throwIfAborted();
+  const id=exec?.agent?.session?.header?.id;if(!id)throw Error('SESSION_NOT_FOUND');
+  const url=imageURL(rawURL);
+  return this.#lock(id,async()=>{
+   const {core,state}=await this.#load(id,true);
+   if(!same(core.identity,coreIdentity(exec.agent.session.header,id)))throw Error('SESSION_MISMATCH');
+   const source=core.events.findLast(e=>e.type==='user/message'&&e.surfaceOp==='append'&&userProvidedURL(e.data,url));
+   if(!source?.data?.id)throw Error('USER_IMAGE_URL_REQUIRED');
+   const attachments=this.attachments;
+   if(!attachments?.saveImage||!attachments?.readImage)throw Error('MEDIA_UNAVAILABLE');
+   const input=await downloadImageBytes(url,attachments,signal);signal.throwIfAborted();
+   // saveImage fully decodes and checks the MIME. Store and decoder are the existing Host capability.
+   const ref=await attachments.saveImage(input);signal.throwIfAborted();
+   const stored=await attachments.readImage(ref,signal);signal.throwIfAborted();
+   if(!same(stored.ref,ref))throw Error('MEDIA_DIGEST_MISMATCH');
+   const media=mediaBinding(ref,stored.data),live=await this.#core(id);signal.throwIfAborted();
+   const currentMedia=await this.attachments?.readImage(ref,signal);signal.throwIfAborted();
+   if(!currentMedia||!same(mediaBinding(currentMedia.ref,currentMedia.data),media)||!same(live.identity,core.identity)||!live.events.some(e=>e.type==='user/message'&&e.data?.id===source.data.id&&userProvidedURL(e.data,url)))throw Error('SESSION_MISMATCH');
+   state.images??={};state.images[ref.attachmentId]={media,sourceMessageId:source.data.id};
+   await this.#save(id,core,state);signal.throwIfAborted();
+   return {sessionRef:id,sourceMessageId:source.data.id,downloadSha256:imageDigest(input.data),downloadBytes:input.data.byteLength,media,image:imageRef(media)};
+  });
+ }
+ async #media(items,core,state) {
+  if(!items.length)return [];
+  if(!this.attachments?.readImage)fail('CAPABILITY_UNAVAILABLE');
+  const accepted=[];
+  for(const item of items){
+   const ref=imageRef(item);
+   const fromDownload=state.images?.[item.attachmentRef];
+   const fromUser=core.events.some(e=>e.type==='user/message'&&e.surfaceOp==='append'&&e.data?.role==='user'&&e.data?.source?.kind==='user'&&e.data.content?.some(p=>p.type==='image'&&p.attachment?.attachmentId===ref.attachmentId&&p.attachment.mediaType===ref.mediaType&&p.attachment.bytes===ref.bytes&&p.attachment.width===ref.width&&p.attachment.height===ref.height));
+   if(!fromDownload&&!fromUser)fail('ATTACHMENT_REJECTED');
+   if(fromDownload&&!same(fromDownload.media,item))fail('MEDIA_DIGEST_MISMATCH');
+   if(!this.capabilities?.imageMediaTypes?.includes(item.mediaType))fail('CAPABILITY_UNAVAILABLE');
+   const stored=await this.attachments.readImage(ref);
+   const actual=mediaBinding(stored.ref,stored.data);
+   if(!same(actual,item))fail('MEDIA_DIGEST_MISMATCH');
+   accepted.push(copy(actual));
+  }
+  return accepted;
+ }
  async #dispatch(operation,body,core,state) {
   if(operation==='SwitchWorldContext'){
    if(Object.values(state.builds).some(b=>b.dispatched&&!b.outcome&&!b.terminal))fail('RECOVERY_PENDING');
@@ -95,11 +139,11 @@ export class WorkshopV3 {
    return {context:copy(state.context),turns:state.turns,capabilities:this.capabilities,sessionDeleteSupported:false};
   }
   if(operation==='AppendMultimodalTurn'){
-   if(body.media.length)fail('CAPABILITY_UNAVAILABLE'); // image work retained in deferred source, outside this MVP lane
+   const media=await this.#media(body.media,core,state);
    if(state.turns.some(t=>t.turnRef===body.turnRef))fail('REPLAY_MISMATCH');
    const dims=body.controls.dimensions;
    const complete=body.text.trim()&&body.controls.purpose?.trim()&&dims?.unit==='node'&&['width','height','depth'].every(k=>Number.isSafeInteger(dims[k])&&dims[k]>0);
-   const turn={turnRef:body.turnRef,turnRevision:revision(),text:body.text,media:[],referenceBriefDigest:null,intentDigest:null,actionReceiptDigest:null};state.turns.push(turn);
+   const turn={turnRef:body.turnRef,turnRevision:revision(),text:body.text,media,referenceBriefDigest:null,intentDigest:null,actionReceiptDigest:null};state.turns.push(turn);
    const question=complete?`请确认建造${body.text}，尺寸${dims.width}×${dims.depth}×${dims.height}个节点。回复“确认”或修改。`:'请由当前skill补齐用途和节点尺寸后重新提交。';
    state.pending={sessionRef:body.sessionRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,invocationId:body.requestId,clarificationId:revision(),question,complete:!!complete,controls:body.controls,afterSeq:core.events.length-1};
    state.details[turn.turnRef]={resultText:question,confirmedBrief:null};
@@ -115,7 +159,7 @@ export class WorkshopV3 {
     pending.complete=false;pending.afterSeq=core.events.length-1;pending.clarificationId=revision();pending.question='请更新建造参数并重新提交，之后再确认。';
     return this.#turnReceipt(body,state,turn,pending.question,this.#clarification(pending));
    }
-   const brief=C.validateType('BriefProjection',{contractVersion:'ReferenceBrief/v3',sessionRef:body.sessionRef,turnRevision:turn.turnRevision,briefRevision:revision(),media:[],text:turn.text,controls:pending.controls});
+   const brief=C.validateType('BriefProjection',{contractVersion:'ReferenceBrief/v3',sessionRef:body.sessionRef,turnRevision:turn.turnRevision,briefRevision:revision(),media:await this.#media(turn.media,core,state),text:turn.text,controls:pending.controls});
    const briefDigest=digest('reference-brief',brief);
    const intent=C.validateType('IntentProjection',{contractVersion:VERSION,referenceBriefDigest:briefDigest,confirmedIntent:{kind:'BUILD_STRUCTURE',text:turn.text,purpose:pending.controls.purpose,dimensions:pending.controls.dimensions,entrancePortalRefs:pending.controls.entrancePortalRefs,confirmedTurnRevision:turn.turnRevision},intendedWorldRef:body.localContext.worldRef,orderedTargetRefs:[]});
    turn.referenceBriefDigest=briefDigest;turn.intentDigest=digest('intent',intent);
@@ -279,7 +323,8 @@ export function apply(ctx) {
  const projectionStore=new WorkshopProjectionStore(()=>ctx.get('storageDomain'));
  ctx.effect?.(()=>()=>projectionStore.close(),'hanaworlds-workshop.projection-close');
  const service=new WorkshopV3({projectionStore});
- for(const [field,port] of Object.entries({sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
+ for(const [field,port] of Object.entries({attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
+ registerImageTool(ctx,service);
  ctx.provide('hanaworldsWorkshop',service);ctx.provide('hanaworldsWorkshopV3',service);
 }
 export default {name,inject,apply};

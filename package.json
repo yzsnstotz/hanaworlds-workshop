@@ -1,6 +1,6 @@
 {
   "name": "hanaworlds-workshop",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -18,6 +18,7 @@
   },
   "files": [
     "src/index.mjs",
+    "src/image-attachment.mjs",
     "src/projection-store.mjs",
     "client.cjs",
     "cordis.patch.yml",
@@ -41,8 +42,10 @@
     }
   },
   "scripts": {
-    "build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs",
-    "test": "node --test test/local-world-runtime.test.mjs"
+    "build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs && node --check src/image-attachment.mjs",
+    "test": "node --test test/local-world-runtime.test.mjs test/image-attachment.test.mjs",
+    "test:image": "node --test test/image-attachment.test.mjs",
+    "test:text-normal": "node --test --test-name-pattern='local text proposal' test/local-world-runtime.test.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -50,12 +53,15 @@
     "@deepseek-ai/dsh-scope": "0.2.0-rc.2",
     "@deepseek-ai/dsh-session": "0.2.0-rc.2",
     "@deepseek-ai/dsh-storage-domain": "0.2.0-rc.2",
-    "zod": "4.6.5",
+    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
     "canonicalize": "5.1.0",
-    "hanaworlds-contracts": "https://codeload.github.com/yzsnstotz/hanaworlds-contracts/tar.gz/8cfb18f8e13aa33d7a942f230ec6117914322cdd"
+    "hanaworlds-contracts": "https://codeload.github.com/yzsnstotz/hanaworlds-contracts/tar.gz/8cfb18f8e13aa33d7a942f230ec6117914322cdd",
+    "zod": "4.6.5"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-attachment-local": "0.2.0-rc.2",
     "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-storage-json": "0.2.0-rc.2"
+    "@deepseek-ai/dsh-storage-json": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2"
   }
 }
