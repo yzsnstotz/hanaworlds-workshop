@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# S1-WS-WRITE-TOOLS-01 component gate: two self-described write modes on actual
-# contracts 0.4.2 bytes, plus the affected text/image proposal regression, on a
+# S1-WS-WRITE-TOOLS-01 component gate: two contract WriteMethodDescriptors and PER_CELL/REGION chains on actual
+# contracts 0.5.0 bytes, plus the affected text/image proposal regression, on a
 # clean archive and on the independently installed packed tarball.
-# Painter/Brush/Canvas/world are FIXTURE; region final consumption is NOT_RUN.
+# Painter/Brush/Canvas/world are FIXTURE; real peers, Luanti and product UI are NOT_RUN.
 set -euo pipefail
 TASK_EVIDENCE=${1:?absolute evidence directory required}
-CONTRACTS_TAR=${2:?admitted contracts 0.4.2 tar required}
+CONTRACTS_TAR=${2:?admitted contracts 0.5.0 tar required}
 case "$TASK_EVIDENCE" in /*) ;; *) exit 2;; esac
 mkdir -p "$TASK_EVIDENCE"
 TASK_TEMP=$(mktemp -d "$TASK_EVIDENCE/runtime.XXXXXX")
@@ -18,7 +18,7 @@ printf '%s\n' "$SOURCE_SHA" > "$TASK_EVIDENCE/source-sha.txt"
 node --input-type=module - "$CONTRACTS_TAR" <<'JS' > "$TASK_EVIDENCE/input-identity.json"
 import {readFile} from 'node:fs/promises'; import {createHash} from 'node:crypto';
 const raw=await readFile(process.argv[2]),sha=createHash('sha256').update(raw).digest('hex');
-if(sha!=='c3528a4fc3f0cdf94245c4d2d8b1cfa5d28db96d1cd00ae74737bdbdfcd26ec6')throw Error('WRONG_CONTRACTS_TAR');
+if(sha!=='7fb42f1eaaf4988730f6cf254faecb84bbbb1d84e293558b66727c470181b31e')throw Error('WRONG_CONTRACTS_TAR');
 console.log(JSON.stringify({path:process.argv[2],sha256:sha,bytes:raw.length}));
 JS
 TESTS="test/write-tools.test.mjs test/local-world-runtime.test.mjs test/image-attachment.test.mjs"

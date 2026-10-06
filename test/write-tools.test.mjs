@@ -14,7 +14,10 @@ import Attachments from '@deepseek-ai/dsh-attachment-local';
 import Tools from '@deepseek-ai/dsh-tools';
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import * as C from 'hanaworlds-contracts';
-// S1-WS-WRITE-TOOLS-01: two self-described write modes of the same skill. Peers/world are FIXTURE.
+import { gzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
+// S1-WS-WRITE-TOOLS-01 on actual contracts 0.5.0: two WriteMethodDescriptors, PER_CELL and REGION chains.
+// Painter/Brush/Canvas (cells and region) and the world are FIXTURE; Workshop, Cordis, Core JSONL, domain storage, attachments, Tools and HTTP are real.
 const entry=process.env.HW_WORKSHOP_PACKAGE_ENTRY??new URL('../src/index.mjs',import.meta.url).href;
 const {default:plugin}=await import(entry);
 const entryDir=dirname(entry.startsWith('file:')?fileURLToPath(entry):entry);
@@ -58,11 +61,10 @@ async function withRuntime(f,fn){
  try{
   await ctx.plugin(Jsonl,{root:join(root,'core'),compression:'none'}).await();await ctx.plugin(Storage).await();await ctx.plugin(StorageJson,{root:join(root,'projection')}).await();await ctx.plugin(StorageDomain,{backend:'json'}).await();
   await ctx.plugin(Attachments,{dshHome:join(root,'media')}).await();await ctx.plugin(SystemPrompt).await();await ctx.plugin(Tools).await();
-  for(const [k,v] of Object.entries({hanaworldsCanvasV5:f.canvas,hanaworldsPainterV2PictureBlocks:f.painter,hanaworldsBrushV3:f.brush,hanaworldsCatalogue:{read:async()=>clone(sample.request.catalogue)},hanaworldsSafetyProfile:{read:async()=>clone(sample.request.safetyProfile)},hanaworldsCompilerConfig:{read:async()=>({compilationConfig:config,compilerRevision:'fixture-compiler'})},hanaworldsCapabilities:f.capabilities,llm:{async *stream(){f.modelCalls++;throw Error('second model forbidden');}}}))ctx.provide(k,v);
+  for(const [k,v] of Object.entries({hanaworldsCanvasV5:f.canvas,hanaworldsPainterV2PictureBlocks:f.painter,hanaworldsBrushV3:f.brush,hanaworldsCatalogue:{read:async()=>clone(sample.request.catalogue)},hanaworldsSafetyProfile:{read:async()=>clone(sample.request.safetyProfile)},hanaworldsCompilerConfig:{read:async()=>({compilationConfig:config,compilerRevision:'fixture-compiler'})},hanaworldsCapabilities:f.capabilities,...(f.region?{hanaworldsPainterRegionV1:f.region.painter,hanaworldsBrushRegionV1:f.region.brush,hanaworldsCanvasRegionV1:f.region.canvas}:{}),llm:{async *stream(){f.modelCalls++;throw Error('second model forbidden');}}}))ctx.provide(k,v);
   await ctx.plugin(plugin).await();const ws=ctx.get('hanaworldsWorkshop');f.readFacts=q=>ws.readBuildProposalProviderFacts(q);
   const append=async(id,event)=>{const w=await ctx.sessionPersistence.open(id,'write');try{const log=await w.read();await w.append([{...event,seq:log.events.length}]);}finally{await w.close();}};
-  const r={ctx,ws,append,url:`http://127.0.0.1:${server.address().port}/picture`,requests:()=>requests,root};
-  try{await fn(r);}finally{await r.ws.projectionStore.close();}
+  try{await fn({ctx,ws,append,url:`http://127.0.0.1:${server.address().port}/picture`,requests:()=>requests});}finally{await ws.projectionStore.close();}
  }finally{await ctx.fiber.dispose();server.closeAllConnections();await new Promise(r=>server.close(r));await rm(root,{recursive:true,force:true});}
 }
 const base={contractVersion:'session/v3',sessionRef:'s1'};
@@ -87,91 +89,160 @@ async function imageBrief(r,f){
  return {media:out.value.media,advance};
 }
 
-
 const W=await import(entry);
 const pkg=JSON.parse(await readFile(join(entryDir,'..','package.json')));
 const log=(evidence,value)=>console.log(JSON.stringify({evidence,workshop:pkg.version,contracts:C.contractHandshake.contracts,...value}));
 const codes=a=>a.unmet.map(u=>u.code);
+const sha=(k,v)=>C.digestValue(k,v).sha256;
+const caps=wire=>C.regionCapabilities.map(c=>c.id).filter(id=>id.startsWith(`${wire}:`));
+const handshake=(component,protocol,major,minor,capabilities,packageVersion='9.9.9-fixture')=>({profileVersion:'protocol-handshake/v1',component,protocols:[{protocol,major,minor}],capabilities:[...capabilities].sort(),provenance:{packageName:component,packageVersion,sourceRevision:null,artifactDigest:null}});
+const STONE={nodeName:'fixture:stone',param2:0},AIR={nodeName:'air',param2:0};
+const boxOf=b=>({min:[...b.origin],max:b.origin.map((o,a)=>o+b.size[a]-1)});
+const cellsOf=box=>{const out=[];for(let z=box.min[2];z<=box.max[2];z++)for(let y=box.min[1];y<=box.max[1];y++)for(let x=box.min[0];x<=box.max[0];x++)out.push([x,y,z]);return out;};
+// Flat fixture world: y<=0 stone, y>0 air. Region states are produced with the contract's own helpers.
+const flatState=(worldRef,box)=>C.validateType('RegionState',{profileVersion:'region-state/v1',worldRef,block:C.encodeRegionBlock({origin:box.min,size:box.max.map((v,a)=>v-box.min[a]+1),palette:[AIR,STONE],indices:Int32Array.from(cellsOf(box),p=>p[1]<=0?1:0)}),extras:[],derivedLightMode:'recompute-with-readback'});
+const nodeAt=(states,p)=>{for(const s of Object.values(states)){const e=C.expandRegionBlock(s.block),b=e.box;if(p.every((v,a)=>v>=b.min[a]&&v<=b.max[a])){const sx=b.max[0]-b.min[0]+1,sy=b.max[1]-b.min[1]+1;const i=(p[0]-b.min[0])+sx*((p[1]-b.min[1])+sy*(p[2]-b.min[2]));return e.palette[e.indices[i]].nodeName;}}return null;};
+function regionPeers(f,{canvasMajor=1}={}){
+ const r={calls:[],writes:0,undoWrites:0,painterMedia:[],world:{},rollback:false};
+ r.painter={protocolHandshake:handshake('fixture-painter','painter-region',1,2,caps('painter-region/v1')),async call(op,q){r.calls.push(op);assert.equal(op,'ValidateRegionProposal');C.validateRegionProposalRequest(q);r.painterMedia.push(structuredClone(q.referenceBrief.media));
+   const build={contractVersion:'region-build/v1',documentId:`region-doc-${q.invocationId}`,coordinateSpace:'WORLD_NODE',worldRef:q.worldRef,catalogueDigest:q.catalogueDigest,block:q.proposal.block,declaredBounds:C.regionBlockBox(q.proposal.block)};
+   return {contractVersion:'painter-region/v1',requestId:q.requestId,result:{invocationId:q.invocationId,build,buildDigest:sha('region-build',build)},error:null};}};
+ r.brush={protocolHandshake:handshake('fixture-brush','region-build',1,0,caps('region-build/v1')),async call(op,q){r.calls.push(op);assert.equal(op,'CompileRegionBuild');C.validateCompileRegionBuildRequest(q);
+   const e=C.expandRegionBlock(q.build.block),b=e.box,sx=b.max[0]-b.min[0]+1,sy=b.max[1]-b.min[1]+1,chunks=[];
+   for(const c of C.regionChunksOfBox(b)){const idx=Int32Array.from(cellsOf(c.box),p=>e.indices[(p[0]-b.min[0])+sx*((p[1]-b.min[1])+sy*(p[2]-b.min[2]))]);
+    if(idx.every(v=>v===-1))continue;chunks.push({chunkPos:[...c.chunkPos],block:C.encodeRegionBlock({origin:c.box.min,size:c.box.max.map((v,a)=>v-c.box.min[a]+1),palette:e.palette,indices:idx})});}
+   const projection={contractVersion:'region-operations/v1',buildDigest:q.buildDigest,compilerRevision:q.compilerRevision,worldRef:q.worldRef,catalogueDigest:q.catalogueDigest,chunkEdge:16,chunks};
+   return {contractVersion:'region-build/v1',requestId:q.requestId,result:{projection,operationDigest:sha('region-operations',projection),writeBounds:q.build.declaredBounds},error:null};}};
+ r.canvas={protocolHandshake:handshake('fixture-canvas','canvas-region',canvasMajor,0,caps('canvas-region/v1')),async call(op,q){r.calls.push(op);assert.deepEqual(structuredClone(q.localContext),f.local);
+   const ok=result=>({contractVersion:'canvas-region/v1',requestId:q.requestId,result,error:null});
+   const lightBox=chunks=>({min:[0,1,2].map(a=>Math.min(...chunks.map(c=>C.regionBlockBox(c.block).min[a]))),max:[0,1,2].map(a=>Math.max(...chunks.map(c=>C.regionBlockBox(c.block).max[a])))});
+   if(op==='ApplyRegionCommit'){
+    const before=q.operations.chunks.map(c=>({chunkPos:c.chunkPos,state:r.world[c.chunkPos]??flatState(q.worldRef,C.regionBlockBox(c.block))}));
+    const after=before.map((b,i)=>({chunkPos:b.chunkPos,state:C.expectedRegionState(b.state,q.operations.chunks[i].block)}));
+    const beforeSummary=C.summarizeRegionStates(q.worldRef,before),expectedAfterSummary=C.summarizeRegionStates(q.worldRef,after);
+    const content={profileVersion:'region-snapshot-content/v1',worldRef:q.worldRef,chunks:before.map(b=>({chunkPos:b.chunkPos,state:b.state,stateDigest:sha('region-state',b.state)}))};
+    const gz=gzipSync(Buffer.from(C.canonicalJSON(content)));
+    const snapshot={profileVersion:'region-snapshot/v1',contentDigest:sha('region-snapshot-content',content),beforeSummaryDigest:sha('region-summary',beforeSummary),compression:'gzip',compressedSha256:createHash('sha256').update(gz).digest('hex'),compressedByteLength:gz.length};
+    C.validateRegionSnapshotContent(content,snapshot,beforeSummary);
+    r.writes++;if(!r.rollback)for(const a of after)r.world[a.chunkPos]=a.state;else for(const b of before)r.world[b.chunkPos]=b.state;
+    r.before=before;r.commit={transactionId:q.transactionId,worldRef:q.worldRef,status:r.rollback?'ROLLED_BACK':'VERIFIED',operationDigest:q.operationDigest,beforeSummary,expectedAfterSummary,actualSummary:r.rollback?beforeSummary:expectedAfterSummary,snapshot,historyRevision:'region-history-1',lighting:{status:'COMPLETE',box:lightBox(q.operations.chunks),method:'fixture:voxelmanip.calc_lighting+write_to_map'},affectedObjectRefs:[],localContext:structuredClone(q.localContext)};
+    r.lightBox=r.commit.lighting.box;return ok(r.commit);}
+   if(op==='UndoRegionCommit'){assert.equal(q.originTransactionId,r.commit.transactionId);assert.equal(q.expectedHistoryRevision,r.commit.historyRevision);
+    const pre=C.summarizeRegionStates(q.worldRef,r.before.map(b=>({chunkPos:b.chunkPos,state:r.world[b.chunkPos]})));
+    r.undoWrites++;for(const b of r.before)r.world[b.chunkPos]=b.state;
+    return ok({originTransactionId:q.originTransactionId,undoTransactionId:q.undoTransactionId,worldRef:q.worldRef,status:'VERIFIED',originBeforeSummaryDigest:sha('region-summary',r.commit.beforeSummary),originAfterSummaryDigest:sha('region-summary',r.commit.actualSummary),preUndoSummary:pre,actualSummary:r.commit.beforeSummary,historyRevision:'region-history-2',lighting:{status:'COMPLETE',box:r.lightBox,method:'fixture:voxelmanip.calc_lighting+write_to_map'},localContext:structuredClone(q.localContext)});}
+   throw Error(`unexpected region fixture operation ${op}`);}};
+ return r;
+}
+// Region spans mapblocks x 0/1 and y -1/0: y=-1 explicit air (dig), y=0 unspecified (kept), y=1 stone (fill).
+const REGION_BOX={min:[0,-1,0],max:[19,1,2]};
+const regionBlock=()=>C.encodeRegionBlock({origin:REGION_BOX.min,size:[20,3,3],palette:[AIR,STONE],indices:Int32Array.from(cellsOf(REGION_BOX),p=>p[1]===-1?0:p[1]===0?-1:1)});
 
-test('both write tools self-describe purpose, input, typical scale, prerequisites and effects; no threshold field',()=>{
- assert.deepEqual([...W.WRITE_MODES],['cells','region']);
- for(const mode of W.WRITE_MODES){const d=W.writeToolDescriptors[mode];
-  for(const k of ['title','purpose','whenToUse','notFor','input','effects'])assert.ok(typeof d[k]==='string'&&d[k].length>20,`${mode}.${k}`);
-  assert.equal(d.typicalScale.unit,'node');assert.match(d.typicalScale.note,/not a limit/);assert.match(d.typicalScale.note,/never truncates/);
-  assert.ok(d.requires.length>=5);assert.match(d.effects,/No world write/);
-  const flat=JSON.stringify(d);assert.doesNotMatch(flat,/"(max|min|limit|threshold)[A-Za-z]*":/i,'descriptor carries no enforced numeric threshold');}
- assert.match(W.writeToolDescriptors.region.input,/never means air/);assert.match(W.writeToolDescriptors.region.input,/explicit air/);
- assert.match(W.writeToolSkillGuidance,/not limits/);assert.match(W.writeToolSkillGuidance,/do not silently switch modes or shrink the target/);
- log('WRITE_TOOL_DESCRIPTORS',{descriptors:W.writeToolDescriptors,skillGuidance:W.writeToolSkillGuidance});
+test('two contract WriteMethodDescriptors: purpose, input type, typical scale in cells, required capabilities; no threshold field',()=>{
+ const facts={ports:{}};
+ const tools=W.WRITE_METHODS.map(m=>W.describeWriteMethod(m,facts));assert.deepEqual(tools.map(t=>t.descriptor.method),['PER_CELL','REGION']);
+ for(const t of tools){const d=t.descriptor;assert.deepEqual(Object.keys(d).sort(),['inputType','method','purpose','requiredCapabilities','scaleUnit','toolName','typicalScale','unavailableReason']);
+  C.validateType('WriteMethodDescriptor',d);assert.equal(d.scaleUnit,'cells');assert.match(d.typicalScale,/not a limit/);assert.match(d.typicalScale,/never truncates/);
+  for(const k of ['whenToUse','notFor','input'])assert.ok(t.guidance[k].length>20);}
+ assert.deepEqual(tools.map(t=>t.descriptor.inputType),['BuildProposal','RegionProposal']);
+ assert.deepEqual(tools[0].descriptor.requiredCapabilities,['BUILD/V3:per-cell-compile']);
+ assert.deepEqual(tools[1].descriptor.requiredCapabilities,[...caps('canvas-region/v1'),...caps('painter-region/v1'),...caps('region-build/v1')].sort());
+ assert.match(tools[1].guidance.input,/null means unspecified and is never air/);
+ assert.match(W.writeToolSkillGuidance,/not limits/);assert.match(W.writeToolSkillGuidance,/do not silently switch methods or shrink the target/);
+ assert.ok(tools[1].descriptor.unavailableReason.includes('PEER_UNAVAILABLE'));
+ log('WRITE_METHOD_DESCRIPTORS',{tools,skillGuidance:W.writeToolSkillGuidance});
 });
 
-test('region capability: same protocol major + required capability, wrong major or missing is explicit (FIXTURE handshakes)',()=>{
- const hs=caps=>({...C.contractHandshake,capabilities:caps});
- const peers=caps=>({painter:{contractHandshake:hs(caps)},brush:{contractHandshake:hs(caps)},canvas:{contractHandshake:hs(caps)}});
- const ok=W.regionCapabilityUnmet({ownHandshake:hs([W.REGION_CAPABILITY]),peers:peers([W.REGION_CAPABILITY])});
- assert.deepEqual(ok,[]);
- const v2=W.regionCapabilityUnmet({ownHandshake:hs([W.REGION_CAPABILITY]),peers:{...peers([W.REGION_CAPABILITY]),canvas:{contractHandshake:hs(['region-voxel-block/v2'])}}});
- assert.deepEqual(v2.map(u=>u.code),['CAPABILITY_MAJOR_MISMATCH']);assert.match(v2[0].need,/advertises region-voxel-block\/v2/);
- const missing=W.regionCapabilityUnmet({ownHandshake:hs([]),peers:peers([W.REGION_CAPABILITY])});assert.deepEqual(missing.map(u=>u.code),['CAPABILITY_MISSING']);
- // On the actual 0.4.2 schema an extra handshake field is itself refused: the real gate stays closed until region v1 bytes.
- assert.ok(codes(W.evaluateWriteMode('region',{ownHandshake:hs([W.REGION_CAPABILITY]),peers:peers([W.REGION_CAPABILITY])})).includes('PEER_INCOMPATIBLE'));
- const oldPeer=W.evaluateWriteMode('cells',{ownHandshake:C.contractHandshake,peers:{brush:{contractHandshake:C.contractHandshake},canvas:{contractHandshake:C.contractHandshake},painter:{contractHandshake:{...C.contractHandshake,wireVersions:['painter/v3']}}}});
- assert.deepEqual(codes(oldPeer),['PEER_INCOMPATIBLE']);
- const absent=W.evaluateWriteMode('cells',{ownHandshake:C.contractHandshake,peers:{}});assert.deepEqual(codes(absent),['PEER_UNAVAILABLE','PEER_UNAVAILABLE','PEER_UNAVAILABLE']);
- assert.deepEqual(codes(W.evaluateWriteMode('bulk',{})),['UNKNOWN_WRITE_MODE']);
- for(const u of [...v2,...missing,...oldPeer.unmet,...absent.unmet])assert.ok(u.need&&u.remedy,'every unmet need explains itself and its remedy');
- log('REGION_CAPABILITY_FIXTURE',{sameMajor:ok,wrongMajor:v2,missing,oldPeer,absent,fixture:'handshake.capabilities field and token name pending actual Contracts region v1'});
+test('protocol major + capability: same major other minor/provenance accepted; wrong major, missing capability, exact-only peer rejected',()=>{
+ const ports=over=>({painterRegion:{protocolHandshake:handshake('p','painter-region',1,7,caps('painter-region/v1'),'0.0.1')},brushRegion:{protocolHandshake:handshake('b','region-build',1,0,caps('region-build/v1'),'3.1.4')},canvasRegion:{protocolHandshake:handshake('c','canvas-region',1,1,caps('canvas-region/v1'),'0.9.0-other-patch')},...over});
+ const same=W.evaluateWriteMethod('REGION',{ports:ports({})});assert.equal(same.available,true,JSON.stringify(same));
+ const major=W.evaluateWriteMethod('REGION',{ports:ports({canvasRegion:{protocolHandshake:handshake('c','canvas-region',2,0,caps('canvas-region/v1'))}})});assert.deepEqual(codes(major),['UNSUPPORTED_VERSION']);
+ const cap=W.evaluateWriteMethod('REGION',{ports:ports({brushRegion:{protocolHandshake:handshake('b','region-build',1,0,[])}})});assert.deepEqual(codes(cap),['CAPABILITY_UNAVAILABLE']);
+ const exact=W.evaluateWriteMethod('REGION',{ports:ports({painterRegion:{contractHandshake:C.contractHandshake}})});assert.deepEqual(codes(exact),['UNSUPPORTED_VERSION']);
+ const absent=W.evaluateWriteMethod('REGION',{ports:{}});assert.deepEqual(codes(absent),['PEER_UNAVAILABLE','PEER_UNAVAILABLE','PEER_UNAVAILABLE']);
+ const cellBrushMajor=W.evaluateWriteMethod('PER_CELL',{ports:{painter:{contractHandshake:C.contractHandshake},canvas:{contractHandshake:C.contractHandshake},brush:{contractHandshake:C.contractHandshake,protocolHandshake:handshake('b','BUILD',4,0,['BUILD/V3:per-cell-compile'])}}});
+ assert.deepEqual(codes(cellBrushMajor),['UNSUPPORTED_VERSION']);
+ assert.deepEqual(codes(W.evaluateWriteMethod('BULK',{})),['UNKNOWN_WRITE_METHOD']);
+ for(const u of [...major.unmet,...cap.unmet,...exact.unmet,...absent.unmet])assert.ok(u.need&&u.remedy);
+ log('PROTOCOL_MAJOR_CAPABILITY',{sameMajorOtherMinorAndProvenance:same,wrongMajor:major,missingCapability:cap,exactOnlyPeer:exact,absent,perCellBrushWrongMajor:cellBrushMajor});
 });
 
-test('cells mode on real contracts 0.4.2: availability by Session → image brief → Painter → Brush → Canvas → same build Undo',async()=>{
+test('REGION fill + explicit-air dig across mapblocks: image brief → Painter → Brush → Canvas one transaction → whole-region Undo',async()=>{
+ const f=fixture();f.region=regionPeers(f);const R=f.region;await withRuntime(f,async r=>{
+  const {media,advance}=await imageBrief(r,f);
+  const described=await r.ws.describeWriteTools('s1');assert.equal(described.tools[1].availability.available,true,JSON.stringify(described.tools[1].availability));assert.equal(described.tools[1].descriptor.unavailableReason,null);
+  const context=await r.ws.readWriteProposalContext('REGION',{...advance,requestId:'region-context'});
+  assert.equal(context.contractVersion,'painter-region/v1');assert.deepEqual(structuredClone(context.referenceBrief.media),[media]);
+  const request={...context,requestId:'region-proposal',proposal:{decision:'REGION',block:regionBlock()}};
+  const sent=await r.ws.submitWriteProposal('REGION',request);assert.equal(sent.response.error,null,JSON.stringify(sent.response));
+  assert.deepEqual(R.painterMedia,[[media]],'verified image media reaches the region Painter');
+  assert.deepEqual(await r.ws.submitWriteProposal('REGION',request),sent);assert.equal(R.calls.filter(c=>c==='ValidateRegionProposal').length,1);
+  const cellsAdvance=await r.ws.call('AdvanceCurrentBuild',advance);assert.equal(cellsAdvance.error?.code,'UNSUPPORTED_OPERATION');
+  const built=await r.ws.advanceRegionBuild({...advance,requestId:'region-advance'});assert.equal(built.error,null,JSON.stringify(built.error));assert.equal(built.outcome,'VERIFIED');
+  assert.deepEqual(R.calls,['ValidateRegionProposal','CompileRegionBuild','ApplyRegionCommit']);assert.equal(R.writes,1);assert.equal(f.writes,0);
+  const chunks=built.result.beforeSummary.chunks.map(c=>c.chunkPos);assert.ok(chunks.length>=4,'crosses mapblocks');
+  const after={dug:nodeAt(R.world,[3,-1,1]),kept:nodeAt(R.world,[3,0,1]),filled:nodeAt(R.world,[18,1,2])};assert.deepEqual(after,{dug:'air',kept:'fixture:stone',filled:'fixture:stone'});
+  assert.deepEqual(await r.ws.advanceRegionBuild({...advance,requestId:'region-advance-again'}),{...built});assert.equal(R.writes,1,'no second write');
+  assert.deepEqual((await r.ws.describeWriteTools('s1')).currentBuild,{turnRef:'image-turn',method:'REGION',outcome:'VERIFIED',undo:null});
+  const undoReq={contractVersion:'session/v3',sessionRef:'s1',requestId:'region-undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:built.result.historyRevision};
+  const undone=await r.ws.undoRegionBuild(undoReq);assert.equal(undone.error,null,JSON.stringify(undone.error));assert.equal(undone.outcome,'VERIFIED');
+  assert.equal(undone.result.originTransactionId,built.result.transactionId);assert.equal(R.undoWrites,1);
+  const restored={dug:nodeAt(R.world,[3,-1,1]),kept:nodeAt(R.world,[3,0,1]),filled:nodeAt(R.world,[18,1,2])};assert.deepEqual(restored,{dug:'fixture:stone',kept:'fixture:stone',filled:'air'});
+  assert.deepEqual(await r.ws.undoRegionBuild(undoReq),undone);assert.equal(R.undoWrites,1);
+  assert.equal(f.modelCalls,0);
+  log('REGION_FILL_DIG_UNDO',{media,painterSawMedia:true,chunks,transactionId:built.result.transactionId,status:built.result.status,snapshot:built.result.snapshot,after,undo:undone.result.status,restored,regionWrites:R.writes,undoWrites:R.undoWrites,cellsWrites:f.writes,modelCalls:f.modelCalls,peers:'FIXTURE'});
+ });
+});
+
+test('REGION Canvas rollback is surfaced as ROLLED_BACK failure, world unchanged, no Undo',async()=>{
+ const f=fixture();f.region=regionPeers(f);f.region.rollback=true;await withRuntime(f,async r=>{
+  const {advance}=await imageBrief(r,f);const context=await r.ws.readWriteProposalContext('REGION',{...advance,requestId:'region-context'});
+  assert.equal((await r.ws.submitWriteProposal('REGION',{...context,requestId:'p',proposal:{decision:'REGION',block:regionBlock()}})).response.error,null);
+  const built=await r.ws.advanceRegionBuild({...advance,requestId:'a'});assert.equal(built.error?.code,'APPLY_FAILED');assert.equal(built.error?.mutationState,'ROLLED_BACK');
+  assert.equal(nodeAt(f.region.world,[3,-1,1]),'fixture:stone');assert.equal(nodeAt(f.region.world,[18,1,2]),'air');
+  const undo=await r.ws.undoRegionBuild({contractVersion:'session/v3',sessionRef:'s1',requestId:'u',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:'region-history-1'});
+  assert.equal(undo.error?.code,'UNDO_CONFLICT');assert.equal(f.region.undoWrites,0);assert.equal(f.region.writes,1);
+  log('REGION_ROLLBACK',{error:built.error,undoError:undo.error,writes:f.region.writes,undoWrites:0});
+ });
+});
+
+test('REGION unavailable on wrong Canvas major: explains needs, zero Painter calls and writes, no fallback; skill may still choose PER_CELL',async()=>{
+ const f=fixture();f.region=regionPeers(f,{canvasMajor:2});await withRuntime(f,async r=>{
+  const {advance}=await imageBrief(r,f);const context=await r.ws.readWriteProposalContext('REGION',{...advance,requestId:'region-context'});
+  const sent=await r.ws.submitWriteProposal('REGION',{...context,requestId:'region-proposal',proposal:{decision:'REGION',block:regionBlock()}});
+  assert.equal(sent.response.error?.code,'CAPABILITY_UNAVAILABLE');assert.deepEqual(codes(sent.availability),['UNSUPPORTED_VERSION']);
+  assert.deepEqual(f.region.calls,[]);assert.equal(f.region.writes,0);assert.equal((await r.ws.describeWriteTools('s1')).currentBuild,null);
+  const unknown=await r.ws.submitWriteProposal('BULK',{...context,requestId:'x',proposal:{decision:'REGION',block:regionBlock()}});assert.deepEqual(codes(unknown.availability),['UNKNOWN_WRITE_METHOD']);
+  const cellsContext=await r.ws.readWriteProposalContext('PER_CELL',{...advance,requestId:'cells-context'});
+  const cells=await r.ws.submitWriteProposal('PER_CELL',{...cellsContext,requestId:'cells-proposal',proposal:clone(sample.request.proposal)});assert.equal(cells.response.error,null,JSON.stringify(cells.response));
+  log('REGION_WRONG_MAJOR_UNAVAILABLE',{response:sent.response,availability:sent.availability,regionCalls:0,regionWrites:0,unknown:unknown.availability,explicitPerCellAfterwards:'VALIDATED'});
+ });
+});
+
+test('PER_CELL chain on 0.5.0: image brief → Painter → Brush → Canvas → same build Undo',async()=>{
  const f=fixture();await withRuntime(f,async r=>{
   const before=await r.ws.describeWriteTools('s1');assert.deepEqual(codes(before.tools[0].availability),['SESSION_NOT_FOUND']);
-  const {media,advance}=await imageBrief(r,f);
-  const described=await r.ws.describeWriteTools('s1');const [cells,region]=described.tools;
-  assert.equal(cells.mode,'cells');assert.equal(cells.availability.available,true,JSON.stringify(cells.availability));
-  assert.equal(region.availability.available,false);
-  const context=await r.ws.readBuildProposalContext({...advance,requestId:'read-context'});
-  assert.deepEqual(clone(context.referenceBrief.media),[media]);
-  const sent=await r.ws.submitWriteProposal('cells',{...context,requestId:'proposal',proposal:clone(sample.request.proposal)});
-  assert.equal(sent.mode,'cells');assert.equal(sent.availability.available,true);assert.equal(sent.response.error,null,JSON.stringify(sent));
-  assert.deepEqual(clone(f.painterContexts[0].referenceBrief.media),[media],'image media preserved into Painter');
-  assert.deepEqual(await r.ws.submitWriteProposal('cells',{...context,requestId:'proposal',proposal:clone(sample.request.proposal)}),sent,'exact duplicate returns stored result');
-  assert.equal(f.calls.filter(c=>c==='ValidateBuildProposal').length,1);
+  const {media,advance}=await imageBrief(r,f);const described=await r.ws.describeWriteTools('s1');
+  assert.equal(described.tools[0].availability.available,true,JSON.stringify(described.tools[0].availability));assert.deepEqual(codes(described.tools[1].availability),['PEER_UNAVAILABLE','PEER_UNAVAILABLE','PEER_UNAVAILABLE']);
+  const context=await r.ws.readWriteProposalContext('PER_CELL',{...advance,requestId:'read-context'});
+  const sent=await r.ws.submitWriteProposal('PER_CELL',{...context,requestId:'proposal',proposal:clone(sample.request.proposal)});assert.equal(sent.response.error,null,JSON.stringify(sent));
+  assert.deepEqual(structuredClone(f.painterContexts[0].referenceBrief.media),[media]);
   const built=await call(r,'AdvanceCurrentBuild',advance);assert.equal(built.outcome,'VERIFIED');assert.equal(f.writes,1);
-  assert.deepEqual(f.calls.filter(c=>['ValidateBuildProposal','BuildDocument','ApplyRecoverableCommit','Readback'].includes(c)),['ValidateBuildProposal','BuildDocument','ApplyRecoverableCommit','Readback']);
-  assert.deepEqual((await r.ws.describeWriteTools('s1')).currentBuild,{turnRef:'image-turn',writeMode:'cells',outcome:'VERIFIED'});
+  assert.deepEqual((await r.ws.describeWriteTools('s1')).currentBuild,{turnRef:'image-turn',method:'PER_CELL',outcome:'VERIFIED',undo:null});
+  const regionAdvance=await r.ws.advanceRegionBuild({...advance,requestId:'not-region'});assert.equal(regionAdvance.error?.code,'TARGET_REQUIRED');
   const undo=await call(r,'UndoCurrentBuild',{requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:'history-1'});
   assert.equal(undo.status,'VERIFIED');assert.equal(f.undoWrites,1);assert.equal(f.modelCalls,0);
-  log('CELLS_MODE_CHAIN',{before:before.tools.map(t=>t.availability),after:described.tools.map(t=>t.availability),media,painterSawMedia:true,proposalMode:sent.mode,outcome:built.outcome,currentBuild:{writeMode:'cells'},undo:undo.status,canvasWrites:f.writes,undoWrites:f.undoWrites,modelCalls:f.modelCalls,peers:'FIXTURE'});
+  log('PER_CELL_CHAIN',{before:before.tools.map(t=>t.availability),after:described.tools.map(t=>t.availability),media,outcome:built.outcome,undo:undo.status,canvasWrites:f.writes,undoWrites:f.undoWrites,peers:'FIXTURE'});
  });
 });
 
-test('region mode on real contracts 0.4.2 is not available: explains needs, zero Painter calls, zero writes, no fallback to cells',async()=>{
- const f=fixture();await withRuntime(f,async r=>{
-  const {advance}=await imageBrief(r,f);
-  const context=await r.ws.readBuildProposalContext({...advance,requestId:'read-context'});
-  const sent=await r.ws.submitWriteProposal('region',{...context,requestId:'region-proposal',proposal:clone(sample.request.proposal)});
-  assert.equal(sent.response.error?.code,'CAPABILITY_UNAVAILABLE');assert.equal(sent.availability.available,false);
-  assert.deepEqual(codes(sent.availability),['CAPABILITY_MISSING','CAPABILITY_MISSING','CAPABILITY_MISSING','CAPABILITY_MISSING']);
-  assert.match(sent.availability.unmet[0].need,/Installed hanaworlds-contracts advertising region-voxel-block\/v1/);
-  assert.equal(f.calls.includes('ValidateBuildProposal'),false);assert.equal(f.writes,0);
-  assert.equal((await r.ws.describeWriteTools('s1')).currentBuild,null,'no silent cells fallback build was recorded');
-  const unknown=await r.ws.submitWriteProposal('bulk',{...context,requestId:'bulk-proposal',proposal:clone(sample.request.proposal)});
-  assert.equal(unknown.response.error?.code,'CAPABILITY_UNAVAILABLE');assert.deepEqual(codes(unknown.availability),['UNKNOWN_WRITE_MODE']);
-  // The same captured context still accepts an explicit cells choice afterwards (skill decides, Workshop does not).
-  const cells=await r.ws.submitWriteProposal('cells',{...context,requestId:'cells-proposal',proposal:clone(sample.request.proposal)});assert.equal(cells.response.error,null);
-  const replay=await r.ws.submitWriteProposal('region',{...context,requestId:'cells-proposal',proposal:clone(sample.request.proposal)});assert.equal(replay.response.error?.code,'CAPABILITY_UNAVAILABLE');
-  log('REGION_UNAVAILABLE_042',{response:sent.response,availability:sent.availability,painterCalls:0,worldWrites:f.writes,unknownMode:unknown.availability,peers:'FIXTURE'});
- });
-});
-
-test('wrong current world connection rejects a write proposal before Painter',async()=>{
- const f=fixture();await withRuntime(f,async r=>{
-  const {advance}=await imageBrief(r,f);const context=await r.ws.readBuildProposalContext({...advance,requestId:'read-context'});
+test('wrong current world connection rejects a REGION proposal before Painter',async()=>{
+ const f=fixture();f.region=regionPeers(f);await withRuntime(f,async r=>{
+  const {advance}=await imageBrief(r,f);const context=await r.ws.readWriteProposalContext('REGION',{...advance,requestId:'region-context'});
   f.local.connectionIncarnationRef='reopened-socket';
-  const sent=await r.ws.submitWriteProposal('cells',{...context,requestId:'proposal',proposal:clone(sample.request.proposal)});
+  const sent=await r.ws.submitWriteProposal('REGION',{...context,requestId:'p',proposal:{decision:'REGION',block:regionBlock()}});
   assert.ok(['CURRENT_WORLD_MISMATCH','TARGET_FACTS_STALE'].includes(sent.response.error?.code),JSON.stringify(sent.response));
-  assert.equal(f.calls.includes('ValidateBuildProposal'),false);assert.equal(f.writes,0);
-  log('WRONG_CONNECTION_REJECT',{error:sent.response.error,painterCalls:0,worldWrites:0});
+  assert.deepEqual(f.region.calls,[]);assert.equal(f.region.writes,0);
+  log('REGION_WRONG_CONNECTION',{error:sent.response.error,regionCalls:0,regionWrites:0});
  });
 });

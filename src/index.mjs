@@ -2,14 +2,17 @@ import { randomUUID } from 'node:crypto';
 import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import * as C from 'hanaworlds-contracts';
 import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, mediaBinding, imageRef, imageDigest } from './image-attachment.mjs';
-import { WRITE_MODES, writeToolDescriptors, writeToolSkillGuidance, evaluateWriteMode } from './write-tools.mjs';
-export { WRITE_MODES, REGION_CAPABILITY, writeToolDescriptors, writeToolSkillGuidance, evaluateWriteMode, regionCapabilityUnmet, capabilityMatch } from './write-tools.mjs';
+import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod } from './write-tools.mjs';
+export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod } from './write-tools.mjs';
 const VERSION = 'session/v3', CANVAS = 'canvas/v5';
 const copy = structuredClone, revision = () => `rev-${randomUUID()}`;
 const same = (a,b) => C.canonicalJSON(a) === C.canonicalJSON(b);
 const digest = (kind,value) => C.digestValue(kind,value).sha256;
 const fail = (code,details) => { throw new C.ContractError(code,'validate','REQUIRED_FACT_UNKNOWN',details); };
 const packet = (wire,id,result,error=null) => ({contractVersion:wire,requestId:id,result,error});
+const pub = error => error?.publicError ?? C.publicError(error);
+const peerFail = response => {const error=new Error(response.error.code);error.publicError=response.error;throw error;};
+const withoutRequest = ({requestId:_r,proposal:_p,...rest}) => rest;
 const initial = id => ({context:{currentSession:id,activeWorldRef:null,orderedSelectedObjectRefs:[],sessionRevision:revision(),selectionRevision:'0',localContext:null},turns:[],details:{},confirmed:{},pending:null,requests:{},contexts:{},builds:{},undos:{}});
 
 /** Current fresh-install runtime. Peer ports are Host-owned in-process services;
@@ -220,14 +223,16 @@ export class WorkshopV3 {
   C.validateBuildProposalContext(request,facts);
   return copy(facts);
  }
- /** Existing proposal entry: the per-node (cells) write mode. */
- async submitBuildProposal(raw) {return (await this.#submit(raw,'cells')).response;}
- /** Same skill, either self-described write mode. Returns a Workshop business
-  * envelope around the exact painter/v4 response; unmet needs are explained and
-  * nothing is sent to Painter. No mode switch, truncation or target rewrite. */
- async submitWriteProposal(mode,raw) {const {availability,response}=await this.#submit(raw,mode);return {mode,availability,response};}
- #writeFacts() {return {ownHandshake:C.contractHandshake,peers:{painter:this.painter,brush:this.brush,canvas:this.canvas}};}
- /** Self-description of both write tools plus current availability; read-only. */
+ /** Existing proposal entry: the PER_CELL write method. */
+ async submitBuildProposal(raw) {return (await this.#submit(raw,'PER_CELL')).response;}
+ /** Same skill, either self-described write method. Returns a Workshop business
+  * envelope around the exact painter/v4 or painter-region/v1 response; unmet needs
+  * are explained and nothing is sent to Painter. No method switch, truncation or
+  * target rewrite. */
+ async submitWriteProposal(method,raw) {const {availability,response}=await this.#submit(raw,method);return {method,availability,response};}
+ #writeFacts() {return {ports:{painter:this.painter,brush:this.brush,canvas:this.canvas,painterRegion:this.painterRegion,brushRegion:this.brushRegion,canvasRegion:this.canvasRegion}};}
+ #gate(method) {const availability=evaluateWriteMethod(method,this.#writeFacts());if(!availability.available)fail('CAPABILITY_UNAVAILABLE');return availability;}
+ /** Contract WriteMethodDescriptors plus current availability; read-only. */
  async describeWriteTools(sessionRef=null) {
   const facts=this.#writeFacts();let current=null;
   if(sessionRef!==null){
@@ -236,31 +241,116 @@ export class WorkshopV3 {
    if(state){let confirmed=true;try{this.#turn(state);}catch(error){if(error?.code!=='INTENT_UNCONFIRMED')throw error;confirmed=false;}
     facts.session.worldBound=!!state.context.localContext&&state.context.activeWorldRef===state.context.localContext.worldRef;facts.session.intentConfirmed=confirmed;
     const turn=state.turns.at(-1),build=turn&&state.builds[turn.turnRef];
-    current=build?{turnRef:turn.turnRef,writeMode:build.writeMode,outcome:build.outcome?.outcome??(build.terminal??(build.dispatched?'PENDING':'VALIDATED'))}:null;}
+    if(build){const r=build.region;
+     current={turnRef:turn.turnRef,method:build.method??'PER_CELL',outcome:r?(r.result?.status??(r.dispatched?'PENDING':'VALIDATED')):(build.outcome?.outcome??(build.terminal??(build.dispatched?'PENDING':'VALIDATED'))),undo:r?.undo?.result?.status??null};}}
   }
-  return copy({skillGuidance:writeToolSkillGuidance,tools:WRITE_MODES.map(mode=>({...writeToolDescriptors[mode],availability:evaluateWriteMode(mode,facts)})),currentBuild:current});
+  return copy({skillGuidance:writeToolSkillGuidance,tools:WRITE_METHODS.map(method=>describeWriteMethod(method,facts)),currentBuild:current});
  }
- async #submit(raw,mode) {
-  let request,availability=null;
-  try {request=copy(C.validateBuildProposalRequest(raw));return await this.#lock(request.sessionRef,async()=>{
-   availability=evaluateWriteMode(mode,this.#writeFacts());
-   if(!availability.available)fail('CAPABILITY_UNAVAILABLE');
+ /** PER_CELL delegates to readBuildProposalContext. REGION captures the current
+  * confirmed brief (with verified media), intent and catalogue for painter-region/v1;
+  * the region itself is in world node coordinates, so no placement inspection. */
+ async readWriteProposalContext(method,raw) {
+  if(method==='PER_CELL')return this.readBuildProposalContext(raw);
+  if(method!=='REGION')fail('CAPABILITY_UNAVAILABLE');
+  const body=copy(C.validateBoundRequest(VERSION,'AdvanceCurrentBuild',raw));
+  return this.#lock(body.sessionRef,async()=>{
+   const {core,state}=await this.#load(body.sessionRef);C.validateCurrentRequest(VERSION,'AdvanceCurrentBuild',body,await this.#facts(body,state));
+   const {turn}=this.#turn(state);if(body.expectedTurnRevision!==turn.turnRevision)fail('TURN_REVISION_MISMATCH');
+   let stored=state.contexts[body.requestId];
+   if(!stored){
+    if(state.builds[turn.turnRef]?.dispatched||state.builds[turn.turnRef]?.region?.dispatched)fail('TRANSACTION_CONFLICT');
+    stored={method:'REGION',invocationId:`region-proposal-${randomUUID()}`,context:null,request:null,response:null};
+    stored.context=await this.#regionContext(body,state,stored);state.contexts[body.requestId]=stored;state.currentContextId=body.requestId;await this.#save(body.sessionRef,core,state);
+   }
+   if(stored.method!=='REGION')fail('REPLAY_MISMATCH');
+   if(!same(await this.#regionContext(body,state,stored),stored.context))fail('TARGET_FACTS_STALE');return copy(stored.context);
+  });
+ }
+ async #regionContext(body,state,stored) {
+  const {turn,saved}=this.#turn(state);await this.#current(body,state);
+  const catalogue=C.validateType('Catalogue',await this.catalogue.read(body.localContext.worldRef));
+  return copy({contractVersion:'painter-region/v1',sessionRef:body.sessionRef,worldRef:body.localContext.worldRef,turnRevision:turn.turnRevision,invocationId:stored.invocationId,intent:saved.intent,intentDigest:turn.intentDigest,referenceBrief:saved.brief,referenceBriefDigest:turn.referenceBriefDigest,catalogue,catalogueDigest:digest('catalogue',catalogue),localContext:copy(body.localContext)});
+ }
+ async #submit(raw,method) {
+  let request,availability=null;const region=method==='REGION';
+  try {
+   if(!WRITE_METHODS.includes(method)){availability=evaluateWriteMethod(method,this.#writeFacts());fail('CAPABILITY_UNAVAILABLE');}
+   request=copy(region?C.validateRegionProposalRequest(raw):C.validateBuildProposalRequest(raw));return await this.#lock(request.sessionRef,async()=>{
+   availability=evaluateWriteMethod(method,this.#writeFacts());if(!availability.available)fail('CAPABILITY_UNAVAILABLE');
    const {core,state}=await this.#load(request.sessionRef);const stored=Object.values(state.contexts).find(x=>x.invocationId===request.invocationId);
-   const facts=await this.#proposalFacts(request,state,stored);C.validateBuildProposalContext(request,facts);
-   if((stored.writeMode??'cells')!==mode&&stored.request)fail('REPLAY_MISMATCH');
+   if(!stored||(stored.method??'PER_CELL')!==method||state.contexts[state.currentContextId]!==stored)fail(stored&&(stored.method??'PER_CELL')!==method?'REPLAY_MISMATCH':'TARGET_FACTS_STALE');
+   if(region){
+    if(!same(withoutRequest(request),stored.context))fail('TRANSACTION_CONFLICT');
+    if(!same(await this.#regionContext(request,state,stored),stored.context))fail('TARGET_FACTS_STALE');
+   }else{const facts=await this.#proposalFacts(request,state,stored);C.validateBuildProposalContext(request,facts);}
    if(stored.response)return {availability,response:copy(stored.response)};
    if(stored.request&&!same(stored.request,request))fail('REPLAY_MISMATCH');
-   const {turn}=this.#turn(state);if(state.builds[turn.turnRef]?.dispatched)fail('TRANSACTION_CONFLICT');
-   const painter=this.#peer(this.painter,'painter/v4');stored.request=copy(request);stored.writeMode=mode;await this.#save(request.sessionRef,core,state);
-   const response=C.validateBuildProposalResponse(request,await painter.call('ValidateBuildProposal',copy(request)));
-   C.validateBuildProposalContext(request,await this.#proposalFacts(request,state,stored));
-   if(painter!==this.painter)fail('CURRENT_WORLD_MISMATCH');
-   if(!response.error){stored.response=copy(response);state.builds[turn.turnRef]={contextId:state.currentContextId,writeMode:mode,plan:response.result,compiled:null,submission:null,dispatched:false,outcome:null};await this.#save(request.sessionRef,core,state);}
+   const {turn}=this.#turn(state);if(state.builds[turn.turnRef]?.dispatched||state.builds[turn.turnRef]?.region?.dispatched)fail('TRANSACTION_CONFLICT');
+   const painter=region?this.painterRegion:this.#peer(this.painter,'painter/v4');stored.request=copy(request);await this.#save(request.sessionRef,core,state);
+   const response=region?C.validateRegionProposalResponse(request,await painter.call('ValidateRegionProposal',copy(request))):C.validateBuildProposalResponse(request,await painter.call('ValidateBuildProposal',copy(request)));
+   if(region){if(!same(await this.#regionContext(request,state,stored),stored.context))fail('TARGET_FACTS_STALE');}
+   else C.validateBuildProposalContext(request,await this.#proposalFacts(request,state,stored));
+   if(painter!==(region?this.painterRegion:this.painter))fail('CURRENT_WORLD_MISMATCH');
+   if(!response.error){stored.response=copy(response);state.builds[turn.turnRef]={contextId:state.currentContextId,method,plan:response.result,compiled:null,submission:null,dispatched:false,outcome:null,...(region?{region:{compiled:null,commitRequest:null,dispatched:false,result:null,undo:null}}:{})};await this.#save(request.sessionRef,core,state);}
    return {availability,response:copy(response)};
-  });}catch(error){return {availability,response:packet('painter/v4',request?.requestId??raw?.requestId??null,null,C.publicError(error))};}
+  });}catch(error){return {availability,response:packet(region?'painter-region/v1':'painter/v4',request?.requestId??raw?.requestId??null,null,pub(error))};}
+ }
+ /** REGION Advance: validated plan → Brush CompileRegionBuild → Canvas
+  * ApplyRegionCommit (one logical transaction). Request is persisted before
+  * dispatch; a dispatched commit without result stays PENDING, never re-sent. */
+ async advanceRegionBuild(raw) {
+  let body;
+  try {body=copy(C.validateBoundRequest(VERSION,'AdvanceCurrentBuild',raw));return await this.#lock(body.sessionRef,async()=>{
+   const {core,state}=await this.#load(body.sessionRef);C.validateCurrentRequest(VERSION,'AdvanceCurrentBuild',body,await this.#facts(body,state));
+   const {turn}=this.#turn(state),build=state.builds[turn.turnRef];
+   if(body.expectedTurnRevision!==turn.turnRevision)fail('TURN_REVISION_MISMATCH');
+   if(build?.method!=='REGION')fail('TARGET_REQUIRED');const r=build.region;
+   const out=(result,outcome)=>({method:'REGION',sessionRef:body.sessionRef,worldRef:body.worldRef,turnRevision:turn.turnRevision,outcome,result,error:null});
+   if(r.result)return out(copy(r.result),r.result.status);
+   if(r.dispatched)return out(null,'PENDING');
+   this.#gate('REGION');
+   const ctx=state.contexts[build.contextId].context,settings=await this.compilerConfig.read(body.worldRef);
+   const compile={contractVersion:'region-build/v1',sessionRef:body.sessionRef,requestId:`${body.requestId}:region-compile`,worldRef:body.worldRef,build:build.plan.build,buildDigest:build.plan.buildDigest,catalogue:ctx.catalogue,catalogueDigest:ctx.catalogueDigest,compilerRevision:settings.compilerRevision,localContext:body.localContext};
+   const brush=this.brushRegion,compiled=C.validateCompiledRegionSet(compile,await brush.call('CompileRegionBuild',copy(compile)));
+   if(compiled.error)peerFail(compiled);if(brush!==this.brushRegion)fail('CURRENT_WORLD_MISMATCH');
+   await this.#current(body,state);r.compiled=compiled.result;
+   const apply={contractVersion:'canvas-region/v1',sessionRef:body.sessionRef,requestId:`${body.requestId}:region-apply`,worldRef:body.worldRef,transactionId:`region-${randomUUID()}`,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,guarantee:'RECOVERABLE_VERIFIED',localContext:body.localContext};
+   r.commitRequest=apply;r.dispatched=true;await this.#save(body.sessionRef,core,state);
+   let response;try{response=await this.canvasRegion.call('ApplyRegionCommit',copy(apply));}catch{return out(null,'PENDING');}
+   response=C.validateRegionCommit(apply,response);
+   if(response.error){if(response.error.mutationState==='NONE'){r.dispatched=false;await this.#save(body.sessionRef,core,state);}peerFail(response);}
+   const result=response.result;
+   if(result.status==='VERIFIED'&&!same(result.actualSummary,result.expectedAfterSummary))fail('READBACK_MISMATCH',{mutationState:'UNKNOWN',transactionRef:apply.transactionId});
+   r.result=copy(result);if(result.status==='VERIFIED')turn.actionReceiptDigest=digest('region-summary',result.actualSummary);
+   state.details[turn.turnRef].resultText=result.status==='VERIFIED'?'区域写入已验证，整片读回一致。':'区域写入失败，已整体回滚。';await this.#save(body.sessionRef,core,state);
+   if(result.status==='ROLLED_BACK')fail('APPLY_FAILED',{mutationState:'ROLLED_BACK',transactionRef:apply.transactionId});
+   return out(copy(result),'VERIFIED');
+  });}catch(error){return {method:'REGION',sessionRef:body?.sessionRef??raw?.sessionRef??null,outcome:null,result:null,error:pub(error)};}
+ }
+ /** Whole-region Undo of the latest VERIFIED region build: same transaction, Canvas decides. */
+ async undoRegionBuild(raw) {
+  let body;
+  try {body=copy(C.validateBoundRequest(VERSION,'UndoCurrentBuild',raw));return await this.#lock(body.sessionRef,async()=>{
+   const {core,state}=await this.#load(body.sessionRef);await this.#current(body,state);
+   const turn=state.turns.findLast(t=>state.builds[t.turnRef]?.region?.result?.status==='VERIFIED'),r=turn&&state.builds[turn.turnRef].region;
+   if(!r||body.expectedTurnRevision!==turn.turnRevision||body.expectedHistoryRevision!==r.result.historyRevision)fail('UNDO_CONFLICT');
+   const out=(result,outcome)=>({method:'REGION',sessionRef:body.sessionRef,worldRef:body.worldRef,turnRevision:turn.turnRevision,outcome,result,error:null});
+   if(r.undo?.result)return out(copy(r.undo.result),r.undo.result.status);
+   if(r.undo)return out(null,'PENDING');
+   this.#gate('REGION');
+   const request={contractVersion:'canvas-region/v1',sessionRef:body.sessionRef,requestId:`${body.requestId}:region-undo`,worldRef:body.worldRef,originTransactionId:r.result.transactionId,undoTransactionId:`region-undo-${randomUUID()}`,expectedHistoryRevision:r.result.historyRevision,localContext:body.localContext};
+   r.undo={request,result:null};await this.#save(body.sessionRef,core,state);
+   let response;try{response=await this.canvasRegion.call('UndoRegionCommit',copy(request));}catch{return out(null,'PENDING');}
+   response=C.validateRegionUndo(request,response,r.result);
+   if(response.error){if(response.error.mutationState==='NONE'){r.undo=null;await this.#save(body.sessionRef,core,state);}peerFail(response);}
+   r.undo.result=copy(response.result);await this.#save(body.sessionRef,core,state);
+   if(response.result.status!=='VERIFIED')fail('APPLY_FAILED',{mutationState:'ROLLED_BACK',transactionRef:request.undoTransactionId});
+   return out(copy(response.result),'VERIFIED');
+  });}catch(error){return {method:'REGION',sessionRef:body?.sessionRef??raw?.sessionRef??null,outcome:null,result:null,error:pub(error)};}
  }
  async #advance(body,core,state) {
   const {turn,saved}=this.#turn(state),build=state.builds[turn.turnRef];if(!build)fail('TARGET_REQUIRED');
+  if(build.method==='REGION')fail('UNSUPPORTED_OPERATION');
   if(state.undos[turn.turnRef]?.result)fail('UNDO_CONFLICT');
   if(build.outcome)return copy(build.outcome);
   const pending=()=>({sessionRef:body.sessionRef,worldRef:body.worldRef,turnRevision:turn.turnRevision,stage:'APPLY',outcome:'PENDING'});
@@ -348,7 +438,7 @@ export function apply(ctx) {
  const projectionStore=new WorkshopProjectionStore(()=>ctx.get('storageDomain'));
  ctx.effect?.(()=>()=>projectionStore.close(),'hanaworlds-workshop.projection-close');
  const service=new WorkshopV3({projectionStore});
- for(const [field,port] of Object.entries({attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
+ for(const [field,port] of Object.entries({attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities',painterRegion:'hanaworldsPainterRegionV1',brushRegion:'hanaworldsBrushRegionV1',canvasRegion:'hanaworldsCanvasRegionV1'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
  registerImageTool(ctx,service);
  ctx.provide('hanaworldsWorkshop',service);ctx.provide('hanaworldsWorkshopV3',service);
 }

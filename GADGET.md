@@ -1,6 +1,6 @@
-# Workshop 0.3.0 — local-world skill business component
+# Workshop 0.4.0 — local-world skill business component
 
-Fresh profile only. Exact contracts 0.4.2 / source aad7c0ea2a4a9a93dfb13555c46cd98b9b5da777; root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
+Fresh profile only. Contracts 0.5.0 / source c006a839a6e6c2c63d57a14b72e4e6b26fa717f1 (tar 7fb42f1e…); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
 ## Host assembly
 
@@ -95,55 +95,61 @@ AttachmentLocal (0.2.0-rc.2), with a declared agent/Host publication/Canvas fixt
 archive and independent installed package, plus the affected text normal flow.
 Actual Desktop/skill/model/image building/UI/world/Undo remains NOT_RUN.
 
-## Two self-described write modes (S1-WS-WRITE-TOOLS-01)
+## Two write methods (S1-WS-WRITE-TOOLS-01, contracts 0.5.0)
 
-The one building skill has two write modes. Both are descriptions plus the same
-business chain; neither writes the world. Exports from the package root:
-`WRITE_MODES` (`['cells','region']`), `writeToolDescriptors`,
-`writeToolSkillGuidance`, `evaluateWriteMode`, `regionCapabilityUnmet`,
-`capabilityMatch`, `REGION_CAPABILITY`.
+The one building skill has two write methods, each published as a contracts
+`WriteMethodDescriptor` (`method`, `toolName`, `purpose`, `inputType`,
+free-text `typicalScale`, `scaleUnit:"cells"`, `requiredCapabilities`,
+`unavailableReason`; no threshold field). Root exports: `WRITE_METHODS`,
+`WRITE_METHOD_PORTS`, `writeToolSkillGuidance`, `evaluateWriteMethod`,
+`describeWriteMethod`.
 
-| mode | purpose | typical scale (guidance, not a limit) | input |
+| method | toolName (suggested to Host) | input | typical scale (guidance, not a limit) |
 | --- | --- | --- | --- |
-| `cells` 逐格微调 | exact nodes or a few small boxes; details and corrections | one to a few hundred nodes, usually within one 16×16×16 mapblock | existing painter/v4 `BuildProposal` (`boxes`, 1×1×1 = one node) |
-| `region` 区域批量 | fill or dig a large area in one transaction | thousands to millions of nodes across many mapblocks | region voxel block + palette v1; explicit air digs, unspecified stays unchanged |
+| `PER_CELL` 逐格微调 | `hanaworlds_proposal` | `BuildProposal` | a single cell up to a few hundred cells |
+| `REGION` 区域批量 | `hanaworlds_region_proposal` | `RegionProposal` (region-voxels/v1; explicit air digs, null = unspecified, never air) | hundreds to millions of cells across mapblocks |
 
-Each descriptor carries `title`, `purpose`, `whenToUse`, `notFor`, `input`,
-`typicalScale {unit:'node', typical, note}`, `requires` and `effects`. There is no
-size threshold, setting or admin switch: the skill picks the mode from its goal
-and volume and may refine the choice over iterations. Workshop never truncates a
-proposal, changes its target or switches mode for the skill.
+There is no size threshold, setting or admin switch. The skill picks the method
+from its goal and volume and may refine the choice; Workshop never truncates a
+proposal, changes its target or switches method.
 
-Service methods (Host keeps tool registration and trusted Session/world context):
+Compatibility: REGION requires each region port to advertise a contracts
+`ProtocolHandshake` and pass `checkProtocolCompatibility` for its wire and the
+`regionCapabilities` it owns (same major, minor ≥ required, all capabilities;
+provenance only recorded). PER_CELL keeps the existing exact
+`ContractHandshake` check (contracts: K1/K2 unchanged); if Brush also advertises
+a `ProtocolHandshake` it must carry `BUILD/V3:per-cell-compile`.
 
-- `describeWriteTools(sessionRef?)` → `{skillGuidance, tools:[descriptor + availability], currentBuild}`.
-  `availability = {mode, available, unmet:[{code, need, remedy}]}`. Codes:
-  `PEER_UNAVAILABLE`, `PEER_INCOMPATIBLE`, `CAPABILITY_MISSING`,
-  `CAPABILITY_MAJOR_MISMATCH`, `SESSION_NOT_FOUND`, `WORLD_NOT_BOUND`,
-  `INTENT_UNCONFIRMED`, `UNKNOWN_WRITE_MODE`. `currentBuild` reports the latest
-  turn's durable `writeMode` and outcome. Read-only.
-- `submitWriteProposal(mode, ValidateBuildProposalRequest)` →
-  `{mode, availability, response}` where `response` is the exact painter/v4
-  packet. An unavailable mode returns `CAPABILITY_UNAVAILABLE` with the unmet
-  list and sends nothing to Painter. The chosen mode is stored durably with the
-  proposal and build; reusing a request under another mode is `REPLAY_MISMATCH`.
-  `submitBuildProposal(request)` is the same path with `cells`.
+Ports consumed (Host assembles; names are Workshop's consumption choice):
+`hanaworldsPainterRegionV1`, `hanaworldsBrushRegionV1`, `hanaworldsCanvasRegionV1`,
+each `{protocolHandshake, call(operation, request)}` with the contract operation
+names `ValidateRegionProposal`, `CompileRegionBuild`, `ApplyRegionCommit`,
+`UndoRegionCommit`. Workshop imports no peer.
 
-After validation, `AdvanceCurrentBuild`, `ReadCurrentUndoStatus` and
-`UndoCurrentBuild` are unchanged for both modes: Brush compiles, Canvas owns the
-transaction/readback, and Undo reverts that exact build. Session, world
-connection, Undo linkage and confirmed image media are kept as before.
+Service methods:
 
-Region availability on contracts 0.4.2 is **false** by design: installed
-contracts and Painter/Brush/Canvas must each advertise `region-voxel-block/v1`
-(same protocol major; `/v2` is a major mismatch). The token name and the
-`contractHandshake.capabilities` field are a declared FIXTURE from the K3 cards
-until the actual Contracts region v1 package is delivered; the 0.4.2 handshake
-schema itself refuses that extra field. Final region consumption, protocol-major
-compatibility from the real contract and the region path through Painter →
-Brush → Canvas are NOT_RUN until those bytes exist.
+- `describeWriteTools(sessionRef?)` → `{skillGuidance, tools:[{descriptor, guidance, availability}], currentBuild}`;
+  `availability.unmet = [{code, need, remedy}]`. Read-only.
+- `readWriteProposalContext(method, AdvanceCurrentBuildRequest)` — PER_CELL is
+  `readBuildProposalContext`; REGION captures the confirmed brief (verified media
+  kept), intent and catalogue as the painter-region/v1 request minus
+  `requestId`/`proposal`. Regions use world node coordinates; no placement inspection.
+- `submitWriteProposal(method, request)` → `{method, availability, response}`.
+  Unavailable methods return `CAPABILITY_UNAVAILABLE` plus the unmet list and send
+  nothing to Painter. The method is stored durably; another method for the same
+  invocation is `REPLAY_MISMATCH`. `submitBuildProposal` is PER_CELL.
+- `advanceRegionBuild(AdvanceCurrentBuildRequest)` — Brush `CompileRegionBuild`
+  (`validateCompiledRegionSet`), then Canvas `ApplyRegionCommit`
+  (`validateRegionCommit`). The commit request is persisted before dispatch; a
+  dispatched commit without result stays PENDING and is never re-sent. VERIFIED
+  also requires `actualSummary == expectedAfterSummary`; ROLLED_BACK is a failure.
+  `AdvanceCurrentBuild` rejects a REGION build with `UNSUPPORTED_OPERATION`.
+- `undoRegionBuild(UndoCurrentBuildRequest)` — `UndoRegionCommit` of the latest
+  VERIFIED region transaction with its `historyRevision` (`validateRegionUndo`).
 
-`npm run test:write-tools` uses real Workshop, Cordis, Core JSONL, domain
-storage, attachments, Tools and HTTP with Painter/Brush/Canvas/world FIXTURE.
-`scripts/gate-write-tools.sh <evidence-dir> <contracts-0.4.2-tar>` repeats it and
+`npm run test:write-tools`: real Workshop, Cordis, Core JSONL, domain storage,
+attachments, Tools and HTTP; Painter/Brush/Canvas (cell and region) and the world
+are FIXTURE built with the contract's own region helpers.
+`scripts/gate-write-tools.sh <evidence-dir> <contracts-0.5.0-tar>` repeats it and
 the affected text/image regression on a clean archive and on the packed tarball.
+Real peers, Luanti world, model choice and UI are NOT_RUN here.
