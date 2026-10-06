@@ -1,14 +1,12 @@
-HanaWorlds Workshop 0.1.0 component candidate.
+HanaWorlds Workshop 0.2.0 local-world component candidate.
 
-HanaWorlds-owned source is MIT; see LICENSE. Workshop includes a byte-identical
-runtime closure and two test fixtures of hanaworlds-contracts@0.3.10 from public
-revision e66800964726b951a300eb9377b74c318641417f (npm pack SHA256
-8624bd026815fcdafc5248b21d8bc611baa0569b7b492b66905d2d015a496ce1).
-That source is MIT; its LICENSE, NOTICE, per-file hashes, import closure and
-canonicalize Apache-2.0 license text are retained under vendor/contracts/.
-Runtime imports the same contracts version pinned to the public codeload revision
-with package-lock integrity. scripts/generate-vendored-contracts.py reproduces
-vendor bytes from the admitted package without editing generated modules.
+HanaWorlds-owned source is MIT; see LICENSE. Runtime imports
+hanaworlds-contracts@0.4.0 (MIT), pinned to public revision
+8cfb18f8e13aa33d7a942f230ec6117914322cdd and package-lock integrity.
+Admitted package SHA256 d7b22e76de5e161abe7525596df608b3f00445fb4237808941cb5ef8328e9bc4.
+The development vendor is copied verbatim from that public package including
+its LICENSE/NOTICE/licenses; scripts/generate-vendored-contracts.py reproduces
+it without editing generated modules. Vendor and deferred sources do not ship.
 The package installs canonicalize@5.1.0 separately from the public registry;
 its Apache-2.0 license remains with that dependency. Workshop does not embed
 the upstream canonicalize implementation.

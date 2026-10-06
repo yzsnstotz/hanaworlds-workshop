@@ -1,1888 +1,273 @@
-import { randomUUID, createHash } from 'node:crypto';
-import { AsyncLocalStorage } from 'node:async_hooks';
-import canonicalize from 'canonicalize';
+import { randomUUID } from 'node:crypto';
 import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
-import { LegacyHistoryService, LegacyHistoryStore } from './legacy-history.mjs';
-import {
-  admitRequest, validateRequest, validateBoundRequest, validateResponse,
-  ContractError, contractHandshake, checkContractHandshake, digestValue, validateType,
-  validateChoiceSelection, validateRegionInspection, checkSessionReadbackHandshake,
-  checkSessionUndoHandshake, checkUndoRecoveryHandshake,
-  validateUndoRecoveryResponse, checkBuildEntryHandshake,
-  validateBuildEntryContext, validateBuildEntryResponse,
-  checkWorldContextHandshake, validateWorldSelectionContextResponse,
-  checkCurrentBuildAuthorizationHandshake, validateCurrentBuildAuthorizationFacts,
-  validateCurrentBuildAuthorizedApply,
-  checkBuildProposalHandshake, validateBuildProposalRequest,
-  validateBuildProposalContext, validateBuildProposalResponse, operationContracts,
-} from 'hanaworlds-contracts/v4';
+import * as C from 'hanaworlds-contracts';
+const VERSION = 'session/v3', CANVAS = 'canvas/v5';
+const copy = structuredClone, revision = () => `rev-${randomUUID()}`;
+const same = (a,b) => C.canonicalJSON(a) === C.canonicalJSON(b);
+const digest = (kind,value) => C.digestValue(kind,value).sha256;
+const fail = (code,details) => { throw new C.ContractError(code,'validate','REQUIRED_FACT_UNKNOWN',details); };
+const packet = (wire,id,result,error=null) => ({contractVersion:wire,requestId:id,result,error});
+const initial = id => ({context:{currentSession:id,activeWorldRef:null,orderedSelectedObjectRefs:[],sessionRevision:revision(),selectionRevision:'0',localContext:null},turns:[],details:{},confirmed:{},pending:null,requests:{},contexts:{},builds:{},undos:{}});
 
-const VERSION = 'session/v2';
-const ACTION_VERSION = 'interaction-surface/v3';
-const revision = () => `rev-${randomUUID()}`;
-const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-const copy = value => structuredClone(value);
-const recordedDigest = receipt => digestValue('receipt', receipt).sha256;
-
-function failure(code, phase, reason) { throw new ContractError(code, phase, reason); }
-function packet(version, requestId, result, error = null) {
-  return { contractVersion: version, requestId, result, error };
+/** Current fresh-install runtime. Peer ports are Host-owned in-process services;
+ * no model JSON can select a peer or call Canvas/Adapter mutators directly. */
+export class WorkshopV3 {
+ constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;this.locks=new Map(); }
+ async #lock(id,run) {
+  const previous=this.locks.get(id)??Promise.resolve();let release;
+  const next=new Promise(r=>{release=r;});this.locks.set(id,next);
+  await previous;try{return await run();}finally{release();if(this.locks.get(id)===next)this.locks.delete(id);}
+ }
+ async #core(id) {
+  if(!this.sessionPersistence?.open)fail('SESSION_NOT_FOUND');
+  const handle=await this.sessionPersistence.open(id,'read');
+  try {const log=await handle.read();return {identity:coreIdentity(handle.header,id),events:log.events};}finally{await handle.close();}
+ }
+ async #load(id,create=false) {
+  const core=await this.#core(id);let state=await this.projectionStore.get(id,core.identity);
+  if(!state&&create){state=initial(id);await this.projectionStore.create(id,core.identity,state);}
+  if(!state)fail('SESSION_NOT_FOUND');return {core,state};
+ }
+ async #save(id,core,state,nextRevision=revision()) {
+  const live=await this.#core(id);if(!same(live.identity,core.identity))fail('SESSION_NOT_FOUND');
+  const prior=state.context.sessionRevision;state.context.sessionRevision=nextRevision;
+  await this.projectionStore.replace(id,core.identity,prior,state);
+ }
+ #peer(port,wire) {if(!port)fail('CAPABILITY_UNAVAILABLE');C.checkContractHandshake(port.contractHandshake,{wires:[wire],factProfiles:['target-facts/v4']});return port;}
+ async #canvas(op,request) {
+  const port=this.#peer(this.canvas,CANVAS);C.validateBoundRequest(CANVAS,op,request);
+  const response=C.validateBoundResponse(CANVAS,op,request,await port.call(op,copy(request)));
+  if(port!==this.canvas)fail('CURRENT_WORLD_MISMATCH');
+  if(response.error){const error=new Error(response.error.code);error.publicError=response.error;throw error;}
+  return copy(response.result);
+ }
+ #child(body,step,fields={}) {return {contractVersion:CANVAS,sessionRef:body.sessionRef,requestId:`${body.requestId}:${step}`,worldRef:body.localContext.worldRef,localContext:copy(body.localContext),...fields};}
+ async #selection(body) {
+  const result=await this.#canvas('ReadWorldSelectionContext',{contractVersion:CANVAS,sessionRef:body.sessionRef,requestId:`${body.requestId}:current:${randomUUID()}`,worldRef:body.localContext.worldRef});
+  const selected=result.selection;
+  if(selected.status!=='BOUND'||selected.context.currentSession!==body.sessionRef||
+    selected.connectionRef!==body.localContext.connectionRef||!same(selected.context.localContext,body.localContext)||
+    selected.context.activeWorldRef!==body.localContext.worldRef)fail('CURRENT_WORLD_MISMATCH');
+  return selected.context;
+ }
+ async #facts(body,state,record=null,{switching=false}={}) {
+  let currentContext=null;
+  if(body.localContext){const selected=await this.#selection(body);currentContext=selected.localContext;
+   if(!switching&&!same(state.context.localContext,currentContext))fail('CURRENT_WORLD_MISMATCH');}
+  const current=state.turns.at(-1);
+  return C.validateType('LocalRequestFacts',{currentContext,sessionRef:state.context.currentSession,currentTurnRevision:current?.turnRevision??null,currentBriefDigest:current?.referenceBriefDigest??null,
+   requestState:record?.response?'COMPLETED':'ACTIVE',replay:record?.response?'EXACT_REPLAY':'NEW',priorRequestDigest:record?.response?record.digest:null});
+ }
+ async #current(body,state) {await this.#facts(body,state);await this.#core(body.sessionRef);}
+ #turn(state) {
+  const turn=state.turns.at(-1), saved=turn&&state.confirmed[turn.turnRef];
+  if(!saved||state.pending||!same(saved.localContext,state.context.localContext))fail('INTENT_UNCONFIRMED');
+  return {turn,saved};
+ }
+ async call(operation,raw) {
+  let body;
+  try {
+   body=copy(typeof raw==='string'||raw instanceof Uint8Array?C.admitRequest(VERSION,operation,raw):C.validateBoundRequest(VERSION,operation,raw));
+   return await this.#lock(body.sessionRef,async()=>{
+    const {core,state}=await this.#load(body.sessionRef,operation==='StartOrResumeSession');
+    if(operation==='StartOrResumeSession')return packet(VERSION,body.requestId,C.validateType('SessionSnapshot',{context:state.context,turns:state.turns,capabilities:this.capabilities,sessionDeleteSupported:false}));
+    const key=`${operation}:${body.requestId}`,record=state.requests[key];
+    const facts=await this.#facts(body,state,record,{switching:operation==='SwitchWorldContext'});
+    const admitted=C.validateCurrentRequest(VERSION,operation,body,facts);
+    if(admitted.disposition==='RETURN_STORED')return copy(record.response);
+    if(record)fail('REQUEST_NOT_ACTIVE');
+    if(body.expectedRevision!==undefined&&body.expectedRevision!==state.context.sessionRevision)fail('STALE_REVISION');
+    const readOnly=['ReadCurrentUndoStatus','ReadSessionTurnDetails'].includes(operation);
+    if(!readOnly){state.requests[key]={digest:admitted.requestDigest,response:null};await this.#save(body.sessionRef,core,state);}
+    let response;
+    try {const result=await this.#dispatch(operation,body,core,state);response=C.validateResponse(VERSION,operation,packet(VERSION,body.requestId,result));}
+    catch(error){response=packet(VERSION,body.requestId,null,C.publicError(error));}
+    if(!readOnly){const next=revision();response=copy(response);if(response.result?.context)response.result.context.sessionRevision=next;state.requests[key].response=copy(response);await this.#save(body.sessionRef,core,state,next);}
+    return copy(response);
+   });
+  }catch(error){return packet(VERSION,body?.requestId??raw?.requestId??null,null,C.publicError(error));}
+ }
+ async #dispatch(operation,body,core,state) {
+  if(operation==='SwitchWorldContext'){
+   if(Object.values(state.builds).some(b=>b.dispatched&&!b.outcome&&!b.terminal))fail('RECOVERY_PENDING');
+   const context=await this.#selection(body);if(body.selectionRevision!==context.selectionRevision)fail('CURRENT_WORLD_MISMATCH');
+   state.context={...copy(context),sessionRevision:state.context.sessionRevision};state.pending=null;
+   return {context:copy(state.context),turns:state.turns,capabilities:this.capabilities,sessionDeleteSupported:false};
+  }
+  if(operation==='AppendMultimodalTurn'){
+   if(body.media.length)fail('CAPABILITY_UNAVAILABLE'); // image work retained in deferred source, outside this MVP lane
+   if(state.turns.some(t=>t.turnRef===body.turnRef))fail('REPLAY_MISMATCH');
+   const dims=body.controls.dimensions;
+   const complete=body.text.trim()&&body.controls.purpose?.trim()&&dims?.unit==='node'&&['width','height','depth'].every(k=>Number.isSafeInteger(dims[k])&&dims[k]>0);
+   const turn={turnRef:body.turnRef,turnRevision:revision(),text:body.text,media:[],referenceBriefDigest:null,intentDigest:null,actionReceiptDigest:null};state.turns.push(turn);
+   const question=complete?`请确认建造${body.text}，尺寸${dims.width}×${dims.depth}×${dims.height}个节点。回复“确认”或修改。`:'请由当前skill补齐用途和节点尺寸后重新提交。';
+   state.pending={sessionRef:body.sessionRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,invocationId:body.requestId,clarificationId:revision(),question,complete:!!complete,controls:body.controls,afterSeq:core.events.length-1};
+   state.details[turn.turnRef]={resultText:question,confirmedBrief:null};
+   return this.#turnReceipt(body,state,turn,question,this.#clarification(state.pending));
+  }
+  if(operation==='AnswerClarification'){
+   const pending=state.pending,turn=state.turns.at(-1);
+   if(!pending||pending.turnRef!==body.turnRef||pending.clarificationId!==body.clarificationId||turn.turnRef!==body.turnRef)fail('TURN_REVISION_MISMATCH');
+   const inputs=core.events.slice(pending.afterSeq+1).filter(e=>e.type==='user/message');
+   const e=inputs[0],message=e?.data;
+   if(inputs.length!==1||e.surfaceOp!=='append'||message?.role!=='user'||message?.source?.kind!=='user'||message.id!==body.requestId||message.content?.length!==1||message.content[0].type!=='text'||message.content[0].text!==body.answer)fail('INTENT_UNCONFIRMED');
+   if(!pending.complete||!['确认','yes','YES'].includes(body.answer.trim())){
+    pending.complete=false;pending.afterSeq=core.events.length-1;pending.clarificationId=revision();pending.question='请更新建造参数并重新提交，之后再确认。';
+    return this.#turnReceipt(body,state,turn,pending.question,this.#clarification(pending));
+   }
+   const brief=C.validateType('BriefProjection',{contractVersion:'ReferenceBrief/v3',sessionRef:body.sessionRef,turnRevision:turn.turnRevision,briefRevision:revision(),media:[],text:turn.text,controls:pending.controls});
+   const briefDigest=digest('reference-brief',brief);
+   const intent=C.validateType('IntentProjection',{contractVersion:VERSION,referenceBriefDigest:briefDigest,confirmedIntent:{kind:'BUILD_STRUCTURE',text:turn.text,purpose:pending.controls.purpose,dimensions:pending.controls.dimensions,entrancePortalRefs:pending.controls.entrancePortalRefs,confirmedTurnRevision:turn.turnRevision},intendedWorldRef:body.localContext.worldRef,orderedTargetRefs:[]});
+   turn.referenceBriefDigest=briefDigest;turn.intentDigest=digest('intent',intent);
+   state.confirmed[turn.turnRef]={brief,intent,confirmationInputId:message.id,localContext:copy(body.localContext)};state.pending=null;
+   state.details[turn.turnRef]={resultText:'已确认建造意图。',confirmedBrief:brief};return this.#turnReceipt(body,state,turn,'已确认建造意图。',null);
+  }
+  if(operation==='ReadSessionTurnDetails')return {sessionRef:body.sessionRef,sessionRevision:state.context.sessionRevision,turns:state.turns.map(t=>({turnRef:t.turnRef,turnRevision:t.turnRevision,userText:t.text,...state.details[t.turnRef]}))};
+  if(operation==='AdvanceCurrentBuild')return this.#advance(body,core,state);
+  if(operation==='ReadCurrentUndoStatus')return (await this.#undoStatus(body,state)).status;
+  if(operation==='UndoCurrentBuild')return this.#undo(body,core,state);
+  if(operation==='DeleteSession')fail('SESSION_DELETE_UNSUPPORTED');
+  fail('CAPABILITY_UNAVAILABLE');
+ }
+ #clarification(p){return {sessionRef:p.sessionRef,turnRevision:p.turnRevision,invocationId:p.invocationId,clarificationId:p.clarificationId,code:'AMBIGUOUS_INTENT',question:p.question};}
+ #turnReceipt(body,state,turn,text,clarification){return {sessionRef:body.sessionRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,briefDigest:turn.referenceBriefDigest,model:'gpt-5.6-luna',resultText:text,clarification};}
+ async #context(body,state,stored) {
+  const {turn,saved}=this.#turn(state);await this.#current(body,state);
+  if(body.expectedTurnRevision&&body.expectedTurnRevision!==turn.turnRevision)fail('TURN_REVISION_MISMATCH');
+  const catalogue=C.validateType('Catalogue',await this.catalogue.read(body.localContext.worldRef));
+  const safetyProfile=C.validateType('SafetyProfile',await this.safety.read(body.localContext.worldRef));
+  const region=C.validateRegionInspection(stored.inspection);
+  return copy(C.validateType('BuildProposalContext',{contractVersion:'painter/v4',sessionRef:body.sessionRef,worldRef:body.localContext.worldRef,turnRevision:turn.turnRevision,painterId:'picture-blocks',invocationId:stored.invocationId,intent:saved.intent,intentDigest:turn.intentDigest,referenceBrief:saved.brief,referenceBriefDigest:turn.referenceBriefDigest,catalogue,targetFacts:region.targetFacts,targetFactsDigest:region.targetFactsDigest,safetyProfile,safetyProfileDigest:digest('safety-profile',safetyProfile),regionInspection:region,localContext:body.localContext}));
+ }
+ async readBuildProposalContext(raw) {
+  const body=copy(C.validateBoundRequest(VERSION,'AdvanceCurrentBuild',raw));
+  return this.#lock(body.sessionRef,async()=>{
+   const {core,state}=await this.#load(body.sessionRef);C.validateCurrentRequest(VERSION,'AdvanceCurrentBuild',body,await this.#facts(body,state));
+   const {turn,saved}=this.#turn(state);let stored=state.contexts[body.requestId];
+   if(!stored){
+    if(state.builds[turn.turnRef]?.dispatched)fail('TRANSACTION_CONFLICT');
+    const dims=saved.intent.confirmedIntent.dimensions;
+    const placement=await this.#canvas('InspectPlacementRegion',this.#child(body,'placement',{anchor:{kind:'CURRENT_VIEW',invocationId:saved.confirmationInputId},footprint:{widthCells:dims.width,depthCells:dims.depth,heightCells:dims.height}}));
+    if(placement.outcome!=='REGION_INSPECTED')fail('TARGET_REQUIRED');
+    stored={invocationId:`proposal-${randomUUID()}`,inspection:placement.inspection,context:null,request:null,response:null};
+    stored.context=await this.#context(body,state,stored);state.contexts[body.requestId]=stored;state.currentContextId=body.requestId;await this.#save(body.sessionRef,core,state);
+   }
+   const current=await this.#context(body,state,stored);if(!same(current,stored.context))fail('TARGET_FACTS_STALE');return copy(stored.context);
+  });
+ }
+ async #proposalFacts(request,state,stored) {
+  if(!stored||state.contexts[state.currentContextId]!==stored)fail('TARGET_FACTS_STALE');
+  const currentContext=await this.#context(request,state,stored);
+  const record=stored.response?{response:stored.response,digest:C.requestDigest('painter/v4','ValidateBuildProposal',stored.request)}:null;
+  const requestFacts=await this.#facts(request,state,record);
+  return C.validateType('BuildProposalProviderFacts',{sourceContext:stored.context,currentContext,requestFacts});
+ }
+ async submitBuildProposal(raw) {
+  let request;
+  try {request=copy(C.validateBuildProposalRequest(raw));return await this.#lock(request.sessionRef,async()=>{
+   const {core,state}=await this.#load(request.sessionRef);const stored=Object.values(state.contexts).find(x=>x.invocationId===request.invocationId);
+   const facts=await this.#proposalFacts(request,state,stored);C.validateBuildProposalContext(request,facts);
+   if(stored.response)return copy(stored.response);
+   if(stored.request&&!same(stored.request,request))fail('REPLAY_MISMATCH');
+   const {turn}=this.#turn(state);if(state.builds[turn.turnRef]?.dispatched)fail('TRANSACTION_CONFLICT');
+   const painter=this.#peer(this.painter,'painter/v4');stored.request=copy(request);await this.#save(request.sessionRef,core,state);
+   const response=C.validateBuildProposalResponse(request,await painter.call('ValidateBuildProposal',copy(request)));
+   C.validateBuildProposalContext(request,await this.#proposalFacts(request,state,stored));
+   if(painter!==this.painter)fail('CURRENT_WORLD_MISMATCH');
+   if(!response.error){stored.response=copy(response);state.builds[turn.turnRef]={contextId:state.currentContextId,plan:response.result,compiled:null,submission:null,dispatched:false,outcome:null};await this.#save(request.sessionRef,core,state);}
+   return copy(response);
+  });}catch(error){return packet('painter/v4',request?.requestId??raw?.requestId??null,null,C.publicError(error));}
+ }
+ async #advance(body,core,state) {
+  const {turn,saved}=this.#turn(state),build=state.builds[turn.turnRef];if(!build)fail('TARGET_REQUIRED');
+  if(state.undos[turn.turnRef]?.result)fail('UNDO_CONFLICT');
+  if(build.outcome)return copy(build.outcome);
+  const pending=()=>({sessionRef:body.sessionRef,worldRef:body.worldRef,turnRevision:turn.turnRevision,stage:'APPLY',outcome:'PENDING'});
+  if(build.dispatched)return pending();
+  const stored=state.contexts[build.contextId];C.validateBuildProposalContext(stored.request,await this.#proposalFacts(stored.request,state,stored));
+  const ctx=stored.context,settings=await this.compilerConfig.read(body.worldRef);
+  const compile={contractVersion:'BUILD/V3',sessionRef:body.sessionRef,requestId:`${body.requestId}:compile`,worldRef:body.worldRef,localContext:body.localContext,build:build.plan.build,buildDigest:build.plan.buildDigest,catalogue:ctx.catalogue,catalogueDigest:digest('catalogue',ctx.catalogue),targetFacts:ctx.targetFacts,targetFactsDigest:ctx.targetFactsDigest,safetyProfile:ctx.safetyProfile,safetyProfileDigest:ctx.safetyProfileDigest,compilationConfig:settings.compilationConfig,compilationConfigDigest:digest('compilation-config',settings.compilationConfig),compilerRevision:settings.compilerRevision};
+  const brush=this.#peer(this.brush,'BUILD/V3');C.validateBoundRequest('BUILD/V3','BuildDocument',compile);
+  const compiled=C.validateBoundResponse('BUILD/V3','BuildDocument',compile,await brush.compile(copy(compile)));
+  if(compiled.error){const e=new Error(compiled.error.code);e.publicError=compiled.error;throw e;}
+  await this.#current(body,state);build.compiled=compiled.result;
+  const objects=await this.#canvas('ListObjects',this.#child(body,'objects',{expectedRevision:null}));
+  const tx=`build-${randomUUID()}`;
+  const analysis=await this.#canvas('AnalyzeAffectedObjects',this.#child(body,'analysis',{transactionId:tx,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,expectedRevision:ctx.targetFacts.worldRevision,expectedRegistryRevision:objects.registryRevision,expectedSelectionRevision:body.localContext.selectionRevision}));
+  const apply=this.#child(body,'apply',{transactionId:tx,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,analysisDigest:digest('affected-analysis',analysis),decisionRevision:null,expectedWorldRevision:analysis.worldRevision,expectedObjectRevisions:{},guarantee:'RECOVERABLE_VERIFIED',regionInspectionBinding:{inspectionId:ctx.regionInspection.inspectionId,build:build.plan.build}});
+  const submission={parentRequest:body,turnRef:turn.turnRef,confirmationInputId:saved.confirmationInputId,intent:saved.intent,analysis,apply};
+  C.validateCurrentBuildSubmission(submission,await this.#facts(body,state));build.submission=submission;await this.#save(body.sessionRef,core,state);
+  C.validateCurrentBuildSubmission(submission,await this.#facts(body,state));
+  build.dispatched=true;await this.#save(body.sessionRef,core,state);
+  let receipt;
+  try {receipt=await this.#canvas('ApplyRecoverableCommit',apply);}catch(error){
+   if(['NONE','ROLLED_BACK'].includes(error.publicError?.mutationState))throw error;
+   return pending();
+  }
+  build.receipt=receipt;await this.#save(body.sessionRef,core,state);
+  if(receipt.status==='ROLLED_BACK'){build.terminal='ROLLED_BACK';await this.#save(body.sessionRef,core,state);fail('APPLY_FAILED',{mutationState:'ROLLED_BACK',transactionRef:tx});}
+  if(receipt.status!=='VERIFIED')return pending();
+  try {
+   const readback=await this.#canvas('Readback',this.#child(body,'readback',{transactionId:tx,commitRevision:receipt.observedWorldRevision,expectedOperations:compiled.result.projection,transactionPayloadDigest:receipt.transactionPayloadDigest}));
+   if(!same(readback,receipt))fail('READBACK_MISMATCH');
+   const matches=await this.#linkedHistory(body,receipt);
+   await this.#current(body,state);build.matches=matches;
+  }catch(error){fail(error.publicError?.code??'READBACK_FAILED',{mutationState:'UNKNOWN',transactionRef:tx});}
+  const outcome={sessionRef:body.sessionRef,worldRef:body.worldRef,turnRevision:turn.turnRevision,stage:'COMPLETE',outcome:'VERIFIED',receipt};
+  build.outcome=outcome;turn.actionReceiptDigest=digest('receipt',receipt);state.details[turn.turnRef].resultText='建造已验证，且已读回当前世界与历史。';await this.#save(body.sessionRef,core,state);return outcome;
+ }
+ async #linkedHistory(body,receipt) {
+  const inventory=await this.#canvas('ListObjects',this.#child(body,'linked-objects',{expectedRevision:null})),matches=[];
+  for(const object of inventory.objects){const history=await this.#canvas('HistoryQuery',this.#child(body,`history:${object.objectRef}`,{objectRef:object.objectRef,expectedHistoryRevision:null}));
+   const entry=history.entries.find(e=>e.transactionId===receipt.transactionId&&e.status==='VERIFIED'&&e.operationDigest===receipt.operationDigest&&e.expectedAfterReadbackDigest===receipt.readbackDigest&&e.receiptDigest===digest('receipt',receipt)&&e.affectedObjectRefs.includes(object.objectRef));
+   if(entry)matches.push({object,history,entry});}
+  if(!matches.length||matches.length!==matches[0].entry.affectedObjectRefs.length||!matches[0].entry.affectedObjectRefs.every(ref=>matches.some(m=>m.object.objectRef===ref&&same(m.entry,matches[0].entry)&&m.history.historyRevision===matches[0].history.historyRevision&&m.history.headTransactionId===receipt.transactionId)))fail('READBACK_FAILED');
+  return matches;
+ }
+ async #undoStatus(body,state) {
+  const turn=state.turns.findLast(t=>state.builds[t.turnRef]?.outcome?.outcome==='VERIFIED'),build=turn&&state.builds[turn.turnRef];
+  const status={sessionRef:body.sessionRef,worldRef:body.worldRef,turnRef:turn?.turnRef??null,turnRevision:turn?.turnRevision??null,availability:'NO_VERIFIED_BUILD',head:null};
+  if(!build||!same(build.receipt.localContext,body.localContext))return {status};
+  const matches=[];
+  for(const original of build.matches){const history=await this.#canvas('HistoryQuery',this.#child(body,`undo-head:${original.object.objectRef}`,{objectRef:original.object.objectRef,expectedHistoryRevision:null}));if(!history.entries.some(e=>same(e,original.entry)))fail('READBACK_FAILED');matches.push({...original,history});}
+  const history=matches[0].history;
+  if(!matches.every(m=>m.history.historyRevision===history.historyRevision&&m.history.headTransactionId===history.headTransactionId))fail('UNDO_CONFLICT');
+  status.head={historyRevision:history.historyRevision,headTransactionId:history.headTransactionId};
+  status.availability=history.undoAvailable&&history.headTransactionId===build.receipt.transactionId?'AVAILABLE':'NO_UNDO_AT_HEAD';return {status,turn,build,matches};
+ }
+ async #undo(body,core,state) {
+  const current=await this.#undoStatus(body,state),{turn,build,matches,status}=current;
+  if(status.availability!=='AVAILABLE'||body.expectedTurnRevision!==turn.turnRevision||body.expectedHistoryRevision!==status.head.historyRevision)fail('UNDO_CONFLICT');
+  if(state.undos[turn.turnRef])fail('RECOVERY_PENDING');
+  const objectRevisions={},worldRevisions=[];
+  for(const m of matches){const inspected=await this.#canvas('InspectObject',this.#child(body,`undo-inspect:${m.object.objectRef}`,{objectRef:m.object.objectRef,expectedRevision:m.object.objectRevision,sampledBounds:state.contexts[build.contextId].inspection.targetFacts.sampledBounds}));
+   if(inspected.objectRef!==m.object.objectRef||inspected.objectRevision!==m.object.objectRevision)fail('UNDO_CONFLICT');objectRevisions[m.object.objectRef]=inspected.objectRevision;worldRevisions.push(inspected.worldRevision);}
+  if(worldRevisions.some(v=>v!==worldRevisions[0]))fail('UNDO_CONFLICT');
+  const intentDigest=turn.intentDigest;
+  // Durable descriptor of this actual Undo invocation; no permission or grant.
+  const action=C.validateType('ActionProjection',{contractVersion:'interaction-surface/v2',sessionRef:body.sessionRef,turnRevision:turn.turnRevision,frameRef:`undo:${body.requestId}`,frameRevision:status.head.historyRevision,actionId:body.requestId,orderedTargetRefs:matches.map(m=>m.object.objectRef),intentDigest,operationDigest:build.receipt.operationDigest,analysisDigest:build.submission.apply.analysisDigest,decisionRevision:null});
+  const request=this.#child(body,'undo',{objectRef:matches[0].object.objectRef,transactionId:`undo-${randomUUID()}`,historyTransactionId:build.receipt.transactionId,expectedHistoryRevision:body.expectedHistoryRevision,expectedWorldRevision:worldRevisions[0],expectedObjectRevisions:objectRevisions,intentDigest,surfaceActionDigest:digest('surface-action',action)});
+  state.undos[turn.turnRef]={request,action,result:null};await this.#save(body.sessionRef,core,state);await this.#current(body,state);
+  const receipt=await this.#canvas('Undo',request);if(receipt.status!=='VERIFIED')fail('RECOVERY_PENDING',{mutationState:'UNKNOWN',transactionRef:request.transactionId});
+  const originalIndex=matches[0].history.entries.findIndex(e=>e.transactionId===build.receipt.transactionId);
+  const expectedAfterHead=matches[0].history.entries[originalIndex-1]?.transactionId??null;
+  const after=[];
+  for(const m of matches){const history=await this.#canvas('HistoryQuery',this.#child(body,`undo-after:${m.object.objectRef}`,{objectRef:m.object.objectRef,expectedHistoryRevision:null}));
+   const row=history.entries.find(e=>e.transactionId===receipt.transactionId&&e.originTransactionId===build.receipt.transactionId&&e.status==='VERIFIED'&&e.receiptDigest===digest('receipt',receipt)&&e.expectedAfterReadbackDigest===receipt.readbackDigest&&e.operationDigest===receipt.operationDigest&&e.historyRevision===history.historyRevision&&same(e.affectedObjectRefs,m.entry.affectedObjectRefs));
+   if(!row||history.historyRevision===status.head.historyRevision||history.headTransactionId!==expectedAfterHead)fail('READBACK_FAILED',{mutationState:'UNKNOWN',transactionRef:request.transactionId});after.push(history);}
+  if(!after.every(h=>h.historyRevision===after[0].historyRevision&&h.headTransactionId===after[0].headTransactionId))fail('READBACK_FAILED');
+  await this.#current(body,state);
+  const result={sessionRef:body.sessionRef,worldRef:body.worldRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,status:'VERIFIED',beforeHead:status.head,afterHead:{historyRevision:after[0].historyRevision,headTransactionId:after[0].headTransactionId}};
+  state.undos[turn.turnRef].result=result;await this.#save(body.sessionRef,core,state);return result;
+ }
 }
-function toPublic(error) {
-  return error?.publicError ?? new ContractError('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE').publicError;
-}
-function readbackPublic(error) {
-  const publicError = error?.publicError;
-  return ['PERMISSION_DENIED', 'AUTHORIZATION_REVOKED', 'SESSION_NOT_FOUND',
-    'READBACK_FAILED'].includes(publicError?.code) ? publicError :
-    new ContractError('READBACK_FAILED', 'validate', 'POLICY_UNAVAILABLE').publicError;
-}
-function requirePeer(port, requirement) {
-  if (!port) failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-  const advertised = port.contractHandshake ?? port.handshake?.() ??
-    port.status?.().contractHandshake;
-  if (!advertised) failure('UNSUPPORTED_VERSION', 'decode', 'VERSION_UNSUPPORTED');
-  return checkContractHandshake(advertised, requirement);
-}
-function requireUndoPeer(port) {
-  const peer = requirePeer(port,
-    { wires: ['canvas/v4', 'session/v2'], factProfiles: [] });
-  return checkSessionUndoHandshake(peer.advertised);
-}
-function initialState(sessionRef) {
-  return { context: { currentSession: sessionRef, activeWorldRef: null,
-    orderedSelectedObjectRefs: [], sessionRevision: revision(), selectionRevision: '0' },
-    turns: [], pendingClarification: null, pendingPlacement: null, frames: [],
-    receipts: [], artifacts: Object.create(null), offeredInventory: null,
-    turnDetails: Object.create(null),
-    confirmedIntents: Object.create(null),
-    turnControls: Object.create(null), turnWorldRefs: Object.create(null),
-    lastPlacement: null, pendingUndo: null };
-}
-
-function parseStructureProposal(text) {
-  let value;
-  try { value = JSON.parse(text); } catch { return null; }
-  if (!value || typeof value !== 'object' || Array.isArray(value) ||
-      Object.keys(value).sort().join(',') !== 'dimensions,entrancePortalRefs,kind,purpose,text' ||
-      value.kind !== 'BUILD_STRUCTURE' || typeof value.text !== 'string' || !value.text ||
-      typeof value.purpose !== 'string' || !value.purpose ||
-      !Array.isArray(value.entrancePortalRefs) || value.entrancePortalRefs.length !== 0 ||
-      !value.dimensions || Object.keys(value.dimensions).sort().join(',') !== 'depth,height,unit,width' ||
-      value.dimensions.unit !== 'node' ||
-      !['width', 'depth', 'height'].every(key => Number.isSafeInteger(value.dimensions[key]) &&
-        value.dimensions[key] > 0)) return null;
-  return value;
-}
-
-function confirmingSessionInputId(log, pending, body) {
-  // Core's durable user/message ID identifies the actual Session input. A
-  // caller's requestId alone is not evidence that an Adapter relay issued it.
-  const after = pending.afterSessionEventSeq;
-  if (!Number.isSafeInteger(after) || after < -1)
-    failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-  const inputs = log.events.slice(after + 1).filter(event =>
-    event.type === 'user/message');
-  if (inputs.length !== 1)
-    failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-  const message = inputs[0].data;
-  if (inputs[0].surfaceOp !== 'append' ||
-      message?.role !== 'user' || message?.source?.kind !== 'user' ||
-      message.id !== body.requestId || !Array.isArray(message.content) ||
-      message.content.length !== 1 || message.content[0]?.type !== 'text' ||
-      message.content[0].text !== body.answer)
-    failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-  return message.id;
-}
-
-/** Workshop state is durable in its own domain; Core JSONL is read for confirmation facts. */
-export class WorkshopV1 {
-  constructor({ sessionPersistence, projectionStore, attachments, llm, authority, capabilities,
-    canvas, painter, textPlanSource, brush, resources, mediaAuthority, modelRoute,
-    catalogue, safety, compilerConfig, applyAuthority, proposalAuthority } = {}) {
-    Object.assign(this, { sessionPersistence, projectionStore, attachments, llm, authority,
-      capabilities, canvas, painter, textPlanSource, brush, resources, mediaAuthority, modelRoute,
-      catalogue, safety, compilerConfig, applyAuthority, proposalAuthority });
-    this.locks = new Map();
-    this.lockContext = new AsyncLocalStorage();
-    this.contractHandshake = contractHandshake;
-  }
-
-  async #authorized(body, operation) {
-    if (!this.authority?.verify)
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    const proof = await this.authority?.verify?.(body, operation);
-    const required = operation === 'StartOrResumeSession' ? 'READ' :
-      ['AppendMultimodalTurn', 'AnswerClarification',
-        'RecordActionReceipt', 'PersistRequiredArtifactResources'].includes(operation) ? 'APPEND' :
-      operation === 'SwitchWorldContext' || operation === 'SelectObjects' ? 'SELECT' :
-      operation === 'AnalyzeCurrentBuild' ? 'ANALYZE' :
-      operation === 'ApplyCurrentBuild' ? 'APPLY_RECOVERABLE' :
-      operation === 'AdvanceCurrentBuild' ? 'APPLY_RECOVERABLE' :
-      operation === 'ReadCurrentUndoStatus' ? 'HISTORY' :
-      operation === 'UndoCurrentBuild' ? 'UNDO' :
-      ['BeginFirstBuilding', 'InvokeAction', 'CreateBuildPlan', 'CompileCurrentBuild'].includes(operation) ? 'INSPECT' : 'READ';
-    if (!proof?.current || proof.actorRef !== body.actorRef ||
-        proof.sessionRef !== body.sessionRef ||
-        proof.authorizationRef !== body.authorizationRef ||
-        !proof.allowedActions?.includes(required))
-      failure('AUTHORIZATION_REVOKED', 'authorize', 'GRANT_REVOKED');
-    if (['ReadCurrentUndoStatus', 'UndoCurrentBuild', 'AdvanceCurrentBuild'].includes(operation) &&
-        proof.worldRef !== body.worldRef)
-      failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-    return proof;
-  }
-
-  async #worldContextProof(body, initial = null) {
-    const proof = await this.#authorized(body, 'SwitchWorldContext');
-    const ref = value => typeof value === 'string' && value.length > 0;
-    if (!ref(proof.sessionIncarnationRef))
-      failure('SESSION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
-    if (proof.grantStatus !== 'CURRENT' || !ref(proof.nativeGrantRef))
-      failure('AUTHORIZATION_REVOKED', 'authorize', 'GRANT_REVOKED');
-    if (proof.worldRef !== body.worldRef || !ref(proof.invocationRef) ||
-        proof.invocationStatus !== 'ACTIVE')
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    if (initial) {
-      if (proof.nativeGrantRef !== initial.nativeGrantRef)
-        failure('AUTHORIZATION_REVOKED', 'authorize', 'GRANT_REVOKED');
-      if (proof.sessionIncarnationRef !== initial.sessionIncarnationRef ||
-          proof.invocationRef !== initial.invocationRef)
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    }
-    // Snapshot the trusted callback's facts: it may reuse a mutable object.
-    return copy(proof);
-  }
-
-  async #switchWorldContext(body, log, state, initial) {
-    if (state.context.sessionRevision !== body.expectedRevision)
-      failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-    if (state.pendingApply?.status === 'RESERVED' || state.pendingUndo &&
-        !['VERIFIED', 'ROLLED_BACK'].includes(state.pendingUndo.status))
-      failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-    const peer = requirePeer(this.canvas,
-      { wires: ['canvas/v4', 'session/v2'], factProfiles: [] });
-    checkWorldContextHandshake(peer.advertised);
-    if (!this.canvas?.call)
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    const current = () => this.#worldContextProof(body, initial);
-    await current();
-    const common = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-      sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
-      worldRef: body.worldRef };
-    const requestId = step => `${body.requestId}:world-context:${step}`;
-    const call = async (operation, request) => {
-      validateBoundRequest('canvas/v4', operation, request);
-      await current();
-      // The trusted Host captures this exact child within the active parent
-      // invocation. Canvas authorizes each operation independently; Workshop
-      // neither mints a proof nor broadens SELECT to world-write operations.
-      const raw = await this.canvas.call(operation, request);
-      await current();
-      const response = operation === 'ReadWorldSelectionContext' ?
-        validateWorldSelectionContextResponse(request, raw) :
-        validateResponse('canvas/v4', operation, raw);
-      if (response.requestId !== request.requestId)
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-      if (response.error) {
-        const error = new Error(response.error.code); error.publicError = response.error; throw error;
-      }
-      return response.result;
-    };
-    const read = step => call('ReadWorldSelectionContext', { ...common, requestId: requestId(step) });
-    const clear = value => {
-      const next = copy(value);
-      next.context.activeWorldRef = null;
-      next.context.orderedSelectedObjectRefs = [];
-      next.offeredInventory = null;
-      next.pendingPlacement = null;
-      next.lastPlacement = null;
-      return next;
-    };
-    // A subsequent error/uncertain Canvas receipt must not leave the previous
-    // Workshop world marked ready. This changes only our own projection CAS.
-    state = await this.#save(body.sessionRef, log, clear(state));
-    await current();
-    let context = await read('before');
-    const selection = context.selection;
-    const sameWorld = selection.status === 'BOUND' &&
-      selection.context.activeWorldRef === body.worldRef;
-    const candidates = context.inventory.connections;
-    const candidate = sameWorld ? candidates.find(row => row.connectionRef === selection.connectionRef) :
-      candidates.length === 1 ? candidates[0] : null;
-    if (!candidate) {
-      if (candidates.length === 0 || sameWorld)
-        failure('CONNECTION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'REQUIRED_FACT_UNKNOWN');
-    }
-    if (candidate.readiness !== 'READY')
-      failure(candidate.readiness, 'validate', 'POLICY_UNAVAILABLE');
-    if (!sameWorld) {
-      const unbound = selection.status === 'UNBOUND';
-      const request = unbound ? { ...common, requestId: requestId('select'),
-        connectionRef: candidate.connectionRef, expectedRevision: selection.sessionRevision } :
-        { ...common, requestId: requestId('switch'),
-          worldRef: selection.context.activeWorldRef, fromWorldRef: selection.context.activeWorldRef,
-          toWorldRef: body.worldRef, toConnectionRef: candidate.connectionRef,
-          expectedRevision: selection.context.sessionRevision };
-      const selected = await call(unbound ? 'SelectWorldConnection' : 'SwitchWorldConnection', request);
-      if (selected.currentSession !== body.sessionRef || selected.activeWorldRef !== body.worldRef)
-        failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      context = await read('selected');
-      if (context.selection.status !== 'BOUND' ||
-          context.selection.connectionRef !== candidate.connectionRef ||
-          canonicalize(context.selection.context) !== canonicalize(selected))
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-    }
-    const selectedCandidate = context.inventory.connections.find(row =>
-      row.connectionRef === context.selection.connectionRef);
-    if (!selectedCandidate)
-      failure('CONNECTION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
-    if (selectedCandidate.readiness !== 'READY')
-      failure(selectedCandidate.readiness, 'validate', 'POLICY_UNAVAILABLE');
-    const inventory = await call('ListObjects', { ...common,
-      requestId: requestId('objects'), expectedRevision: null });
-    if (inventory.worldRef !== body.worldRef)
-      failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-    const released = await read('release');
-    if (canonicalize(released) !== canonicalize(context))
-      failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-    await current();
-    state.context.activeWorldRef = body.worldRef;
-    state.context.selectionRevision = body.selectionRevision;
-    state = await this.#save(body.sessionRef, log, state, current);
-    try { await current(); }
-    catch (error) {
-      // Authorization may change while storage awaits durable completion.
-      // Clear only the projection revision we just saved, before rejecting.
-      const cleared = clear(state);
-      cleared.context.sessionRevision = revision();
-      await this.projectionStore.replace(body.sessionRef, log.coreIdentity,
-        state.context.sessionRevision, cleared);
-      throw error;
-    }
-    return this.#snapshot(state);
-  }
-
-  async #readCore(id) {
-    if (!this.sessionPersistence?.open) failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    let handle;
-    try { handle = await this.sessionPersistence.open(id, 'read'); }
-    catch (error) {
-      if (error?.name === 'SessionPersistenceNotFoundError')
-        failure('SESSION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
-      throw error;
-    }
-    let data, identity;
-    try {
-      identity = coreIdentity(handle.header, id);
-      data = await handle.read();
-    }
-    finally { await handle.close(); }
-    if (!Array.isArray(data?.events))
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    return { events: data.events, coreIdentity: identity };
-  }
-
-  async #load(id, { allowUninitialized = false } = {}) {
-    if (!this.projectionStore?.get)
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    const log = await this.#readCore(id);
-    const state = await this.projectionStore.get(id, log.coreIdentity);
-    if (!state && !allowUninitialized)
-      failure('SESSION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
-    return { log, state };
-  }
-
-  async #save(id, log, state, beforeWrite = null) {
-    const next = copy(state);
-    const expectedRevision = next.context.sessionRevision;
-    next.context.sessionRevision = revision();
-    if (!this.projectionStore?.replace)
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    const current = await this.#readCore(id);
-    if (current.events.length !== log.events.length ||
-        JSON.stringify(current.coreIdentity) !== JSON.stringify(log.coreIdentity))
-      failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-    if (beforeWrite) await beforeWrite();
-    await this.projectionStore.replace(id, log.coreIdentity, expectedRevision, next);
-    return next;
-  }
-
-  async #withLock(id, action) {
-    const inherited = this.lockContext.getStore();
-    if (inherited?.id === id && inherited.active) return action();
-    const prior = this.locks.get(id) ?? Promise.resolve();
-    let release;
-    const next = new Promise(resolve => { release = resolve; });
-    const gate = prior.then(() => next);
-    this.locks.set(id, gate);
-    await prior;
-    const held = { id, active: true };
-    try { return await this.lockContext.run(held, action); }
-    finally {
-      held.active = false;
-      release();
-      if (this.locks.get(id) === gate) this.locks.delete(id);
-    }
-  }
-
-  #snapshot(state) {
-    if (!this.capabilities)
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    return { context: state.context, turns: state.turns,
-      capabilities: this.capabilities, sessionDeleteSupported: false };
-  }
-
-  async #mediaForModel(body) {
-    const media = [], imageBlocks = [];
-    for (const item of body.media) {
-      // Scope proof deliberately precedes existence and corruption checks.
-      if (!this.mediaAuthority?.verify)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const proof = await this.mediaAuthority?.verify?.({ actorRef: body.actorRef,
-        sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
-        attachmentRef: item.attachmentRef });
-      if (!proof?.current || proof.sessionRef !== body.sessionRef)
-        failure('PERMISSION_DENIED', 'authorize', 'SCOPE_DENIED');
-      if (!this.attachments?.readImage || !this.attachments?.readImageRequest ||
-          !this.modelRoute?.imagePolicy)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const ref = { attachmentId: item.attachmentRef, mediaType: item.mediaType,
-        bytes: item.bytes, width: item.width, height: item.height };
-      let stored, projection;
-      try {
-        stored = await this.attachments.readImage(ref);
-        if (hash(stored.data) !== item.storedBytesDigest ||
-            stored.ref.attachmentId !== item.attachmentRef ||
-            stored.ref.bytes !== item.bytes || stored.ref.width !== item.width ||
-            stored.ref.height !== item.height || stored.ref.mediaType !== item.mediaType)
-          failure('MEDIA_DIGEST_MISMATCH', 'validate', 'DIGEST_MISMATCH');
-        projection = await this.attachments.readImageRequest(ref, this.modelRoute.imagePolicy);
-      } catch (error) {
-        if (error?.publicError) throw error;
-        failure('ATTACHMENT_REJECTED', 'validate', 'POLICY_UNAVAILABLE');
-      }
-      const projectionBytesDigest = hash(projection.data);
-      if (item.projectionVariantId !== null &&
-          (item.projectionVariantId !== projection.variantId ||
-           item.projectionBytesDigest !== projectionBytesDigest))
-        failure('MEDIA_DIGEST_MISMATCH', 'validate', 'DIGEST_MISMATCH');
-      media.push({ ...item, projectionVariantId: projection.variantId,
-        projectionBytesDigest });
-      imageBlocks.push({ type: 'image', attachment: ref });
-    }
-    return { media, imageBlocks };
-  }
-
-  async #modelTurn(body, imageBlocks, priorTurns = []) {
-    if (this.modelRoute?.model !== 'gpt-5.6-luna' ||
-        typeof this.modelRoute.provider !== 'string' || !this.modelRoute.provider ||
-        !this.llm?.stream) failure('MODEL_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    const message = { id: `hw-${randomUUID()}`, role: 'user', source: { kind: 'user' },
-      content: [{ type: 'text', text: body.text }, ...imageBlocks] };
-    let result = '', finished = false;
-    try {
-      for await (const chunk of this.llm.stream({ provider: this.modelRoute.provider,
-        model: 'gpt-5.6-luna', messages: [
-          ...priorTurns.map(turn => ({ id: `hw-${turn.turnRef}`, role: 'user',
-            source: { kind: 'user' }, content: [{ type: 'text', text: turn.text }] })),
-          message], sessionId: body.sessionRef,
-        system: 'You are HanaWorlds Workshop. Never guess a world, target, dimension, or placement. If the user refers to another or an unclear world, ask them to select or clarify it in the Shell. Later user corrections override earlier details. When the user has supplied a concrete structure and all three node dimensions, respond with only JSON matching {"kind":"BUILD_STRUCTURE","text":"<structure>","purpose":"<purpose>","dimensions":{"width":1,"depth":1,"height":1,"unit":"node"},"entrancePortalRefs":[]}. Use the supplied integer dimensions; do not invent values. If any required fact is missing, ask one concise clarification question in Chinese instead of JSON.' })) {
-        if (chunk.type === 'text-delta') result += chunk.text;
-        if (chunk.type === 'finish')
-          finished = chunk.reason === 'stop' || chunk.reason?.kind === 'stop';
-      }
-    } catch { failure('MODEL_REQUEST_FAILED', 'validate', 'POLICY_UNAVAILABLE'); }
-    if (!finished || !result.trim()) failure('MODEL_REQUEST_FAILED', 'validate', 'POLICY_UNAVAILABLE');
-    return result.trim();
-  }
-
-  async call(operation, raw) {
-    return this.#call(operation, raw, null);
-  }
-
-  /** Host service only. The original Undo is selected from this Session's durable projection. */
-  async recoverPendingUndo(raw) {
-    let body;
-    try {
-      body = raw instanceof Uint8Array || typeof raw === 'string' ?
-        admitRequest(VERSION, 'RecoverPendingUndo', Buffer.from(raw)) :
-        validateRequest(VERSION, 'RecoverPendingUndo', raw);
-      if (!this.authority?.verifyService)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const service = await this.authority.verifyService(body, 'RecoverPendingUndo');
-      if (service?.current !== true ||
-          service.domainOwner !== 'hanaworlds-workshop' ||
-          service.serviceRecoveryRef !== body.serviceRecoveryRef ||
-          !['actorRef', 'sessionRef', 'worldRef', 'authorizationRef'].every(
-            key => service[key] === body[key]) ||
-          !service.allowedActions?.includes('RecoverPendingUndo'))
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-      validateBoundRequest(VERSION, 'RecoverPendingUndo', body);
-      checkUndoRecoveryHandshake(this.contractHandshake);
-      requireUndoPeer(this.canvas);
-      checkUndoRecoveryHandshake(this.canvas.contractHandshake ??
-        this.canvas.handshake?.() ?? this.canvas.status?.().contractHandshake);
-      if (!this.canvas?.call)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const result = await this.#withLock(body.sessionRef, async () => {
-        const { log, state } = await this.#load(body.sessionRef);
-        const pending = state.pendingUndo;
-        if (!pending)
-          failure('TRANSACTION_CONFLICT', 'validate', 'POLICY_UNAVAILABLE');
-        const original = validateRequest('canvas/v4', 'Undo', pending.request);
-        if (state.context.currentSession !== body.sessionRef ||
-            state.context.activeWorldRef !== body.worldRef ||
-            original.actorRef !== body.actorRef ||
-            original.sessionRef !== body.sessionRef ||
-            original.authorizationRef !== body.authorizationRef ||
-            original.worldRef !== body.worldRef ||
-            pending.turnRef == null || pending.turnRevision == null ||
-            pending.expectedTurnRevision !== pending.turnRevision ||
-            pending.expectedHistoryRevision !== original.expectedHistoryRevision ||
-            pending.beforeHead?.historyRevision !== original.expectedHistoryRevision ||
-            pending.beforeHead?.headTransactionId !== original.historyTransactionId ||
-            !Array.isArray(pending.affectedObjectRefs) ||
-            !pending.affectedObjectRefs.includes(original.objectRef) ||
-            !['RESERVED', 'CANVAS_VERIFIED', 'VERIFIED', 'ROLLED_BACK'].includes(pending.status))
-          failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-        const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-          sessionRef: body.sessionRef, requestId: body.requestId,
-          authorizationRef: body.authorizationRef, worldRef: body.worldRef,
-          serviceRecoveryRef: body.serviceRecoveryRef,
-          originalUndoRequestId: original.requestId };
-        const unknown = () => ({ sessionRef: body.sessionRef,
-          worldRef: body.worldRef, originalUndoRequestId: original.requestId,
-          status: 'UNKNOWN', receipt: null });
-        if (pending.status === 'ROLLED_BACK')
-          return { ...unknown(), status: 'ROLLED_BACK' };
-        let result;
-        let canvasOperation = 'ReadPendingUndoResult';
-        try { result = await this.#canvasRead(canvasOperation, request); }
-        catch (error) {
-          if (!error?.publicError) return unknown();
-          if (pending.status !== 'RESERVED' ||
-              error?.publicError?.code !== 'TRANSACTION_CONFLICT') throw error;
-          return unknown();
-        }
-        if (result.status === 'RECOVERY_PENDING') {
-          canvasOperation = 'RecoverPendingUndo';
-          try { result = await this.#canvasRead(canvasOperation, request); }
-          catch (error) {
-            if (!error?.publicError) return unknown();
-            throw error;
-          }
-        }
-        validateUndoRecoveryResponse('canvas/v4', canvasOperation,
-          request, packet('canvas/v4', request.requestId, result));
-        if ((pending.receipt?.status === 'VERIFIED' &&
-             result.status === 'ROLLED_BACK') ||
-            (pending.status === 'ROLLED_BACK' && result.status === 'VERIFIED'))
-          failure('READBACK_FAILED', 'readback', 'READBACK_ERROR');
-        if (result.originalUndoRequestId !== original.requestId ||
-            result.sessionRef !== body.sessionRef || result.worldRef !== body.worldRef ||
-            (result.status === 'VERIFIED' &&
-              (result.receipt?.transactionId !== original.transactionId ||
-               (pending.receipt &&
-                recordedDigest(result.receipt) !== recordedDigest(pending.receipt)))))
-          failure('READBACK_FAILED', 'readback', 'READBACK_ERROR');
-        if (result.status === 'VERIFIED' && pending.status === 'RESERVED') {
-          // Canvas has settled the original transaction. A visible Undo still
-          // needs an independently authorized HistoryQuery through #finishUndo.
-          state.pendingUndo = { ...pending, status: 'CANVAS_VERIFIED',
-            receipt: result.receipt };
-          await this.#save(body.sessionRef, log, state);
-        } else if (result.status === 'ROLLED_BACK') {
-          state.pendingUndo = { ...pending, status: 'ROLLED_BACK' };
-          await this.#save(body.sessionRef, log, state);
-        }
-        return result;
-      });
-      return validateUndoRecoveryResponse(VERSION, 'RecoverPendingUndo', body,
-        packet(VERSION, body.requestId, result));
-    } catch (error) {
-      const denied = packet(VERSION, body?.requestId ?? null, null, toPublic(error));
-      return body?.requestId ? validateResponse(VERSION, 'RecoverPendingUndo', denied) : denied;
-    }
-  }
-
-  async #call(operation, raw, relayPrincipal) {
-    const version = operation === 'InvokeAction' ? ACTION_VERSION : VERSION;
-    let body;
-    try {
-      body = raw instanceof Uint8Array || typeof raw === 'string' ?
-        admitRequest(version, operation, Buffer.from(raw)) :
-        validateRequest(version, operation, raw);
-      const proof = operation === 'SwitchWorldContext' ?
-        await this.#worldContextProof(body) : await this.#authorized(body, operation);
-      if (relayPrincipal && (operation !== 'InvokeAction' ||
-          proof.surface !== 'LUANTI' || proof.worldRef !== relayPrincipal.worldRef ||
-          proof.engineActorName !== relayPrincipal.engineActorName))
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-      validateBoundRequest(version, operation, body);
-      const result = operation === 'AdvanceCurrentBuild' ?
-        await this.#advanceCurrentBuild(body) :
-        operation === 'UndoCurrentBuild' ?
-        await this.#undoCurrentBuild(body) :
-        await this.#withLock(body.sessionRef, async () => this.#dispatch(operation, body, proof));
-      const response = packet(version, body.requestId, result);
-      return operation === 'AdvanceCurrentBuild' ?
-        validateBuildEntryResponse(body, response) :
-        validateResponse(version, operation, response);
-    } catch (error) {
-      let publicError = operation === 'ReadSessionTurnDetails' ? readbackPublic(error) : toPublic(error);
-      if (operation === 'AdvanceCurrentBuild' && !operationContracts[VERSION]
-          .find(row => row.operation === operation).failureCodes.includes(publicError.code)) {
-        publicError = { ...publicError, causeCode: publicError.code,
-          code: publicError.code === 'CONNECTION_UNAUTHORIZED' ? 'PERMISSION_DENIED' : 'CAPABILITY_UNAVAILABLE' };
-      }
-      const denied = packet(version, body?.requestId ?? null, null,
-        publicError);
-      return ['ReadSessionTurnDetails', 'ReadCurrentUndoStatus', 'UndoCurrentBuild',
-        'AdvanceCurrentBuild', 'SwitchWorldContext'].includes(operation) && body?.requestId
-        ? validateResponse(version, operation, denied) : denied;
-    }
-  }
-
-  /** The Adapter expects a raw InvokeActionReceipt and supplies its verified relay principal. */
-  async invokeAction(request, principal) {
-    if (!principal || typeof principal.worldRef !== 'string' || !principal.worldRef ||
-        typeof principal.engineActorName !== 'string' || !principal.engineActorName)
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    const response = await this.#call('InvokeAction', request, principal);
-    if (response.error) {
-      const error = new Error(response.error.code);
-      error.code = response.error.code;
-      error.publicError = response.error;
-      throw error;
-    }
-    return response.result;
-  }
-
-  /** Reauthorize the exact pending durable frame before Adapter shows it in Luanti. */
-  async verifyFrameDelivery({ worldRef, engineActorName, frame, authorizationRef } = {}) {
-    if (typeof worldRef !== 'string' || !worldRef ||
-        typeof engineActorName !== 'string' || !engineActorName ||
-        typeof authorizationRef !== 'string' || !authorizationRef)
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    validateType('InteractionFrame', frame);
-    const { state } = await this.#load(frame.sessionRef);
-    const pending = state.pendingPlacement;
-    if (!pending?.frame || state.context.activeWorldRef !== worldRef ||
-        pending.worldRef !== worldRef ||
-        JSON.stringify(pending.frame) !== JSON.stringify(frame))
-      failure('INVALID_FRAME', 'validate', 'REVISION_CHANGED');
-    if (pending.authorizationRef !== authorizationRef || !pending.actorRef)
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    const proof = await this.#authorized({ actorRef: pending.actorRef,
-      sessionRef: frame.sessionRef, authorizationRef }, 'BeginFirstBuilding');
-    if (proof.surface !== 'LUANTI' && proof.surface !== 'SHELL')
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    if (proof.worldRef !== worldRef || proof.engineActorName !== engineActorName)
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    return { current: true, worldRef, engineActorName, sessionRef: frame.sessionRef,
-      authorizationRef, actorRef: pending.actorRef };
-  }
-
-  async beginFirstBuilding(body) {
-    await this.#authorized(body, 'BeginFirstBuilding');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const saved = state.confirmedIntents[body.turnRef];
-      const intent = saved?.intent;
-      if (!intent || intent.confirmedIntent.kind !== 'BUILD_STRUCTURE')
-        failure('INTENT_UNCONFIRMED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      if (typeof saved.confirmationInputId !== 'string' ||
-          !saved.confirmationInputId)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      if (body.invocationId !== undefined &&
-          body.invocationId !== saved.confirmationInputId)
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-      if (!state.context.activeWorldRef ||
-          intent.intendedWorldRef !== state.context.activeWorldRef)
-        failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      if (state.context.orderedSelectedObjectRefs.length !== 0)
-        failure('TARGET_REQUIRED', 'validate', 'SCOPE_DENIED');
-      const dims = intent.confirmedIntent.dimensions;
-      if (!dims || dims.unit !== 'node' ||
-          !['width', 'height', 'depth'].every(key => Number.isSafeInteger(dims[key]) && dims[key] > 0))
-        failure('AMBIGUOUS_GEOMETRY', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      requirePeer(this.canvas, {
-        wires: ['canvas/v4'], factProfiles: ['target-facts/v3'] });
-      const footprint = { widthCells: dims.width, depthCells: dims.depth,
-        heightCells: dims.height };
-      const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: state.context.activeWorldRef,
-        anchor: { kind: 'DEFAULT_PLAYER', invocationId: saved.confirmationInputId }, footprint };
-      validateBoundRequest('canvas/v4', 'InspectPlacementRegion', request);
-      const response = validateResponse('canvas/v4', 'InspectPlacementRegion',
-        await this.canvas.call('InspectPlacementRegion', request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      const outcome = await this.#recordPlacement(state, body, response.result, footprint, intent);
-      await this.#save(body.sessionRef, log, state);
-      return outcome;
-    });
-  }
-
-  /** The public entry owns phase selection; callers never supply a turn or transaction ID. */
-  async #advanceCurrentBuild(body) {
-    checkBuildEntryHandshake(this.contractHandshake);
-    return this.#withLock(body.sessionRef, async () => {
-      let { log, state } = await this.#load(body.sessionRef);
-      const current = state.turns.at(-1);
-      const turnWorldRef = current && state.turnWorldRefs?.[current.turnRef];
-      if (!current || !state.confirmedIntents?.[current.turnRef] ||
-          state.pendingClarification?.turnRef === current.turnRef)
-        failure('INTENT_UNCONFIRMED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      if (state.context.currentSession !== body.sessionRef ||
-          state.context.activeWorldRef !== body.worldRef ||
-          (turnWorldRef !== undefined && turnWorldRef !== body.worldRef))
-        failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      if (state.pendingApply?.status === 'RESERVED' &&
-          state.pendingApply.turnRef !== current.turnRef)
-        failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-      const stage = () => state.pendingApply?.turnRef === current.turnRef ?
-        (state.pendingApply.status === 'VERIFIED' ? 'COMPLETE' : 'APPLY') :
-        state.lastAnalysis?.turnRef === current.turnRef ? 'APPLY' :
-        state.lastCompiled?.turnRef === current.turnRef ? 'ANALYZE' :
-        state.lastBuild?.turnRef === current.turnRef ? 'COMPILE' :
-        state.lastPlacement?.turnRef === current.turnRef &&
-        state.lastPlacement.outcome === 'REGION_INSPECTED' ? 'PLAN' : 'PLACEMENT';
-      const entries = state.buildEntries ??= Object.create(null);
-      const payloadDigest = hash(canonicalize(body));
-      const prior = entries[body.requestId];
-      validateBuildEntryContext(body, { actorRef: body.actorRef,
-        sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
-        worldRef: body.worldRef, currentTurnRevision: current.turnRevision,
-        turnStatus: 'CURRENT_CONFIRMED', grantStatus: 'CURRENT', stage: stage(),
-        replay: prior ? prior.payloadDigest === payloadDigest ? 'EXACT_REPLAY' :
-          'CONFLICT' : 'NEW' });
-      if (prior?.outcome) return prior.outcome;
-      if (!prior) {
-        entries[body.requestId] = { payloadDigest, parentRequest: copy(body), turnRef: current.turnRef,
-          worldRef: body.worldRef, authorizationRef: body.authorizationRef,
-          outcome: null };
-        state = await this.#save(body.sessionRef, log, state);
-      } else if (prior.turnRef !== current.turnRef || prior.worldRef !== body.worldRef ||
-          prior.authorizationRef !== body.authorizationRef) {
-        failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
-      }
-      const refresh = async () => {
-        ({ log, state } = await this.#load(body.sessionRef));
-        if (state.context.activeWorldRef !== body.worldRef ||
-            state.turns.at(-1)?.turnRef !== current.turnRef ||
-            state.turns.at(-1)?.turnRevision !== current.turnRevision)
-          failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
-      };
-      const finish = async outcome => {
-        await refresh();
-        state.buildEntries[body.requestId].outcome = outcome;
-        await this.#save(body.sessionRef, log, state);
-        return outcome;
-      };
-      const pending = stageName => ({ sessionRef: body.sessionRef,
-        worldRef: body.worldRef, turnRevision: current.turnRevision,
-        stage: stageName, outcome: 'PENDING' });
-      const stageBody = name => ({ actorRef: body.actorRef,
-        sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
-        turnRef: current.turnRef, requestId: `${body.requestId}:${name}` });
-      if (state.pendingPlacement?.turnRef === current.turnRef) {
-        const frame = state.pendingPlacement.frame;
-        if (frame.sessionRef !== body.sessionRef ||
-            frame.turnRevision !== current.turnRevision)
-          failure('INVALID_FRAME', 'validate', 'REVISION_CHANGED');
-        return finish({ sessionRef: body.sessionRef, worldRef: body.worldRef,
-          turnRevision: current.turnRevision, stage: 'PLACEMENT',
-          outcome: 'CHOICE_REQUIRED', frame });
-      }
-      if (stage() === 'PLACEMENT') {
-        const placed = await this.beginFirstBuilding({ ...stageBody('placement'),
-          invocationId: state.confirmedIntents[current.turnRef].confirmationInputId });
-        await refresh();
-        if (placed.outcome === 'PLACEMENT_CHOICE_REQUIRED')
-          return finish({ sessionRef: body.sessionRef, worldRef: body.worldRef,
-            turnRevision: current.turnRevision, stage: 'PLACEMENT',
-            outcome: 'CHOICE_REQUIRED', frame: placed.frame });
-      }
-      if (stage() === 'PLAN') {
-        await this.createBuildPlan(stageBody('plan'));
-        await refresh();
-      }
-      if (stage() === 'COMPILE') {
-        await this.compileCurrentBuild(stageBody('compile'));
-        await refresh();
-      }
-      if (stage() === 'ANALYZE') {
-        await this.#checkProposalBuild(stageBody('analyze'), state);
-        await this.analyzeCurrentBuild(stageBody('analyze'));
-        await refresh();
-        await this.#checkProposalBuild(stageBody('analyze'), state);
-      }
-      if (stage() === 'APPLY') {
-        if (!state.pendingApply) await this.#checkProposalBuild(stageBody('apply'), state);
-        try { await this.applyCurrentBuild(stageBody('apply')); }
-        catch (error) {
-          await refresh();
-          if (state.pendingApply?.turnRef === current.turnRef &&
-              state.pendingApply.status === 'RESERVED' &&
-              (!error?.publicError || error.buildApplyDispatched))
-            return pending('APPLY');
-          throw error;
-        }
-        await refresh();
-      }
-      if (state.pendingApply?.turnRef !== current.turnRef ||
-          state.pendingApply.status !== 'VERIFIED') return pending('APPLY');
-      const receipt = await this.#readAppliedBuild(body, state, current);
-      await this.#authorized(body, 'AdvanceCurrentBuild');
-      await refresh();
-      const digest = recordedDigest(receipt);
-      const durableTurn = state.turns.find(row => row.turnRef === current.turnRef);
-      if (durableTurn.actionReceiptDigest && durableTurn.actionReceiptDigest !== digest)
-        failure('READBACK_FAILED', 'readback', 'REVISION_CHANGED');
-      if (!durableTurn.actionReceiptDigest) {
-        durableTurn.actionReceiptDigest = digest;
-        state.receipts.push({ turnRef: current.turnRef, actionId: `build-${body.requestId}`,
-          domainReceiptDigest: digest,
-          apply: { request: copy(state.pendingApply.request), response: copy(receipt),
-            sampledBounds: copy(state.lastCompiled.inspection.targetFacts.sampledBounds) } });
-        state.turnDetails ??= Object.create(null);
-        state.turnDetails[current.turnRef] = {
-          ...(state.turnDetails[current.turnRef] ?? {}),
-          resultText: '建造已验证，且已读回当前世界与历史。',
-          confirmedBrief: state.confirmedIntents[current.turnRef].brief ?? null };
-        if (state.pendingUndo?.status === 'VERIFIED') state.pendingUndo = null;
-        await this.#save(body.sessionRef, log, state);
-      }
-      return finish({ sessionRef: body.sessionRef, worldRef: body.worldRef,
-        turnRevision: current.turnRevision, stage: 'COMPLETE',
-        outcome: 'VERIFIED', receipt });
-    });
-  }
-
-  async #readAppliedBuild(body, state, turn) {
-    await this.#authorized(body, 'ReadCurrentUndoStatus');
-    const { request, response } = state.pendingApply;
-    const receipt = validateType('ReceiptProjection', response?.result);
-    if (receipt.status !== 'VERIFIED' ||
-        request.actorRef !== body.actorRef || request.sessionRef !== body.sessionRef ||
-        request.authorizationRef !== body.authorizationRef ||
-        request.worldRef !== body.worldRef ||
-        request.transactionId !== receipt.transactionId ||
-        request.operationDigest !== receipt.operationDigest)
-      failure('READBACK_FAILED', 'readback', 'REVISION_CHANGED');
-    requirePeer(this.canvas, { wires: ['canvas/v4'], factProfiles: [] });
-    const common = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-      sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
-      worldRef: body.worldRef };
-    const inventory = await this.#canvasRead('ListObjects', { ...common,
-      requestId: `${body.requestId}:read-objects`, expectedRevision: null });
-    if (inventory.worldRef !== body.worldRef)
-      failure('READBACK_FAILED', 'readback', 'REVISION_CHANGED');
-    const matches = [];
-    for (const object of inventory.objects) {
-      const history = await this.#canvasRead('HistoryQuery', { ...common,
-        objectRef: object.objectRef, requestId: `${body.requestId}:read-history:${object.objectRef}`,
-        expectedHistoryRevision: null });
-      if (history.worldRef !== body.worldRef || history.objectRef !== object.objectRef)
-        failure('READBACK_FAILED', 'readback', 'REVISION_CHANGED');
-      const entry = history.entries.find(row =>
-        row.transactionId === receipt.transactionId &&
-        row.operationDigest === receipt.operationDigest &&
-        row.expectedAfterReadbackDigest === receipt.readbackDigest &&
-        row.receiptDigest === recordedDigest(receipt) && row.status === 'VERIFIED' &&
-        row.affectedObjectRefs.includes(object.objectRef));
-      if (entry) matches.push({ object, history, entry });
-    }
-    if (!matches.length ||
-        matches.length !== matches[0].entry.affectedObjectRefs.length ||
-        !matches[0].entry.affectedObjectRefs.every(ref =>
-          matches.some(item => item.object.objectRef === ref &&
-            item.history.headTransactionId === receipt.transactionId &&
-            item.history.historyRevision === matches[0].history.historyRevision &&
-            JSON.stringify(item.entry) === JSON.stringify(matches[0].entry))))
-      failure('READBACK_FAILED', 'readback', 'REVISION_CHANGED');
-    if (turn.actionReceiptDigest && turn.actionReceiptDigest !== recordedDigest(receipt))
-      failure('READBACK_FAILED', 'readback', 'REVISION_CHANGED');
-    return receipt;
-  }
-
-  async #recordPlacement(state, body, result, footprint, intent) {
-    if (result.outcome === 'REGION_INSPECTED') {
-      const inspection = validateRegionInspection(result.inspection);
-      state.lastPlacement = { outcome: 'REGION_INSPECTED', inspection,
-        turnRef: body.turnRef, intentDigest: digestValue('intent', intent).sha256 };
-      state.pendingPlacement = null;
-      return { outcome: 'REGION_INSPECTED', inspection };
-    }
-    const choice = result.choice;
-    const frameRef = `frame-${randomUUID()}`, frameRevision = revision();
-    const turnRevision = state.turns.find(turn => turn.turnRef === body.turnRef)?.turnRevision;
-    if (!turnRevision) failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
-    const projections = Object.create(null), actions = [];
-    const add = (kind, choices) => {
-      const actionId = `action-${randomUUID()}`;
-      const projection = { contractVersion: 'interaction-surface/v2',
-        sessionRef: body.sessionRef, turnRevision, frameRef, frameRevision,
-        actionId, orderedTargetRefs: [], intentDigest: digestValue('intent', intent).sha256,
-        operationDigest: null, analysisDigest: null, decisionRevision: null };
-      const surfaceActionDigest = digestValue('surface-action', projection).sha256;
-      projections[actionId] = projection;
-      actions.push({ actionId, inputKinds: [kind], surfaceActionDigest,
-        capabilityRef: 'hanaworlds-workshop', choices });
-    };
-    if (choice.options.includes('NAME_PLAYER'))
-      add('SELECT_CHOICE', choice.candidatePlayerNames.map(name => ({ value: name, label: name })));
-    add('PICK_WORLD_POINT', null);
-    const frame = validateType('InteractionFrame', { sessionRef: body.sessionRef,
-      turnRevision, frameRef, frameRevision,
-      content: choice.options.includes('NAME_PLAYER') ?
-        '请选择在线玩家，或在游戏中选点。' : '请在游戏中选点。', actions });
-    state.pendingPlacement = { choice, frame, projections, footprint,
-      actorRef: body.actorRef, authorizationRef: body.authorizationRef,
-      worldRef: state.context.activeWorldRef, turnRef: body.turnRef,
-      intentDigest: digestValue('intent', intent).sha256 };
-    state.lastPlacement = { outcome: 'PLACEMENT_CHOICE_REQUIRED', choice, frame };
-    return { ...state.lastPlacement, actionProjections: projections };
-  }
-
-  async getPlacementState(body) {
-    await this.#authorized(body, 'BeginFirstBuilding');
-    const { state } = await this.#load(body.sessionRef);
-    return copy(state.lastPlacement);
-  }
-
-  #proposalLive(body, state) {
-    const turn = state.turns.at(-1);
-    const saved = turn && state.confirmedIntents[turn.turnRef];
-    if (!turn || !saved?.confirmationInputId || state.pendingClarification ||
-        (body.expectedTurnRevision ?? body.turnRevision) !== turn.turnRevision)
-      failure('INTENT_UNCONFIRMED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-    if (state.context.activeWorldRef !== body.worldRef ||
-        state.turnWorldRefs[turn.turnRef] !== body.worldRef ||
-        saved.intent.intendedWorldRef !== body.worldRef ||
-        state.context.orderedSelectedObjectRefs.length)
-      failure('TARGET_FACTS_STALE', 'validate', 'REVISION_CHANGED');
-    if (turn.media.length || state.turnPlanningModes?.[turn.turnRef] !== 'SKILL_PROPOSAL')
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    return { turn, saved };
-  }
-
-  #proposalNotCancelled(signal) {
-    if (signal?.aborted) failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-  }
-
-  async #proposalContext(body, state, invocationId) {
-    const { turn, saved } = this.#proposalLive(body, state);
-    const placement = state.lastPlacement;
-    if (placement?.turnRef !== turn.turnRef || placement.outcome !== 'REGION_INSPECTED')
-      failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-    if (!this.catalogue?.read || !this.safety?.read)
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    const catalogue = validateType('Catalogue', await this.catalogue.read(body.worldRef));
-    const safetyProfile = validateType('SafetyProfile', await this.safety.read(body.worldRef));
-    const inspection = validateRegionInspection(placement.inspection);
-    if (inspection.targetFacts.catalogueDigest !== digestValue('catalogue', catalogue).sha256)
-      failure('CATALOGUE_MISMATCH', 'validate', 'REVISION_CHANGED');
-    return copy(validateType('BuildProposalContext', { contractVersion: 'painter/v3',
-      actorRef: body.actorRef, sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
-      worldRef: body.worldRef, turnRevision: turn.turnRevision, painterId: 'picture-blocks', invocationId,
-      intent: saved.intent, intentDigest: digestValue('intent', saved.intent).sha256,
-      referenceBrief: saved.brief, referenceBriefDigest: digestValue('reference-brief', saved.brief).sha256,
-      catalogue, targetFacts: inspection.targetFacts, targetFactsDigest: inspection.targetFactsDigest,
-      safetyProfile, safetyProfileDigest: digestValue('safety-profile', safetyProfile).sha256,
-      regionInspection: inspection }));
-  }
-
-  #proposalPort() {
-    const port = this.proposalAuthority;
-    if (!port?.capture || !port?.readProviderFacts)
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    checkBuildProposalHandshake(port.contractHandshake);
-    return port;
-  }
-
-  /** Local authenticated Host service. Input is the existing current-turn request;
-   * output is a public immutable context, or the existing placement choice outcome.
-   * Model data must never supply the identity fields in the outer request. */
-  async readBuildProposalContext(raw, { signal } = {}) {
-    const body = copy(validateBoundRequest(VERSION, 'AdvanceCurrentBuild', raw));
-    this.#proposalNotCancelled(signal);
-    return this.#withLock(body.sessionRef, async () => {
-      const port = this.#proposalPort();
-      const proof = await this.#authorized(body, 'CreateBuildPlan');
-      if (proof.worldRef !== body.worldRef) failure('PERMISSION_DENIED', 'authorize', 'SCOPE_DENIED');
-      let { log, state } = await this.#load(body.sessionRef);
-      const { turn } = this.#proposalLive(body, state);
-      const invocationId = `proposal-${body.requestId}`;
-      if (state.currentProposalInvocation !== invocationId &&
-          (state.lastCompiled?.turnRef === turn.turnRef || state.pendingApply?.turnRef === turn.turnRef))
-        failure('PERMISSION_DENIED', 'authorize', 'SCOPE_DENIED');
-      if (!state.lastPlacement || state.lastPlacement.turnRef !== turn.turnRef) {
-        const placed = await this.beginFirstBuilding({ ...body, turnRef: turn.turnRef,
-          requestId: `${body.requestId}:placement` });
-        ({ log, state } = await this.#load(body.sessionRef));
-        this.#proposalNotCancelled(signal);
-        if (placed.outcome === 'PLACEMENT_CHOICE_REQUIRED') return copy(validateType('BuildEntryChoiceRequired', {
-          sessionRef: body.sessionRef, worldRef: body.worldRef, turnRevision: turn.turnRevision,
-          stage: 'PLACEMENT', outcome: 'CHOICE_REQUIRED', frame: placed.frame }));
-      }
-      const context = await this.#proposalContext(body, state, invocationId);
-      const prior = state.proposalContexts?.[invocationId];
-      if (prior && canonicalize(prior.context) !== canonicalize(context))
-        failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
-      // Host captures exact live Session/service/operation and original native grant
-      // before model generation. Repeated captures must retain that original binding.
-      const binding = copy(validateType('OriginalSessionBinding', await port.capture(copy(context), { signal })));
-      if (!binding.allowedActions.includes('INSPECT') ||
-          !['actorRef', 'sessionRef', 'worldRef', 'authorizationRef'].every(k => binding[k] === context[k]) ||
-          (prior && canonicalize(binding) !== canonicalize(prior.binding)))
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-      this.#proposalNotCancelled(signal);
-      const live = await this.#authorized(body, 'CreateBuildPlan');
-      if (live.worldRef !== body.worldRef || this.proposalAuthority !== port ||
-          live.sessionIncarnationRef !== binding.sessionIncarnationRef ||
-          live.nativeGrantRef !== binding.expectedGrantRef)
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-      state.currentProposalInvocation = invocationId;
-      state.proposalContexts ??= Object.create(null);
-      state.proposalContexts[invocationId] ??= { context, binding, request: null, response: null };
-      await this.#save(body.sessionRef, log, state);
-      this.#proposalNotCancelled(signal);
-      return copy(context);
-    });
-  }
-
-  async #checkProposal(request, state, signal) {
-    this.#proposalNotCancelled(signal);
-    const stored = state.proposalContexts?.[request.invocationId];
-    if (!stored || stored.invalidated || state.currentProposalInvocation !== request.invocationId) failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    if (stored.request && canonicalize(stored.request) !== canonicalize(request))
-      failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
-    const port = this.#proposalPort();
-    const proof = await this.#authorized(request, 'CreateBuildPlan');
-    if (proof.worldRef !== request.worldRef) failure('PERMISSION_DENIED', 'authorize', 'SCOPE_DENIED');
-    const currentContext = await this.#proposalContext(request, state, request.invocationId);
-    const contexts = { sourceContext: copy(stored.context), currentContext };
-    // Host must independently refresh INSPECT/Session/grant/delegation. These
-    // Workshop projections are coherence inputs, never proof of authenticity.
-    const facts = copy(validateType('BuildProposalProviderFacts',
-      await port.readProviderFacts(copy(request), copy(contexts), { signal })));
-    if (this.proposalAuthority !== port || canonicalize(facts.originalBinding) !== canonicalize(stored.binding) ||
-        canonicalize(facts.sourceContext) !== canonicalize(contexts.sourceContext) ||
-        canonicalize(facts.currentContext) !== canonicalize(currentContext))
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    validateBuildProposalContext(request, facts);
-    const live = await this.#authorized(request, 'CreateBuildPlan');
-    const latest = await this.#load(request.sessionRef);
-    const refreshed = await this.#proposalContext(request, latest.state, request.invocationId);
-    if (live.worldRef !== request.worldRef || live.sessionIncarnationRef !== stored.binding.sessionIncarnationRef ||
-        live.nativeGrantRef !== stored.binding.expectedGrantRef ||
-        latest.state.currentProposalInvocation !== request.invocationId ||
-        canonicalize(refreshed) !== canonicalize(currentContext))
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    this.#proposalNotCancelled(signal);
-    return stored;
-  }
-
-  async #checkProposalBuild(body, state) {
-    const saved = state.lastBuild;
-    if (saved?.turnRef !== body.turnRef || !saved.proposalRequest) return;
-    const request = saved.proposalRequest;
-    if (!['actorRef', 'sessionRef', 'authorizationRef'].every(k => body[k] === request[k]))
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    await this.#checkProposal(request, state);
-  }
-
-  /** Only the public proposal contains model output. No planner/model call. */
-  async submitBuildProposal(raw, { signal } = {}) {
-    let request;
-    try {
-      request = copy(validateBuildProposalRequest(raw));
-      return await this.#withLock(request.sessionRef, async () => {
-        let { log, state } = await this.#load(request.sessionRef);
-        const stored = await this.#checkProposal(request, state, signal);
-        if (stored.response) return copy(stored.response);
-        const { turn } = this.#proposalLive(request, state);
-        if (state.lastCompiled?.turnRef === turn.turnRef || state.pendingApply?.turnRef === turn.turnRef)
-          failure('PERMISSION_DENIED', 'authorize', 'SCOPE_DENIED');
-        const painter = this.painter;
-        checkBuildProposalHandshake(painter?.contractHandshake);
-        if (!painter?.call) failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-        stored.request = copy(request); // reserve exact payload before any asynchronous consumer
-        state = await this.#save(request.sessionRef, log, state);
-        await this.#checkProposal(request, state, signal);
-        const response = copy(validateBuildProposalResponse(request,
-          await painter.call('ValidateBuildProposal', copy(request), { signal })));
-        ({ log, state } = await this.#load(request.sessionRef));
-        await this.#checkProposal(request, state, signal);
-        if (this.painter !== painter) failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-        if (response.error) return response;
-        state.lastBuild = { turnRef: turn.turnRef, worldRef: request.worldRef,
-          plan: response.result, catalogue: request.catalogue, safetyProfile: request.safetyProfile,
-          inspection: request.regionInspection, proposalRequest: request };
-        state.proposalContexts[request.invocationId].response = response;
-        state = await this.#save(request.sessionRef, log, state);
-        try { await this.#checkProposal(request, state, signal); }
-        catch (error) {
-          // A cancellation/revocation during persistence must not leave a
-          // consumable success behind. Retain reservation for replay auditing.
-          ({ log, state } = await this.#load(request.sessionRef));
-          state.proposalContexts[request.invocationId].invalidated = true;
-          state.proposalContexts[request.invocationId].response = null;
-          if (state.lastBuild?.proposalRequest?.invocationId === request.invocationId) state.lastBuild = null;
-          await this.#save(request.sessionRef, log, state);
-          throw error;
-        }
-        return copy(response);
-      });
-    } catch (error) {
-      return packet('painter/v3', request?.requestId ?? raw?.requestId ?? null, null, toPublic(error));
-    }
-  }
-
-  async createBuildPlan(body) {
-    await this.#authorized(body, 'CreateBuildPlan');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const turn = state.turns.find(row => row.turnRef === body.turnRef);
-      const saved = state.confirmedIntents[body.turnRef];
-      const placement = state.lastPlacement;
-      if (!turn || !saved || !placement || placement.outcome !== 'REGION_INSPECTED' ||
-          placement.turnRef !== body.turnRef ||
-          saved.intent.confirmedIntent.kind !== 'BUILD_STRUCTURE')
-        failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      if (state.turnPlanningModes?.[body.turnRef] === 'SKILL_PROPOSAL')
-        failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      const textOnly = turn.media.length === 0;
-      if (saved.intent.intendedWorldRef !== state.context.activeWorldRef ||
-          placement.inspection.targetFacts.worldRef !== state.context.activeWorldRef)
-        failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      const source = textOnly ? this.textPlanSource : this.painter;
-      requirePeer(source, { wires: [textOnly ? 'BUILD/V2' : 'painter/v3'],
-        factProfiles: ['target-facts/v3'] });
-      if (!this.catalogue?.read || !this.safety?.read ||
-          !(textOnly ? source?.createBuildPlan : source?.call))
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const catalogue = validateType('Catalogue', await this.catalogue.read(state.context.activeWorldRef));
-      const safetyProfile = validateType('SafetyProfile', await this.safety.read(state.context.activeWorldRef));
-      if (digestValue('catalogue', catalogue).sha256 !==
-          placement.inspection.targetFacts.catalogueDigest)
-        failure('CATALOGUE_MISMATCH', 'validate', 'REVISION_CHANGED');
-      const facts = { actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: state.context.activeWorldRef,
-        turnRevision: turn.turnRevision,
-        invocationId: `paint-${randomUUID()}`, intent: saved.intent,
-        intentDigest: digestValue('intent', saved.intent).sha256,
-        referenceBrief: saved.brief,
-        referenceBriefDigest: digestValue('reference-brief', saved.brief).sha256,
-        catalogue, targetFacts: placement.inspection.targetFacts,
-        targetFactsDigest: placement.inspection.targetFactsDigest,
-        safetyProfile, safetyProfileDigest: digestValue('safety-profile', safetyProfile).sha256,
-        regionInspection: placement.inspection };
-      let plan;
-      if (textOnly) {
-        // Host-injected domain plan source, not the image-only picture Painter
-        // wire. It receives real public projections, never invented media.
-        const brief = validateType('BriefProjection', facts.referenceBrief);
-        const intent = validateType('IntentProjection', facts.intent);
-        if (brief.sessionRef !== body.sessionRef || brief.turnRevision !== turn.turnRevision ||
-            brief.media.length !== 0 || intent.referenceBriefDigest !== facts.referenceBriefDigest ||
-            intent.confirmedIntent.confirmedTurnRevision !== turn.turnRevision)
-          failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
-        plan = validateType('BuildPlan', await source.createBuildPlan(copy(facts)));
-        if (plan.invocationId !== facts.invocationId)
-          failure('TRANSACTION_CONFLICT', 'replay', 'PAYLOAD_CHANGED');
-        const build = plan.build;
-        if (digestValue('build', build).sha256 !== plan.buildDigest ||
-            build.catalogueDigest !== digestValue('catalogue', catalogue).sha256 ||
-            build.targetFactsDigest !== facts.targetFactsDigest ||
-            build.safetyProfileDigest !== facts.safetyProfileDigest ||
-            canonicalize(build.coordinateFrame) !== canonicalize(facts.regionInspection.frame) ||
-            build.witnesses.some(w => ['PROTECTION', 'BODY_CLEARANCE'].includes(w.predicate) &&
-              canonicalize(w.facts.evidence) !== canonicalize(facts.regionInspection.evidence)))
-          failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-        const live = await this.#authorized(body, 'CreateBuildPlan');
-        if (live.worldRef !== state.context.activeWorldRef)
-          failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      } else {
-        const request = { contractVersion: 'painter/v3', ...facts, painterId: 'picture-blocks' };
-        validateBoundRequest('painter/v3', 'CreateBuildPlan', request);
-        const response = validateResponse('painter/v3', 'CreateBuildPlan',
-          await source.call('CreateBuildPlan', request));
-        if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-        plan = response.result;
-      }
-      state.lastBuild = { turnRef: body.turnRef, worldRef: state.context.activeWorldRef,
-        plan, catalogue, safetyProfile, inspection: placement.inspection };
-      await this.#save(body.sessionRef, log, state);
-      return plan;
-    });
-  }
-
-  async listObjects(body) {
-    await this.#authorized(body, 'ListObjects');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const worldRef = state.context.activeWorldRef;
-      if (!worldRef) failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      requirePeer(this.canvas,
-        { wires: ['canvas/v4'], factProfiles: [] });
-      const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef, expectedRevision: null };
-      validateBoundRequest('canvas/v4', 'ListObjects', request);
-      const response = validateResponse('canvas/v4', 'ListObjects',
-        await this.canvas.call('ListObjects', request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      state.offeredInventory = response.result;
-      await this.#save(body.sessionRef, log, state);
-      return response.result;
-    });
-  }
-
-  async selectObjects(body) {
-    await this.#authorized(body, 'SelectObjects');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const inventory = state.offeredInventory;
-      if (!inventory || inventory.worldRef !== state.context.activeWorldRef)
-        failure('INVALID_SELECTION', 'validate', 'SCOPE_DENIED');
-      const offered = new Set(inventory.objects.map(object => object.objectRef));
-      if (!Array.isArray(body.objectRefs) ||
-          new Set(body.objectRefs).size !== body.objectRefs.length ||
-          !body.objectRefs.every(ref => offered.has(ref)))
-        failure('INVALID_SELECTION', 'validate', 'SCOPE_DENIED');
-      requirePeer(this.canvas,
-        { wires: ['canvas/v4'], factProfiles: [] });
-      const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: inventory.worldRef,
-        objectRefs: body.objectRefs,
-        expectedSelectionRevision: state.context.selectionRevision };
-      validateBoundRequest('canvas/v4', 'SetObjectSelection', request);
-      const response = validateResponse('canvas/v4', 'SetObjectSelection',
-        await this.canvas.call('SetObjectSelection', request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      state.context.orderedSelectedObjectRefs = response.result.selectedObjectRefs;
-      state.context.selectionRevision = response.result.selectionRevision;
-      state.pendingPlacement = null;
-      state.lastPlacement = null;
-      await this.#save(body.sessionRef, log, state);
-      return response.result;
-    });
-  }
-
-  async compileCurrentBuild(body) {
-    await this.#authorized(body, 'CompileCurrentBuild');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const saved = state.lastBuild;
-      if (!saved || saved.turnRef !== body.turnRef ||
-          saved.worldRef !== state.context.activeWorldRef)
-        failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      await this.#checkProposalBuild(body, state);
-      requirePeer(this.brush,
-        { wires: ['BUILD/V2'], factProfiles: ['target-facts/v3'] });
-      if (!this.brush?.compile || !this.compilerConfig?.read)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const settings = await this.compilerConfig.read(saved.worldRef);
-      const compilationConfig = validateType('CompilationConfig', settings?.compilationConfig);
-      const compilerRevision = settings?.compilerRevision;
-      const request = { contractVersion: 'BUILD/V2', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: saved.worldRef,
-        build: saved.plan.build, buildDigest: saved.plan.buildDigest,
-        catalogue: saved.catalogue,
-        catalogueDigest: digestValue('catalogue', saved.catalogue).sha256,
-        targetFacts: saved.inspection.targetFacts,
-        targetFactsDigest: saved.inspection.targetFactsDigest,
-        safetyProfile: saved.safetyProfile,
-        safetyProfileDigest: digestValue('safety-profile', saved.safetyProfile).sha256,
-        compilationConfig,
-        compilationConfigDigest: digestValue('compilation-config', compilationConfig).sha256,
-        compilerRevision };
-      validateBoundRequest('BUILD/V2', 'BuildDocument', request);
-      const response = validateResponse('BUILD/V2', 'BuildDocument',
-        await this.brush.compile(request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      await this.#checkProposalBuild(body, state);
-      state.lastCompiled = { turnRef: body.turnRef, worldRef: saved.worldRef,
-        compiled: response.result, build: saved.plan.build,
-        inspection: saved.inspection };
-      await this.#save(body.sessionRef, log, state);
-      return response.result;
-    });
-  }
-
-  async analyzeCurrentBuild(body) {
-    await this.#authorized(body, 'AnalyzeCurrentBuild');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const saved = state.lastCompiled;
-      if (!saved || saved.turnRef !== body.turnRef ||
-          saved.worldRef !== state.context.activeWorldRef)
-        failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      requirePeer(this.canvas,
-        { wires: ['canvas/v4'], factProfiles: ['target-facts/v3'] });
-      const base = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
-        worldRef: saved.worldRef };
-      const inventoryRequest = { ...base, requestId: `inventory-${body.requestId}`,
-        expectedRevision: null };
-      validateBoundRequest('canvas/v4', 'ListObjects', inventoryRequest);
-      const inventory = validateResponse('canvas/v4', 'ListObjects',
-        await this.canvas.call('ListObjects', inventoryRequest));
-      if (inventory.error) { const error = new Error(inventory.error.code); error.publicError = inventory.error; throw error; }
-      const transactionId = `tx-${randomUUID()}`;
-      const request = { ...base, requestId: body.requestId, transactionId,
-        operations: saved.compiled.projection,
-        operationDigest: saved.compiled.operationDigest,
-        expectedRevision: saved.inspection.targetFacts.worldRevision,
-        expectedRegistryRevision: inventory.result.registryRevision,
-        expectedSelectionRevision: state.context.selectionRevision };
-      validateBoundRequest('canvas/v4', 'AnalyzeAffectedObjects', request);
-      const response = validateResponse('canvas/v4', 'AnalyzeAffectedObjects',
-        await this.canvas.call('AnalyzeAffectedObjects', request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      state.lastAnalysis = { turnRef: body.turnRef, transactionId,
-        analysis: response.result, analysisDigest: digestValue('affected-analysis', response.result).sha256 };
-      await this.#save(body.sessionRef, log, state);
-      return response.result;
-    });
-  }
-
-  #currentBuildAuthorizationFacts(body, state) {
-    const entry = Object.values(state.buildEntries ?? {}).find(row =>
-      row.parentRequest?.requestId + ':apply' === body.requestId);
-    if (!entry) failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    const parent = validateRequest(VERSION, 'AdvanceCurrentBuild', entry.parentRequest);
-    if (entry.payloadDigest !== hash(canonicalize(parent)))
-      failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
-    const turn = state.turns.at(-1), saved = state.confirmedIntents[body.turnRef];
-    const compiled = state.lastCompiled, analysis = state.lastAnalysis;
-    if (!turn || turn.turnRef !== body.turnRef || turn.turnRevision !== parent.expectedTurnRevision ||
-        !saved?.confirmationInputId || state.pendingClarification?.turnRef === body.turnRef)
-      failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
-    if (!compiled || !analysis || compiled.turnRef !== body.turnRef ||
-        analysis.turnRef !== body.turnRef || state.context.activeWorldRef !== compiled.worldRef ||
-        state.context.activeWorldRef !== parent.worldRef)
-      failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-    const facts = validateCurrentBuildAuthorizationFacts({
-      contractVersion: 'current-build-authorization/v1', parentRequest: parent,
-      turnRef: body.turnRef, confirmationInputId: saved.confirmationInputId,
-      intent: saved.intent, analysis: analysis.analysis,
-      apply: { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: compiled.worldRef,
-        transactionId: analysis.transactionId, operations: compiled.compiled.projection,
-        operationDigest: compiled.compiled.operationDigest, analysisDigest: analysis.analysisDigest,
-        decisionRevision: null, expectedWorldRevision: analysis.analysis.worldRevision,
-        expectedObjectRevisions: {}, guarantee: 'RECOVERABLE_VERIFIED',
-        regionInspectionBinding: { inspectionId: compiled.inspection.inspectionId, build: compiled.build } },
-    });
-    if (entry.authorizationFacts && canonicalize(entry.authorizationFacts) !== canonicalize(facts))
-      failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-    return facts;
-  }
-
-  async #verifyCurrentBuildUse(body, issued, request) {
-    const canvas = this.canvas, host = this.applyAuthority;
-    const initial = await this.#load(body.sessionRef);
-    const facts = this.#currentBuildAuthorizationFacts(body, initial.state);
-    if (!initial.state.pendingApply) await this.#checkProposalBuild(body, initial.state);
-    // Host authenticates its callback and independently captures the actual
-    // parent/child, Session incarnation, engine grant and service instances.
-    const context = await host.readCurrentBuildContext(copy(facts), copy(issued), copy(request));
-    await this.#authorized(facts.parentRequest, 'AdvanceCurrentBuild');
-    const latest = await this.#load(body.sessionRef);
-    const fresh = this.#currentBuildAuthorizationFacts(body, latest.state);
-    if (this.canvas !== canvas || this.applyAuthority !== host)
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    if (canonicalize(facts) !== canonicalize(fresh))
-      failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-    validateCurrentBuildAuthorizedApply(request, issued, fresh, context);
-    return latest;
-  }
-
-  async applyCurrentBuild(body) {
-    await this.#authorized(body, 'ApplyCurrentBuild');
-    return this.#withLock(body.sessionRef, async () => {
-      checkCurrentBuildAuthorizationHandshake(this.contractHandshake);
-      const canvasPeer = requirePeer(this.canvas,
-        { wires: ['canvas/v4'], factProfiles: ['target-facts/v3'] });
-      checkCurrentBuildAuthorizationHandshake(canvasPeer.advertised);
-      const hostPeer = requirePeer(this.applyAuthority,
-        { wires: ['session/v2', 'canvas/v4', 'session-authorization/v1'], factProfiles: [] });
-      checkCurrentBuildAuthorizationHandshake(hostPeer.advertised);
-      if (!this.applyAuthority.issue || !this.applyAuthority.readCurrentBuildContext)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      let { log, state } = await this.#load(body.sessionRef);
-      const facts = this.#currentBuildAuthorizationFacts(body, state);
-      let pending = state.pendingApply;
-      if (pending && pending.turnRef !== body.turnRef) {
-        if (!['VERIFIED', 'FAILED', 'ROLLED_BACK'].includes(pending.status))
-          failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-        pending = null;
-      }
-      if (pending && pending.request.requestId !== body.requestId)
-        failure('TRANSACTION_CONFLICT', 'replay', 'PAYLOAD_CHANGED');
-      if (pending?.status === 'VERIFIED') return pending.response.result;
-      if (pending && pending.status !== 'RESERVED')
-        failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-      if (!pending) {
-        // Preserve the exact parent and unsigned child before async issuance;
-        // a lost response retries those same durable facts, never a new tx.
-        state.buildEntries[facts.parentRequest.requestId].authorizationFacts = copy(facts);
-        await this.#save(body.sessionRef, log, state);
-        const issued = validateType('CurrentBuildAuthorization', await this.applyAuthority.issue(copy(facts), copy(body)));
-        const request = { ...facts.apply, authorizationBinding: issued.authorizationBinding,
-          authorizationBindingDigest: issued.authorizationBindingDigest };
-        ({ log, state } = await this.#verifyCurrentBuildUse(body, issued, request));
-        pending = { request, authorization: copy(issued), turnRef: body.turnRef, status: 'RESERVED' };
-        state.pendingApply = pending;
-        await this.#save(body.sessionRef, log, state);
-      }
-      // Includes retries after restart and the interval after durable reservation.
-      await this.#verifyCurrentBuildUse(body, pending.authorization, pending.request);
-      let response, latest;
-      // An async late response cannot publish success after revocation or a
-      // changed current turn. Keep RESERVED for the owning recovery path.
-      try {
-        response = validateResponse('canvas/v4', 'ApplyRecoverableCommit',
-          await this.canvas.call('ApplyRecoverableCommit', copy(pending.request)));
-        latest = await this.#verifyCurrentBuildUse(body, pending.authorization, pending.request);
-      } catch (error) {
-        // This attempt may already have written. Surface PENDING, never a
-        // pre-dispatch NONE failure, until authoritative recovery/readback.
-        error.buildApplyDispatched = true;
-        throw error;
-      }
-      latest.state.pendingApply.status = response.error?.mutationState === 'NONE' ||
-        response.error?.mutationState === 'ROLLED_BACK' ? 'FAILED' :
-        response.error ? 'RESERVED' : response.result.status;
-      latest.state.pendingApply.response = response;
-      await this.#save(body.sessionRef, latest.log, latest.state);
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      return response.result;
-    });
-  }
-
-  async #undoSource(body, state) {
-    if (state.context.activeWorldRef !== body.worldRef)
-      failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-    const recorded = state.receipts.at(-1);
-    if (!recorded) return null;
-    const turn = state.turns.find(row => row.turnRef === recorded.turnRef);
-    const saved = recorded.apply ?? (state.pendingApply?.turnRef === recorded.turnRef ?
-      { request: state.pendingApply.request, response: state.pendingApply.response?.result,
-        sampledBounds: state.lastCompiled?.turnRef === recorded.turnRef ?
-          state.lastCompiled.inspection?.targetFacts?.sampledBounds : null } : null);
-    if (saved?.request?.worldRef && saved.request.worldRef !== body.worldRef)
-      failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-    if (!turn || turn.actionReceiptDigest !== recorded.domainReceiptDigest ||
-        !saved?.request || saved.response?.status !== 'VERIFIED' ||
-        saved.request.actorRef !== body.actorRef ||
-        saved.request.sessionRef !== body.sessionRef ||
-        saved.request.transactionId !== saved.response.transactionId ||
-        digestValue('receipt', saved.response).sha256 !== recorded.domainReceiptDigest ||
-        !saved.sampledBounds)
-      failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'RESOURCE_MISSING');
-    return { turn, request: saved.request, receipt: saved.response,
-      sampledBounds: saved.sampledBounds };
-  }
-
-  async #canvasRead(operation, request) {
-    validateBoundRequest('canvas/v4', operation, request);
-    const response = validateResponse('canvas/v4', operation,
-      await this.canvas.call(operation, request));
-    if (response.requestId !== request.requestId)
-      failure('READBACK_FAILED', 'validate', 'REVISION_CHANGED');
-    if (response.error) {
-      const allowed = new Set(['PERMISSION_DENIED', 'AUTHORIZATION_REVOKED',
-        'WORLD_NOT_BOUND', 'SESSION_NOT_FOUND', 'OBJECT_NOT_FOUND',
-        'STALE_REVISION', 'UNDO_CONFLICT', 'SAVED_RESOURCE_UNAVAILABLE',
-        'CAPABILITY_UNAVAILABLE', 'READBACK_FAILED', 'TRANSACTION_CONFLICT',
-        'APPLY_FAILED', 'ROLLBACK_FAILED', 'RESTORE_FAILED',
-        'RECOVERY_PENDING', 'OBJECT_SCOPE_MISMATCH']);
-      if (!allowed.has(response.error.code))
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const error = new Error(response.error.code);
-      error.publicError = response.error;
-      throw error;
-    }
-    return response.result;
-  }
-
-  async #currentUndo(body, state) {
-    checkSessionUndoHandshake(this.contractHandshake);
-    const source = await this.#undoSource(body, state);
-    if (!source) return { status: { sessionRef: body.sessionRef, worldRef: body.worldRef,
-      turnRef: null, turnRevision: null, availability: 'NO_VERIFIED_BUILD', head: null } };
-    requireUndoPeer(this.canvas);
-    if (!this.canvas?.call)
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    const common = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-      sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
-      worldRef: body.worldRef };
-    const inventory = await this.#canvasRead('ListObjects', { ...common,
-      requestId: `${body.requestId}:objects`, expectedRevision: null });
-    if (inventory.worldRef !== body.worldRef)
-      failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-    const matches = [];
-    for (const object of inventory.objects) {
-      const history = await this.#canvasRead('HistoryQuery', { ...common,
-        requestId: `${body.requestId}:history:${object.objectRef}`,
-        objectRef: object.objectRef, expectedHistoryRevision: null });
-      if (history.worldRef !== body.worldRef || history.objectRef !== object.objectRef)
-        failure('READBACK_FAILED', 'validate', 'REVISION_CHANGED');
-      const entry = history.entries.find(row =>
-        row.transactionId === source.receipt.transactionId &&
-        row.receiptDigest === recordedDigest(source.receipt) &&
-        row.operationDigest === source.receipt.operationDigest &&
-        row.status === 'VERIFIED' && row.affectedObjectRefs.includes(object.objectRef));
-      if (entry) matches.push({ object, history, entry });
-    }
-    if (!matches.length)
-      failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'RESOURCE_MISSING');
-    const refs = matches[0].entry.affectedObjectRefs;
-    if (matches.length !== refs.length ||
-        !refs.every(ref => matches.some(row => row.object.objectRef === ref &&
-          JSON.stringify(row.entry) === JSON.stringify(matches[0].entry))))
-      failure('OBJECT_SCOPE_MISMATCH', 'validate', 'SCOPE_DENIED');
-    const sameHead = matches.every(row =>
-      row.history.historyRevision === matches[0].history.historyRevision &&
-      row.history.headTransactionId === matches[0].history.headTransactionId);
-    if (!sameHead)
-      failure('UNDO_CONFLICT', 'validate', 'EXTERNAL_EDIT_CONFLICT');
-    const history = matches[0].history;
-    const head = { historyRevision: history.historyRevision,
-      headTransactionId: history.headTransactionId };
-    const available = history.undoAvailable &&
-      history.headTransactionId === source.receipt.transactionId;
-    return { source, matches, status: { sessionRef: body.sessionRef,
-      worldRef: body.worldRef, turnRef: source.turn.turnRef,
-      turnRevision: source.turn.turnRevision,
-      availability: available ? 'AVAILABLE' : 'NO_UNDO_AT_HEAD', head } };
-  }
-
-  async #finishUndo(body, log, state, pending) {
-    const before = pending.beforeHead;
-    const after = [];
-    for (const objectRef of pending.affectedObjectRefs) {
-      const history = await this.#canvasRead('HistoryQuery', {
-        contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
-        worldRef: body.worldRef, objectRef,
-        requestId: `${pending.request.requestId}:after:${objectRef}:${randomUUID()}`,
-        expectedHistoryRevision: null });
-      if (history.worldRef !== body.worldRef || history.objectRef !== objectRef ||
-          history.historyRevision === before.historyRevision ||
-          history.headTransactionId !== pending.expectedAfterHeadTransactionId)
-        failure('READBACK_FAILED', 'validate', 'REVISION_CHANGED');
-      const linked = history.entries.filter(entry =>
-        entry.transactionId === pending.request.transactionId &&
-        entry.originTransactionId === pending.request.historyTransactionId &&
-        entry.status === 'VERIFIED' &&
-        entry.receiptDigest === recordedDigest(pending.receipt) &&
-        entry.historyRevision === history.historyRevision &&
-        JSON.stringify(entry.affectedObjectRefs) ===
-          JSON.stringify(pending.affectedObjectRefs));
-      if (linked.length !== 1)
-        failure('READBACK_FAILED', 'validate', 'REVISION_CHANGED');
-      after.push(history);
-    }
-    if (after.some(row => row.historyRevision !== after[0].historyRevision ||
-        row.headTransactionId !== after[0].headTransactionId))
-      failure('READBACK_FAILED', 'validate', 'REVISION_CHANGED');
-    const result = { sessionRef: body.sessionRef, worldRef: body.worldRef,
-      turnRef: pending.turnRef, turnRevision: pending.turnRevision,
-      status: 'VERIFIED', beforeHead: before,
-      afterHead: { historyRevision: after[0].historyRevision,
-        headTransactionId: after[0].headTransactionId } };
-    state.pendingUndo = { ...pending, status: 'VERIFIED', result };
-    await this.#save(body.sessionRef, log, state);
-    return result;
-  }
-
-  async #sendReservedUndo(body, pending) {
-    let receipt;
-    try { receipt = await this.#canvasRead('Undo', pending.request); }
-    catch (error) {
-      if (['NONE', 'ROLLED_BACK'].includes(error?.publicError?.mutationState)) {
-        const latest = await this.#load(body.sessionRef);
-        if (latest.state.pendingUndo?.request?.requestId === pending.request.requestId) {
-          latest.state.pendingUndo = null;
-          await this.#save(body.sessionRef, latest.log, latest.state);
-        }
-      }
-      throw error;
-    }
-    if (receipt.status !== 'VERIFIED' ||
-        receipt.transactionId !== pending.request.transactionId)
-      failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-    const latest = await this.#load(body.sessionRef);
-    latest.state.pendingUndo = { ...pending, status: 'CANVAS_VERIFIED', receipt };
-    await this.#save(body.sessionRef, latest.log, latest.state);
-    const saved = await this.#load(body.sessionRef);
-    return this.#finishUndo(body, saved.log, saved.state, saved.state.pendingUndo);
-  }
-
-  async #undoCurrentBuild(body) {
-    return this.#withLock(body.sessionRef, async () => {
-      checkSessionUndoHandshake(this.contractHandshake);
-      requireUndoPeer(this.canvas);
-      const { log, state } = await this.#load(body.sessionRef);
-      const pending = state.pendingUndo;
-      if (pending) {
-        if (pending.status === 'ROLLED_BACK' &&
-            pending.request.requestId === body.requestId)
-          failure('UNDO_CONFLICT', 'validate', 'EXTERNAL_EDIT_CONFLICT');
-        if (pending.status !== 'ROLLED_BACK') {
-          if (pending.request.requestId !== body.requestId)
-            failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-          if (pending.expectedTurnRevision !== body.expectedTurnRevision ||
-              pending.expectedHistoryRevision !== body.expectedHistoryRevision ||
-              pending.request.actorRef !== body.actorRef ||
-              pending.request.authorizationRef !== body.authorizationRef ||
-              pending.request.worldRef !== body.worldRef)
-            failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
-          if (pending.status === 'VERIFIED') return pending.result;
-          if (pending.status === 'RESERVED')
-            return this.#sendReservedUndo(body, pending);
-          return this.#finishUndo(body, log, state, pending);
-        }
-      }
-      const current = await this.#currentUndo(body, state);
-      if (current.status.availability !== 'AVAILABLE')
-        failure('UNDO_CONFLICT', 'validate', 'EXTERNAL_EDIT_CONFLICT');
-      if (current.status.turnRevision !== body.expectedTurnRevision ||
-          current.status.head.historyRevision !== body.expectedHistoryRevision)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      const worldRevisions = [];
-      const objectRevisions = {};
-      for (const { object } of current.matches) {
-        const facts = await this.#canvasRead('InspectObject', {
-          contractVersion: 'canvas/v4', actorRef: body.actorRef,
-          sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
-          worldRef: body.worldRef, objectRef: object.objectRef,
-          requestId: `${body.requestId}:inspect:${object.objectRef}`,
-          expectedRevision: object.objectRevision,
-          sampledBounds: current.source.sampledBounds });
-        if (facts.worldRef !== body.worldRef ||
-            facts.objectRef !== object.objectRef ||
-            facts.objectRevision !== object.objectRevision ||
-            typeof facts.worldRevision !== 'string')
-          failure('READBACK_FAILED', 'validate', 'REVISION_CHANGED');
-        worldRevisions.push(facts.worldRevision);
-        objectRevisions[object.objectRef] = facts.objectRevision;
-      }
-      if (worldRevisions.some(value => value !== worldRevisions[0]))
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: body.worldRef,
-        objectRef: current.matches[0].object.objectRef,
-        transactionId: `undo-${randomUUID()}`,
-        historyTransactionId: current.source.receipt.transactionId,
-        expectedHistoryRevision: body.expectedHistoryRevision,
-        expectedWorldRevision: worldRevisions[0],
-        expectedObjectRevisions: objectRevisions,
-        intentDigest: current.source.request.authorizationBinding.intentDigest,
-        surfaceActionDigest: current.source.request.authorizationBinding.surfaceActionDigest };
-      validateBoundRequest('canvas/v4', 'Undo', request);
-      const reserved = { request, turnRef: current.status.turnRef,
-        turnRevision: current.status.turnRevision,
-        expectedTurnRevision: body.expectedTurnRevision,
-        expectedHistoryRevision: body.expectedHistoryRevision,
-        beforeHead: current.status.head,
-        expectedAfterHeadTransactionId: current.matches[0].history.entries[
-          current.matches[0].history.entries.findIndex(row =>
-            row.transactionId === current.source.receipt.transactionId) - 1
-        ]?.transactionId ?? null,
-        affectedObjectRefs: current.matches[0].entry.affectedObjectRefs,
-        status: 'RESERVED' };
-      state.pendingUndo = reserved;
-      await this.#save(body.sessionRef, log, state);
-      return this.#sendReservedUndo(body, reserved);
-    });
-  }
-
-  async #dispatch(operation, body, proof) {
-    if (operation === 'DeleteSession')
-      failure('SESSION_DELETE_UNSUPPORTED', 'validate', 'POLICY_UNAVAILABLE');
-    if (operation === 'ReopenExistingArtifact') {
-      if (!this.resources?.reopen)
-        failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      let reopened;
-      try { reopened = await this.resources.reopen(body); }
-      catch { failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE'); }
-      const result = validateType('ReopenedArtifact', reopened);
-      if (result.artifactRef !== body.artifactRef ||
-          result.resourceManifestDigest !== body.resourceManifestDigest ||
-          result.manifest.workRevision !== body.workRevision ||
-          digestValue('saved-work-resources', result.manifest).sha256 !== body.resourceManifestDigest)
-        failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'DIGEST_MISMATCH');
-      return result;
-    }
-    if (operation === 'StartOrResumeSession') {
-      if (!this.capabilities)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      let loaded;
-      loaded = await this.#load(body.sessionRef, { allowUninitialized: true });
-      if (!loaded.state) {
-        if (body.expectedRevision !== null) failure('SESSION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
-        const state = initialState(body.sessionRef);
-        state.context.sessionRevision = revision();
-        if (!this.projectionStore?.create)
-          failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-        await this.projectionStore.create(body.sessionRef,
-          loaded.log.coreIdentity, state);
-        return this.#snapshot(state);
-      }
-      if (body.expectedRevision !== null &&
-          loaded.state.context.sessionRevision !== body.expectedRevision)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      return this.#snapshot(loaded.state);
-    }
-    if (operation === 'ReadSessionTurnDetails') {
-      checkSessionReadbackHandshake(this.contractHandshake);
-      const { state } = await this.#load(body.sessionRef);
-      const turns = state.turns.map(turn => {
-        const detail = state.turnDetails?.[turn.turnRef];
-        if (typeof detail?.resultText !== 'string' ||
-            !Object.hasOwn(detail, 'confirmedBrief'))
-          failure('READBACK_FAILED', 'validate', 'POLICY_UNAVAILABLE');
-        return { turnRef: turn.turnRef, turnRevision: turn.turnRevision,
-          userText: turn.text, resultText: detail.resultText,
-          confirmedBrief: detail.confirmedBrief };
-      });
-      return { sessionRef: body.sessionRef,
-        sessionRevision: state.context.sessionRevision, turns };
-    }
-    if (operation === 'ReadCurrentUndoStatus') {
-      const { log, state } = await this.#load(body.sessionRef);
-      if (state.pendingUndo?.status === 'CANVAS_VERIFIED')
-        await this.#finishUndo(body, log, state, state.pendingUndo);
-      else if (state.pendingUndo &&
-          !['VERIFIED', 'ROLLED_BACK'].includes(state.pendingUndo.status))
-        failure('READBACK_FAILED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      return (await this.#currentUndo(body, state)).status;
-    }
-    const { log, state } = await this.#load(body.sessionRef);
-    if (operation === 'InvokeAction') {
-      const pending = state.pendingPlacement;
-      if (!pending || !pending.frame ||
-          state.context.activeWorldRef !== pending.worldRef)
-        failure('INVALID_FRAME', 'validate', 'REVISION_CHANGED');
-      if (pending.actorRef !== body.actorRef ||
-          pending.authorizationRef !== body.authorizationRef)
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-      validateChoiceSelection(pending.frame, body);
-      const descriptor = pending.frame.actions.find(action => action.actionId === body.actionId);
-      const projection = pending.projections[body.actionId];
-      if (!projection || descriptor.surfaceActionDigest !== body.surfaceActionDigest ||
-          digestValue('surface-action', projection).sha256 !== body.surfaceActionDigest ||
-          JSON.stringify(projection) !== JSON.stringify(body.surfaceAction) ||
-          body.turnRevision !== pending.frame.turnRevision ||
-          !descriptor.inputKinds.includes(body.input.kind))
-        failure('INVALID_FRAME', 'validate', 'REVISION_CHANGED');
-      if (body.input.kind === 'SELECT_CHOICE' && proof.surface !== 'SHELL')
-        failure('RENDERER_CAPABILITY_UNAVAILABLE', 'validate', 'SCOPE_DENIED');
-      if (body.input.kind === 'PICK_WORLD_POINT' && proof.surface !== 'LUANTI')
-        failure('RENDERER_CAPABILITY_UNAVAILABLE', 'validate', 'SCOPE_DENIED');
-      const anchor = body.input.kind === 'SELECT_CHOICE' ?
-        { kind: 'NAMED_PLAYER', engineActorName: body.input.value } :
-        { kind: 'PICKED_POINT', pickRef: body.input.pickRef };
-      requirePeer(this.canvas,
-        { wires: ['canvas/v4'], factProfiles: ['target-facts/v3'] });
-      const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: pending.worldRef,
-        anchor, footprint: pending.footprint };
-      validateBoundRequest('canvas/v4', 'InspectPlacementRegion', request);
-      const response = validateResponse('canvas/v4', 'InspectPlacementRegion',
-        await this.canvas.call('InspectPlacementRegion', request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      const intent = state.confirmedIntents[pending.turnRef].intent;
-      await this.#recordPlacement(state, { ...body, turnRef: pending.turnRef },
-        response.result, pending.footprint, intent);
-      await this.#save(body.sessionRef, log, state);
-      return { invocationId: body.invocationId, resultRevision: revision(),
-        ownerRef: 'hanaworlds-workshop', domainReceiptDigest: null, accepted: true };
-    }
-    if (operation === 'PersistRequiredArtifactResources') {
-      if (!this.resources?.persist)
-        failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      let persisted;
-      try { persisted = await this.resources.persist(body); }
-      catch { failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE'); }
-      const result = validateType('SavedResourceReceipt', persisted);
-      if (!result.durable || result.resourceManifestDigest !== body.resourceManifestDigest ||
-          digestValue('saved-work-resources', result.manifest).sha256 !== body.resourceManifestDigest)
-        failure('SAVED_RESOURCE_UNAVAILABLE', 'persist', 'POLICY_UNAVAILABLE');
-      state.artifacts[body.artifactRef] = { workRevision: body.manifest.workRevision,
-        resourceManifestDigest: body.resourceManifestDigest };
-      await this.#save(body.sessionRef, log, state);
-      return result;
-    }
-    if (operation === 'RecordActionReceipt') {
-      if (state.context.sessionRevision !== body.expectedRevision)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      const turn = state.turns.find(row => row.turnRef === body.turnRef);
-      const receipt = state.pendingApply?.response?.result;
-      if (!turn || !receipt || receipt.status !== 'VERIFIED' ||
-          state.pendingApply?.turnRef !== body.turnRef ||
-          state.pendingApply?.status !== 'VERIFIED' ||
-          state.pendingApply.request.sessionRef !== body.sessionRef ||
-          digestValue('receipt', receipt).sha256 !== body.domainReceiptDigest)
-        failure('RECOVERY_PENDING', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      turn.actionReceiptDigest = body.domainReceiptDigest;
-      state.receipts.push({ turnRef: body.turnRef, actionId: body.actionId,
-        domainReceiptDigest: body.domainReceiptDigest,
-        apply: { request: copy(state.pendingApply.request),
-          response: copy(receipt),
-          sampledBounds: copy(state.lastCompiled?.inspection?.targetFacts?.sampledBounds ?? null) } });
-      if (state.pendingUndo?.status === 'VERIFIED') state.pendingUndo = null;
-      await this.#save(body.sessionRef, log, state);
-      return { sessionRef: body.sessionRef, turnRef: body.turnRef,
-        turnRevision: turn.turnRevision, briefDigest: turn.referenceBriefDigest,
-        model: 'gpt-5.6-luna', resultText: '已记录已验证的操作回执。', clarification: null };
-    }
-    if (operation === 'SwitchWorldContext') {
-      return this.#switchWorldContext(body, log, state, proof);
-    }
-    if (operation === 'AppendMultimodalTurn') {
-      if (state.context.sessionRevision !== body.expectedRevision)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      if (state.turns.some(turn => turn.turnRef === body.turnRef))
-        failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
-      const { media, imageBlocks } = await this.#mediaForModel(body);
-      const structured = media.length === 0 && parseStructureProposal(JSON.stringify({
-        kind: 'BUILD_STRUCTURE', text: body.text, purpose: body.controls.purpose,
-        dimensions: body.controls.dimensions, entrancePortalRefs: body.controls.entrancePortalRefs }));
-      const answer = structured ? JSON.stringify(structured) : await this.#modelTurn(body, imageBlocks,
-        state.turns.filter(turn => state.turnWorldRefs?.[turn.turnRef] ===
-          state.context.activeWorldRef));
-      const proposal = parseStructureProposal(answer);
-      const turnRevision = revision();
-      const clarification = { sessionRef: body.sessionRef, turnRevision,
-        invocationId: body.requestId, clarificationId: `clarify-${randomUUID()}`,
-        code: 'AMBIGUOUS_INTENT', question: proposal ?
-          `请确认在当前世界建造${proposal.text}，尺寸为${proposal.dimensions.width}×${proposal.dimensions.depth}×${proposal.dimensions.height}个节点。回复“确认”或说明修改。` : answer };
-      state.turns.push({ turnRef: body.turnRef, turnRevision, text: body.text,
-        media, referenceBriefDigest: null, intentDigest: null, actionReceiptDigest: null });
-      state.turnWorldRefs ??= Object.create(null);
-      state.turnWorldRefs[body.turnRef] = state.context.activeWorldRef;
-      state.pendingClarification = { ...clarification, proposal, structured: !!structured, turnRef: body.turnRef,
-        answers: [], afterSessionEventSeq: log.events.length - 1 };
-      state.turnPlanningModes ??= Object.create(null);
-      state.turnPlanningModes[body.turnRef] = structured ? 'SKILL_PROPOSAL' : 'FIXED';
-      state.turnControls[body.turnRef] = body.controls;
-      state.turnDetails[body.turnRef] = { resultText: clarification.question,
-        confirmedBrief: null };
-      await this.#save(body.sessionRef, log, state);
-      return { sessionRef: body.sessionRef, turnRef: body.turnRef, turnRevision,
-        briefDigest: null, model: 'gpt-5.6-luna', resultText: clarification.question, clarification };
-    }
-    if (operation === 'AnswerClarification') {
-      if (state.context.sessionRevision !== body.expectedRevision)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      const pending = state.pendingClarification;
-      if (!pending || pending.clarificationId !== body.clarificationId ||
-          pending.turnRef !== body.turnRef)
-        failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
-      const confirmationInputId = confirmingSessionInputId(log, pending, body);
-      const confirmed = ['确认', 'yes', 'YES'].includes(body.answer.trim());
-      if (!pending.proposal || !confirmed) {
-        const original = state.turns.find(value => value.turnRef === body.turnRef);
-        if (!original) failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
-        const answers = confirmed ? (pending.answers ?? []) :
-          [...(pending.answers ?? []), body.answer];
-        let answer = pending.structured ? '请更新建造参数并重新提交，之后再确认。' : '请补充明确的建造意图和节点尺寸。';
-        let proposal = null;
-        if (!confirmed && !pending.structured) {
-          const { imageBlocks } = await this.#mediaForModel({ ...body, media: original.media });
-          answer = await this.#modelTurn({ ...body,
-            text: `${original.text}\n${answers.map((value, index) =>
-              `用户补充${index + 1}：${value}`).join('\n')}` }, imageBlocks);
-          proposal = parseStructureProposal(answer);
-        }
-        const next = { ...pending, proposal, answers,
-          afterSessionEventSeq: log.events.length - 1,
-          clarificationId: `clarify-${randomUUID()}`,
-          question: proposal ?
-            `请确认在当前世界建造${proposal.text}，尺寸为${proposal.dimensions.width}×${proposal.dimensions.depth}×${proposal.dimensions.height}个节点。回复“确认”或说明修改。` : answer };
-        state.pendingClarification = next;
-        state.turnDetails[body.turnRef] = { resultText: next.question,
-          confirmedBrief: null };
-        await this.#save(body.sessionRef, log, state);
-        return { sessionRef: body.sessionRef, turnRef: body.turnRef,
-          turnRevision: pending.turnRevision, briefDigest: null, model: 'gpt-5.6-luna',
-          resultText: next.question, clarification: {
-            sessionRef: next.sessionRef, turnRevision: next.turnRevision,
-            invocationId: next.invocationId, clarificationId: next.clarificationId,
-            code: 'AMBIGUOUS_INTENT', question: next.question } };
-      }
-      if (!state.context.activeWorldRef)
-        failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      const turn = state.turns.find(value => value.turnRef === body.turnRef);
-      const brief = validateType('BriefProjection', { contractVersion: 'ReferenceBrief/v2',
-        sessionRef: body.sessionRef, turnRevision: turn.turnRevision,
-        briefRevision: revision(), media: turn.media, text: turn.text,
-        controls: state.turnControls[body.turnRef] });
-      const briefDigest = digestValue('reference-brief', brief).sha256;
-      const p = pending.proposal;
-      const intent = validateType('IntentProjection', { contractVersion: 'session/v2',
-        referenceBriefDigest: briefDigest,
-        confirmedIntent: { kind: p.kind, text: p.text, purpose: p.purpose,
-          dimensions: p.dimensions, entrancePortalRefs: p.entrancePortalRefs,
-          confirmedTurnRevision: turn.turnRevision },
-        intendedWorldRef: state.context.activeWorldRef, orderedTargetRefs: [] });
-      turn.referenceBriefDigest = briefDigest;
-      turn.intentDigest = digestValue('intent', intent).sha256;
-      state.confirmedIntents[body.turnRef] = { brief, intent,
-        confirmationInputId };
-      state.pendingClarification = null;
-      state.turnDetails[body.turnRef] = { resultText: '已确认建造意图。',
-        confirmedBrief: brief };
-      await this.#save(body.sessionRef, log, state);
-      return { sessionRef: body.sessionRef, turnRef: body.turnRef,
-        turnRevision: turn.turnRevision, briefDigest,
-        model: 'gpt-5.6-luna', resultText: '已确认建造意图。', clarification: null };
-    }
-    failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-  }
-}
-
-export const name = 'hanaworlds-workshop';
-export const inject = [];
+export const name='hanaworlds-workshop';
+export const inject=[];
 export function apply(ctx) {
-  const projectionStore = new WorkshopProjectionStore(() => ctx.get?.('storageDomain'));
-  ctx.effect?.(() => () => projectionStore.close(), 'hanaworlds-workshop.projection-close');
-  const legacyStore = new LegacyHistoryStore(() => ctx.get?.('storageDomain'));
-  ctx.effect?.(() => () => legacyStore.close(), 'hanaworlds-workshop.legacy-history-close');
-  const legacyHistory = new LegacyHistoryService(legacyStore);
-  const service = new WorkshopV1({ projectionStore });
-  const ports = {
-    sessionPersistence: 'sessionPersistence', attachments: 'attachments',
-    llm: 'llm', authority: 'hanaworldsAuthority',
-    capabilities: 'hanaworldsCapabilities', canvas: 'hanaworldsCanvasV4',
-    painter: 'hanaworldsPainterV2PictureBlocks', brush: 'hanaworldsBrushV2',
-    textPlanSource: 'hanaworldsTextPlanSource',
-    resources: 'hanaworldsRequiredResources', catalogue: 'hanaworldsCatalogue',
-    safety: 'hanaworldsSafetyProfile', compilerConfig: 'hanaworldsCompilerConfig',
-    applyAuthority: 'hanaworldsApplyAuthority', proposalAuthority: 'hanaworldsProposalAuthority',
-    mediaAuthority: 'hanaworldsMediaAuthority', modelRoute: 'hanaworldsModelRoute',
-  };
-  for (const [field, port] of Object.entries(ports))
-    Object.defineProperty(service, field, { enumerable: true,
-      get: () => ctx.get?.(port) });
-  ctx.provide?.('hanaworldsWorkshopV1', service);
-  ctx.provide?.('hanaworldsWorkshop', service);
-  ctx.provide?.('hanaworldsWorkshopLegacyHistoryV1', legacyHistory);
+ const projectionStore=new WorkshopProjectionStore(()=>ctx.get('storageDomain'));
+ ctx.effect?.(()=>()=>projectionStore.close(),'hanaworlds-workshop.projection-close');
+ const service=new WorkshopV3({projectionStore});
+ for(const [field,port] of Object.entries({sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV4PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
+ ctx.provide('hanaworldsWorkshop',service);ctx.provide('hanaworldsWorkshopV3',service);
 }
-export default { name, inject, apply };
+export default {name,inject,apply};

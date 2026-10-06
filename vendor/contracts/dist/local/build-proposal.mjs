@@ -2,20 +2,20 @@
 // world read, provider authentication, BUILD assembly or transaction decision.
 import { validateType, validateRequest, validateResponse, validateDigestBinding,
   digestValue, canonicalJSON, contractHandshake, checkContractHandshake,
-  schemaBundle, validateRegionInspection, validateStaticMaterials,
+  schemaBundle, validateBoundRequest, validateCurrentRequest, validateRegionInspection, validateStaticMaterials,
   validateWitnessCoherence } from './runtime.mjs';
 import { requireFact } from '../errors.mjs';
 import { inside, unionCellCount, comparePosition } from '../geometry.mjs';
-const WIRE = 'painter/v3', OPERATION = 'ValidateBuildProposal';
+const WIRE = 'painter/v4', OPERATION = 'ValidateBuildProposal';
 const same = (a, b) => canonicalJSON(a) === canonicalJSON(b);
-const identity = ok => requireFact(ok, 'PERMISSION_DENIED', 'IDENTITY_UNVERIFIED', 'authorize');
+const identity = ok => requireFact(ok, 'TRANSACTION_CONFLICT', 'PAYLOAD_CHANGED');
 const stale = ok => requireFact(ok, 'TARGET_FACTS_STALE', 'REVISION_CHANGED');
 const geometry = ok => requireFact(ok, 'BUILD_INVALID', 'INVALID_GEOMETRY');
 
 /** Check this new Painter producer only; not a request to update default peers. */
 export function checkBuildProposalHandshake(input) {
   const { advertised } = checkContractHandshake(input,
-    { wires: [WIRE], factProfiles: ['target-facts/v3'] });
+    { wires: [WIRE], factProfiles: ['target-facts/v4'] });
   requireFact(advertised.contracts === contractHandshake.contracts,
     'UNSUPPORTED_VERSION', 'VERSION_UNSUPPORTED', 'decode');
   return Object.freeze({ result: 'HANDSHAKE_OPERATION_MATCH', advertised });
@@ -44,7 +44,6 @@ function proposalGeometry(request) {
   // iterating an attacker-supplied huge box; overlap is counted only once.
   requireFact(unionCellCount(operations) === BigInt(written.length),
     'TARGET_FACTS_INCOMPLETE', 'REQUIRED_FACT_UNKNOWN');
-  requireFact(!region.protectedPositions.some(touched), 'PERMISSION_DENIED', 'SCOPE_DENIED', 'authorize');
   geometry(!region.bodyOccupiedPositions.some(touched));
   const effects = written.map(position => {
     const op = operations.findLast(op => inside(position, op));
@@ -61,9 +60,9 @@ function proposalGeometry(request) {
   return { operations, effects };
 }
 
-/** Payload coherence only. Authentication and currentness are provider duties. */
+/** Payload coherence only. Current connection state is a provider duty. */
 export function validateBuildProposalRequest(input) {
-  const request = validateRequest(WIRE, OPERATION, input);
+  const request = validateBoundRequest(WIRE, OPERATION, input);
   const { intent, referenceBrief: brief, targetFacts: facts, safetyProfile: safety } = request;
   for (const [field, hash, kind] of [
     ['intent', 'intentDigest', 'intent'], ['referenceBrief', 'referenceBriefDigest', 'reference-brief'],
@@ -82,7 +81,7 @@ export function validateBuildProposalRequest(input) {
     region.targetFactsDigest === request.targetFactsDigest &&
     facts.catalogueDigest === digestValue('catalogue', request.catalogue).sha256 &&
     region.evidence.worldRef === request.worldRef && region.evidence.worldRevision === facts.worldRevision);
-  requireFact(safety.requireProtectedClearance && safety.requireBodyClearance,
+  requireFact(safety.requireBodyClearance,
     'CAPABILITY_UNAVAILABLE', 'POLICY_UNAVAILABLE');
   if (safety.requireEntranceConnectivity)
     requireFact(intent.confirmedIntent.entrancePortalRefs.length > 0,
@@ -91,32 +90,23 @@ export function validateBuildProposalRequest(input) {
   return request;
 }
 
-/** Trusted inputs from authenticated Host/Workshop and public fact providers.
+/** Inputs read by Workshop from current local state and public fact providers.
  * This checks their correlation, never their authenticity or temporal atomicity. */
 export function validateBuildProposalContext(input, factsInput) {
-  const request = validateRequest(WIRE, OPERATION, input);
+  const request = validateBoundRequest(WIRE, OPERATION, input);
   const facts = validateType('BuildProposalProviderFacts', factsInput);
-  identity(facts.invocationStatus === 'ACTIVE' && facts.callerServiceRef === facts.expectedCallerServiceRef);
-  requireFact(facts.grantStatus !== 'UNKNOWN', 'CAPABILITY_UNAVAILABLE', 'REQUIRED_FACT_UNKNOWN', 'authorize');
-  requireFact(facts.grantStatus === 'CURRENT', 'AUTHORIZATION_REVOKED', 'GRANT_REVOKED', 'authorize');
-  const binding = facts.originalBinding;
-  identity(same(binding, facts.currentBinding) &&
-    binding.sessionIncarnationRef === facts.liveSessionIncarnationRef && binding.allowedActions.includes('INSPECT'));
-  for (const key of ['actorRef', 'sessionRef', 'authorizationRef', 'worldRef']) identity(request[key] === binding[key]);
-  requireFact(facts.turnStatus === 'CURRENT_CONFIRMED', 'INTENT_UNCONFIRMED', 'REQUIRED_FACT_UNKNOWN');
+  validateCurrentRequest(WIRE, OPERATION, request, facts.requestFacts);
   validateBuildProposalRequest(request);
   const keys = Object.keys(schemaBundle.definitions.BuildProposalContext.properties);
   const context = Object.fromEntries(keys.map(key => [key, request[key]]));
   stale(same(context, facts.sourceContext) && same(context, facts.currentContext));
-  requireFact(facts.replay !== 'CONFLICT' && (facts.replay === 'NEW' ? facts.priorRequest === null :
-    facts.priorRequest !== null && same(facts.priorRequest, request)), 'REPLAY_MISMATCH', 'PAYLOAD_CHANGED');
   return request;
 }
 
 /** Request/result coherence only; caller rechecks validateBuildProposalContext
- * with fresh authenticated facts before releasing this response, including replay. */
+ * with fresh local facts before releasing this response, including replay. */
 export function validateBuildProposalResponse(input, responseInput) {
-  const request = validateRequest(WIRE, OPERATION, input);
+  const request = validateBoundRequest(WIRE, OPERATION, input);
   const response = validateResponse(WIRE, OPERATION, responseInput);
   identity(response.requestId === request.requestId);
   if (response.error !== null) return response;
@@ -132,7 +122,7 @@ export function validateBuildProposalResponse(input, responseInput) {
   const positions = effects.map(effect => effect.position);
   for (const witness of build.witnesses) {
     if (witness.facts.evidence) identity(same(witness.facts.evidence, request.regionInspection.evidence));
-    if (['COVERAGE', 'PROTECTION', 'BODY_CLEARANCE'].includes(witness.predicate))
+    if (['COVERAGE', 'BODY_CLEARANCE'].includes(witness.predicate))
       geometry(same(witness.facts.positions, positions));
     if (witness.predicate === 'HAZARD')
       requireFact(positions.every(p => witness.facts.positions.some(q => same(p, q))),

@@ -40,11 +40,11 @@ window.__ModuleLoader__.load({
         const response = await invoke('hanaworlds_request', {
           operation: 'workshop', input: { sessionRef, operation,
             payload: { contractVersion: operation === 'InvokeAction' ?
-              'interaction-surface/v3' : 'session/v2', ...payload } },
+              'interaction-surface/v4' : 'session/v3', ...payload } },
         });
         if (!response || response.error || !response.result) {
           const code = response?.error?.code ?? 'INVALID_RESPONSE';
-          const reasons = { AUTHORIZATION_REVOKED: '当前授权已撤销',
+          const reasons = { CURRENT_WORLD_MISMATCH: '当前世界连接已变化',
             WORLD_NOT_BOUND: '当前世界已变化',
             SAVED_RESOURCE_UNAVAILABLE: '缺少已验证建造的持久回执',
             UNDO_CONFLICT: '建造历史已变化或发生外部编辑冲突',
@@ -517,7 +517,7 @@ window.__ModuleLoader__.load({
     function apply(ctx) {
       // Electron supplies the same host-owned request boundary through its
       // preload/client service. The host remains responsible for every live
-      // Session and authorization check; this renderer receives no refs.
+      // Core Session and local world association check; this renderer receives no refs.
       const transport = ctx.get?.('hanaworldsWorkshopTransport') ??
         window.hanaworldsWorkshopTransport;
       const invoke = typeof transport?.invoke === 'function'

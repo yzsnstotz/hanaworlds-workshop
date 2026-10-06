@@ -1,0 +1,5 @@
+# Retained implementation before the local-world protocol
+
+Source checkpoint: 323bd5fe023e512a373cbba38b816a9fbed2a7bb. This directory and the existing non-local tests retain the previous implementation/evidence for later work. They are not exported, packaged, adapted or executed by the 0.4.0 local-world MVP.
+
+The active local lane reuses Core identity and projection persistence, the complete-text clarification path, immutable proposal consumption, compilation/analysis, durable single transaction/readback and same-transaction Undo. Permission issuance is removed by owner decision 1dae1b9fc. Images, interior/entity completion, multi-object/cross-world work, resource lifecycle and extensive RPC/reentry/concurrency tests remain deferred under the current card/DEFERRED inventory. Their earlier source is preserved here and in Git, not silently deleted or claimed implemented in the local MVP. This is a protocol replacement, not the product milestone that freezes the fixed orchestration optional; that milestone still requires real skill/model/world/Undo evidence.

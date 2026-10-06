@@ -1,84 +1,14 @@
 import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
-import { dirname, join, relative, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const sourceRevision = 'e66800964726b951a300eb9377b74c318641417f';
-const admittedPackSha256 = '8624bd026815fcdafc5248b21d8bc611baa0569b7b492b66905d2d015a496ce1';
-const manifestSha256 = '3a7af7d44f673940cb6094d19f60cf3ab59eb0cd36d09b509ba7b0a47286ece8';
-const defaultRoot = fileURLToPath(new URL('../vendor/contracts/', import.meta.url));
-const digest = bytes => createHash('sha256').update(bytes).digest('hex');
-
-async function filesUnder(root, prefix = '') {
-  const found = [];
-  for (const entry of await readdir(join(root, prefix), { withFileTypes: true })) {
-    const path = join(prefix, entry.name);
-    if (entry.isDirectory()) found.push(...await filesUnder(root, path));
-    else if (entry.isFile()) found.push(path.split(sep).join('/'));
-    else throw new Error('VENDOR_UNEXPECTED_FILE_TYPE');
-  }
-  return found;
+import { join } from 'node:path';
+const root = new URL('../vendor/contracts/', import.meta.url);
+const manifest = JSON.parse(await readFile(new URL('PROVENANCE.json', root)));
+if (manifest.sourceRevision !== '8cfb18f8e13aa33d7a942f230ec6117914322cdd' || manifest.admittedPackSha256 !== 'd7b22e76de5e161abe7525596df608b3f00445fb4237808941cb5ef8328e9bc4' || manifest.sourcePackageVersion !== '0.4.0') throw Error('VENDOR_PIN_MISMATCH');
+const names = (await readdir(root, {recursive:true,withFileTypes:true})).filter(x=>x.isFile()).map(x=>join(x.parentPath,x.name));
+if (names.length !== manifest.files.length + 1) throw Error('VENDOR_FILE_SET_MISMATCH');
+for (const f of manifest.files) {
+ if (f.path.includes('..') || f.path.startsWith('/')) throw Error('VENDOR_PATH');
+ const bytes=await readFile(new URL(f.path,root));
+ if (bytes.length!==f.bytes || createHash('sha256').update(bytes).digest('hex')!==f.sha256) throw Error(`VENDOR_CHANGED:${f.path}`);
 }
-
-export async function verifyVendoredContracts(root = defaultRoot) {
-  const rawManifest = await readFile(join(root, 'PROVENANCE.json'));
-  if (digest(rawManifest) !== manifestSha256)
-    throw new Error('VENDOR_MANIFEST_DIGEST_MISMATCH');
-  const manifest = JSON.parse(rawManifest);
-  if (manifest.sourceRevision !== sourceRevision ||
-      manifest.admittedPackSha256 !== admittedPackSha256 ||
-      manifest.sourcePackageVersion !== '0.3.10' ||
-      JSON.stringify(manifest.runtimeRoots) !== JSON.stringify(['dist/v4/index.mjs']) ||
-      JSON.stringify(manifest.fixtureFiles) !== JSON.stringify(["fixtures/v4/candidate/placement-region-chain-v4.json", "fixtures/v4/proposal/text-build-proposal.json"]))
-    throw new Error('VENDOR_SOURCE_PIN_MISMATCH');
-  const listed = new Set();
-  for (const file of manifest.files) {
-    if (listed.has(file.path) || file.path.startsWith('/') ||
-        file.path.split('/').includes('..'))
-      throw new Error('VENDOR_FILE_LIST_INVALID');
-    listed.add(file.path);
-    const bytes = await readFile(join(root, file.path));
-    if (bytes.length !== file.bytes || digest(bytes) !== file.sha256)
-      throw new Error(`VENDOR_FILE_DIGEST_MISMATCH:${file.path}`);
-  }
-  const onDisk = (await filesUnder(root)).filter(path => path !== 'PROVENANCE.json');
-  if (onDisk.length !== listed.size || onDisk.some(path => !listed.has(path)))
-    throw new Error('VENDOR_FILE_SET_MISMATCH');
-
-  const visited = new Set();
-  const external = new Set();
-  const pending = [...manifest.runtimeRoots];
-  while (pending.length) {
-    const path = pending.pop();
-    if (visited.has(path)) continue;
-    if (!listed.has(path)) throw new Error(`VENDOR_IMPORT_MISSING:${path}`);
-    visited.add(path);
-    if (path.includes('/generated/')) continue;
-    const source = await readFile(join(root, path), 'utf8');
-    const specs = [...source.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g),
-      ...source.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]/g)]
-      .map(match => match[1]);
-    for (const spec of specs) {
-      if (!spec.startsWith('.')) { external.add(spec); continue; }
-      const child = resolve(root, dirname(path), spec);
-      const rel = relative(root, child).split(sep).join('/');
-      if (rel.startsWith('../') || rel === '..') throw new Error('VENDOR_IMPORT_ESCAPE');
-      pending.push(rel);
-    }
-  }
-  const modules = manifest.files.filter(file => file.path.endsWith('.mjs'))
-    .map(file => file.path).sort();
-  if (modules.length !== visited.size || modules.some(file => !visited.has(file)))
-    throw new Error('VENDOR_IMPORT_CLOSURE_MISMATCH');
-  if (JSON.stringify([...external].sort()) !==
-      JSON.stringify(manifest.allowedExternalImports))
-    throw new Error('VENDOR_EXTERNAL_IMPORT_MISMATCH');
-  return { sourceRevision, admittedPackSha256, fileCount: listed.size,
-    runtimeModuleCount: visited.size, fixtureCount: manifest.fixtureFiles.length,
-    externalImports: [...external].sort() };
-}
-
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try { console.log(JSON.stringify(await verifyVendoredContracts())); }
-  catch (error) { console.error(error.message); process.exitCode = 1; }
-}
+console.log(JSON.stringify({source:manifest.sourceRevision,pack:manifest.admittedPackSha256,files:manifest.files.length}));

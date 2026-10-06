@@ -1,16 +1,49 @@
 {
   "name": "hanaworlds-workshop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "license": "MIT",
   "description": "HanaWorlds Stage 1 Workshop Session and orchestration gadget",
-  "repository": {"type": "git", "url": "https://github.com/yzsnstotz/hanaworlds-workshop.git"},
-  "engines": {"node": ">=24.13.1 <25"},
-  "exports": {".": "./src/index.mjs", "./client": "./client.cjs"},
-  "files": ["src/", "client.cjs", "vendor/contracts/", "cordis.patch.yml", "GADGET.md", "NOTICE", "LICENSE"],
-  "dsh": {"client": {"inject": ["@deepseek-ai/dsh-client-ui-layout", "@deepseek-ai/dsh-client-ui-sidebar"], "external": ["dsh-tauri/client"], "platform": "web"}, "bundle": {"patch": "./cordis.patch.yml"}},
-  "scripts": {"build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs", "test": "node --test test/*.test.mjs"},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yzsnstotz/hanaworlds-workshop.git"
+  },
+  "engines": {
+    "node": ">=24.13.1 <25"
+  },
+  "exports": {
+    ".": "./src/index.mjs",
+    "./client": "./client.cjs"
+  },
+  "files": [
+    "src/index.mjs",
+    "src/projection-store.mjs",
+    "client.cjs",
+    "cordis.patch.yml",
+    "GADGET.md",
+    "NOTICE",
+    "LICENSE"
+  ],
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ],
+      "external": [
+        "dsh-tauri/client"
+      ],
+      "platform": "web"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs",
+    "test": "node --test test/local-world-runtime.test.mjs"
+  },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.4",
     "@deepseek-ai/dsh-invariants": "0.2.0-rc.2",
@@ -19,7 +52,7 @@
     "@deepseek-ai/dsh-storage-domain": "0.2.0-rc.2",
     "zod": "4.6.5",
     "canonicalize": "5.1.0",
-    "hanaworlds-contracts": "https://codeload.github.com/yzsnstotz/hanaworlds-contracts/tar.gz/e66800964726b951a300eb9377b74c318641417f"
+    "hanaworlds-contracts": "https://codeload.github.com/yzsnstotz/hanaworlds-contracts/tar.gz/8cfb18f8e13aa33d7a942f230ec6117914322cdd"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.0-rc.2",
