@@ -16,8 +16,8 @@ operations, and the component orchestration methods:
 - `AdvanceCurrentBuild` on `session/v2` is the public current-turn build action.
   It resolves the turn and phase from the Workshop projection, calls only
   published peer ports, and returns a typed choice, pending state, or a Canvas
-  VERIFIED receipt linked to a fresh public history readback. Its 0.3.5
-  capability check rejects older contract peers.
+  VERIFIED receipt linked to a fresh public history readback. Current capability
+  helpers require the exact 0.3.9 contract peer.
 
 - `beginFirstBuilding`, `getPlacementState`, `createBuildPlan`,
   `compileCurrentBuild`, `analyzeCurrentBuild`, `applyCurrentBuild`;
@@ -142,6 +142,79 @@ footprint. It offers only Canvas candidate players or typed in-game point
 picking. Its recorded `RegionInspection` is passed to Exterior unchanged and
 is carried into Canvas Apply with the matching BUILD/V2 document.
 
+### Explicit text plan source
+
+For a confirmed structure whose real Brief has `media: []`, Host may inject
+`hanaworldsTextPlanSource` (constructor field `textPlanSource`). This is a
+local domain planning function, not a new remote wire or a model loop. It
+advertises the public `BUILD/V2` and `target-facts/v3` handshake and implements
+`createBuildPlan(facts) -> BuildPlan`. There is no built-in plan, image fallback
+or implicit source. Missing capability fails `CAPABILITY_UNAVAILABLE`.
+
+`facts` contains `actorRef`, `sessionRef`, `requestId`, `authorizationRef`,
+`worldRef`, `turnRevision`, a fresh `invocationId`, and these existing public
+contract values: `intent`/`intentDigest`, `referenceBrief`/`referenceBriefDigest`,
+`catalogue`, `targetFacts`/`targetFactsDigest`,
+`safetyProfile`/`safetyProfileDigest`, and `regionInspection`. Workshop derives
+them from its durable confirmed turn and the unchanged Canvas inspection.
+There is no `painterId`, invented attachment, authorization projection or
+caller-supplied plan in this interface. The source is proposal-only and must
+return the same invocation ID with a strictly decoded public `BuildPlan`.
+Workshop checks its build digest, catalogue/facts/safety digests, exact frame
+and protection/body evidence, then rechecks live authority/world before saving.
+Brush still owns compilation and witness/geometry checks; Canvas still owns
+analysis, authorization, transaction and world write decisions.
+
+Image-bearing Briefs continue through the existing `painter/v3` picture-blocks
+port with text and verified image bound to the same Brief. A text source is
+never used to recover from an image validation or image Painter failure.
+The component text test uses explicit model/plan/Brush/Canvas/authority
+fixtures with real DSH/Core/Workshop persistence. It covers both unavailable
+authorization (zero Canvas Apply) and the current public authorization fixture
+through Canvas VERIFIED plus history readback. Neither case proves real Host
+authentication, model/image processing or Luanti effects.
+
+### Current default-build authorization (contracts 0.3.9)
+
+Host must inject `hanaworldsApplyAuthority` with the exact current contract
+handshake and two trusted local callbacks:
+
+- `issue(facts, body) -> CurrentBuildAuthorization`: `facts` is the strict
+  public `CurrentBuildAuthorizationFacts`, including the complete durable
+  AdvanceCurrentBuild parent, confirmed turn/input ID, intent, analysis, and
+  unsigned exact Canvas child. `body` identifies the internal apply stage.
+  Host authenticates the Workshop service and actual invocation independently,
+  checks original/current Session incarnation, native grant, engine verifier
+  and exact Workshop/Canvas service instances, calls
+  `deriveCurrentBuildAuthorization`, and atomically retains the full issuance
+  before returning. The pure helper does not authenticate or issue authority.
+- `readCurrentBuildContext(facts, issued, request) -> CurrentBuildAuthorityContext`:
+  Host independently verifies the persisted issuance and live captured parent,
+  exact child, original/current grant and service identities. Context must be
+  fresh on every call, including exact retries and asynchronous late responses.
+  Renderer/model JSON is never a source of these authority facts.
+
+Workshop persists the parent and unsigned facts before issuance. It uses
+`validateCurrentBuildAuthorizedApply` with its freshly reloaded own facts and
+the fresh Host context after issuance, after reserving the exact request,
+before every dispatch/retry, and after the Canvas response. Changed facts,
+unknown fields, old capability advertisements, substituted issuances and
+expired/revoked grants fail closed. The action digest uses the public
+`current-build-action` domain; no frame/action is invented and the old bare
+AuthProjection callback shape is not accepted. Naked `applyCurrentBuild`
+without a saved public parent is not an authorization entry point.
+
+A lost issuance response reuses the same saved unsigned child. A pending Apply
+reuses the exact original parent/request/transaction and complete issuance;
+a different request ID cannot adopt it. If revocation or another verification
+failure arrives after dispatch, Workshop retains RESERVED and reports PENDING
+without publishing success or claiming that no write occurred. Canvas remains
+the transaction/recovery owner. Completed results require the existing linked
+Canvas history readback; a subsequent confirmed turn gets a new issuance.
+
+Real Desktop Host issuance and the other origins' current contract declarations
+remain integration work. The tests explicitly fixture those dependencies.
+
 Workshop never mutates a world. Canvas owns atomic Apply and recovery.
 For first-building `DEFAULT_PLAYER`, the explicit `AnswerClarification`
 confirmation must correspond to one durable Core Session `user/message` after
@@ -176,8 +249,8 @@ Canvas history itself.
 
 Use Node 24.13.1, a card-local npm cache and isolated DSH profile. `npm ci`,
 `npm run build`, `npm test`, and `npm pack --ignore-scripts` operate from a
-fresh public clone. Current runtime uses the fixed public Contracts 0.3.8 URL
-at revision `ef681148fc4fd6e7871fcc8417baf102abf01b28` with lock integrity.
+fresh public clone. Current runtime uses the fixed public Contracts 0.3.9 URL
+at revision `a4675a4edd7b4a8a7aa4861a7949713a218d8b31` with lock integrity.
 The prior v4 closure and placement fixture under `vendor/contracts/` remain
 byte-identical to the Contracts 0.3.5 source pack at revision
 `295cbc7fd0d8a1e56a0d89e651947e668f2ad658`.
