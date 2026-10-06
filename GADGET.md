@@ -1,10 +1,10 @@
-# Workshop 0.4.1 — local-world skill business component
+# Workshop 0.4.2 — local-world skill business component
 
-Fresh profile only. Contracts 0.5.0 / source c006a839a6e6c2c63d57a14b72e4e6b26fa717f1 (tar 7fb42f1e…); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
+Fresh profile only. Contracts 0.5.2 / source 6185622e977ef5136e9ef12219e0ba89dbba29db (tar e6c50766…); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
 ## Host assembly
 
-Cordis services: `hanaworldsWorkshop` and `hanaworldsWorkshopV3` refer to the same service. Inject real `sessionPersistence`, `storageDomain`, `hanaworldsCanvasV5`, `hanaworldsPainterV2PictureBlocks`, `hanaworldsBrushV3`, `hanaworldsCatalogue.read(worldRef)`, `hanaworldsSafetyProfile.read(worldRef)`, `hanaworldsCompilerConfig.read(worldRef)` and `hanaworldsCapabilities`. Compiler settings return `{compilationConfig,compilerRevision}`. Peer services advertise exact `contractHandshake`. No other plugin import, model loop, MCP or world mutator is included.
+Cordis services: `hanaworldsWorkshop` and `hanaworldsWorkshopV3` refer to the same service. Inject real `sessionPersistence`, `storageDomain`, `hanaworldsCanvasV5`, `hanaworldsPainterV2PictureBlocks`, `hanaworldsBrushV3`, `hanaworldsCatalogue.read(worldRef)`, `hanaworldsSafetyProfile.read(worldRef)`, `hanaworldsCompilerConfig.read(worldRef)` and `hanaworldsCapabilities`. Compiler settings return `{compilationConfig,compilerRevision}`. Painter/Canvas per-cell services advertise exact `contractHandshake`; Brush advertises its public `ProtocolHandshake` for BUILD major 3 and `BUILD/V3:per-cell-compile`. No other plugin import, model loop, MCP or world mutator is included.
 
 Host must keep these ports in its internal runtime. Keep the three existing business categories as agent tools and derive the real Core Session and selected local context in Host. A model does not choose a service or call Canvas/Adapter mutators. `LocalRequestFacts` is generated from Workshop's own durable journal/current brief and fresh Canvas `ReadWorldSelectionContext`; it is never a tool input or a permission assertion.
 
@@ -95,7 +95,7 @@ AttachmentLocal (0.2.0-rc.2), with a declared agent/Host publication/Canvas fixt
 archive and independent installed package, plus the affected text normal flow.
 Actual Desktop/skill/model/image building/UI/world/Undo remains NOT_RUN.
 
-## Two write methods (S1-WS-WRITE-TOOLS-01, contracts 0.5.0)
+## Two write methods (S1-WS-WRITE-TOOLS-01, contracts 0.5.2)
 
 The one building skill has two write methods, each published as a contracts
 `WriteMethodDescriptor` (`method`, `toolName`, `purpose`, `inputType`,
@@ -116,15 +116,19 @@ proposal, changes its target or switches method.
 Compatibility: REGION requires each region port to advertise a contracts
 `ProtocolHandshake` and pass `checkProtocolCompatibility` for its wire and the
 `regionCapabilities` it owns (same major, minor ≥ required, all capabilities;
-provenance only recorded). PER_CELL keeps the existing exact
-`ContractHandshake` check (contracts: K1/K2 unchanged); if Brush also advertises
-a `ProtocolHandshake` it must carry `BUILD/V3:per-cell-compile`.
+provenance only recorded). PER_CELL requires Brush's public `ProtocolHandshake`
+to pass `protocolRequirement('BUILD/V3',['BUILD/V3:per-cell-compile'])`: BUILD
+major 3, the required minor and capability. Descriptor availability and
+`AdvanceCurrentBuild` share `PER_CELL_BRUSH`; package patch/source/hash never
+decide Brush compatibility. Wrong major or absent protocol is
+`UNSUPPORTED_VERSION`; missing capability is `CAPABILITY_UNAVAILABLE`.
+Painter/Canvas per-cell checks remain exact on contracts 0.5.2.
 
 Peer handshakes are read from each peer's public shape (0.4.1, G2): a plain
 value property, or the public methods `handshake()` / `protocolHandshake()` /
 `status().contractHandshake|protocolHandshake` — BrushV3 publishes only these
-methods. The returned values go to the unchanged exact `checkContractHandshake`
-and `checkProtocolCompatibility`; a function is never treated as a handshake and
+methods. Painter/Canvas values go to exact `checkContractHandshake`; Brush
+values go to `checkProtocolCompatibility`; a function is never treated as a handshake and
 the Host needs no alias property. Exported helpers: `peerContractHandshake`,
 `peerProtocolHandshake`.
 
@@ -158,8 +162,11 @@ Service methods:
 `npm run test:write-tools`: real Workshop, Cordis, Core JSONL, domain storage,
 attachments, Tools and HTTP; Painter/Brush/Canvas (cell and region) and the world
 are FIXTURE built with the contract's own region helpers.
-`scripts/gate-write-tools.sh <evidence-dir> <contracts-0.5.0-tar> <brush-0.5.0-tar> <workshop-0.4.0-tar>`
+`scripts/gate-write-tools.sh <evidence-dir> <contracts-0.5.2-tar> <brush-0.5.0-tar> <workshop-0.4.1-tar>`
 repeats it and the affected per-cell regression on a clean archive and the packed
 tarball, uses the actual Brush 0.5.0 `BrushV3` as the external public seam, and
-requires the previous 0.4.0 package to fail that path with UNSUPPORTED_VERSION.
-Real peers, Luanti world, model choice and UI are NOT_RUN here.
+requires the previous 0.4.1 package to reject the same cross-patch Brush fixture
+flow with UNSUPPORTED_VERSION. The baseline uses its own contracts 0.5.0 for
+Painter/Canvas to isolate the Brush exact-package defect. Actual Brush compile
+is exercised in both current source and packed runtimes; Painter/Canvas/world,
+model choice and product UI are FIXTURE or NOT_RUN here.

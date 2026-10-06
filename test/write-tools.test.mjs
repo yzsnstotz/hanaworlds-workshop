@@ -16,7 +16,7 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import * as C from 'hanaworlds-contracts';
 import { gzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
-// S1-WS-WRITE-TOOLS-01 on actual contracts 0.5.0: two WriteMethodDescriptors, PER_CELL and REGION chains.
+// S1-WS-WRITE-TOOLS-01 on actual contracts 0.5.2: two WriteMethodDescriptors, PER_CELL and REGION chains.
 // Painter/Brush/Canvas (cells and region) and the world are FIXTURE; Workshop, Cordis, Core JSONL, domain storage, attachments, Tools and HTTP are real.
 const entry=process.env.HW_WORKSHOP_PACKAGE_ENTRY??new URL('../src/index.mjs',import.meta.url).href;
 const {default:plugin}=await import(entry);
@@ -97,7 +97,7 @@ const sha=(k,v)=>C.digestValue(k,v).sha256;
 const caps=wire=>C.regionCapabilities.map(c=>c.id).filter(id=>id.startsWith(`${wire}:`));
 const handshake=(component,protocol,major,minor,capabilities,packageVersion='9.9.9-fixture')=>({profileVersion:'protocol-handshake/v1',component,protocols:[{protocol,major,minor}],capabilities:[...capabilities].sort(),provenance:{packageName:component,packageVersion,sourceRevision:null,artifactDigest:null}});
 // FIXTURE per-cell Brush advertises the public ProtocolHandshake shape the actual BrushV3 publishes.
-function BUILD_PROTOCOL(major=3,capabilities=['BUILD/V3:per-cell-compile','region-build/v1:compile-mapblock-chunks'],packageVersion='0.5.0'){return {profileVersion:'protocol-handshake/v1',component:'hanaworlds-brush',protocols:[{protocol:'BUILD',major,minor:0},{protocol:'region-build',major:1,minor:0}],capabilities:[...capabilities].sort(),provenance:{packageName:'hanaworlds-brush',packageVersion,sourceRevision:null,artifactDigest:null}};}
+function BUILD_PROTOCOL(major=3,capabilities=['BUILD/V3:per-cell-compile','region-build/v1:compile-mapblock-chunks'],packageVersion='0.5.0'){return {profileVersion:'protocol-handshake/v1',component:'hanaworlds-brush',protocols:[{protocol:'BUILD',major,minor:0},{protocol:'region-build',major:1,minor:0}],capabilities:[...capabilities].sort(),provenance:{packageName:'hanaworlds-brush',packageVersion,sourceRevision:packageVersion==='0.5.0'?null:'f'.repeat(40),artifactDigest:packageVersion==='0.5.0'?null:'e'.repeat(64)}};}
 const STONE={nodeName:'fixture:stone',param2:0},AIR={nodeName:'air',param2:0};
 const boxOf=b=>({min:[...b.origin],max:b.origin.map((o,a)=>o+b.size[a]-1)});
 const cellsOf=box=>{const out=[];for(let z=box.min[2];z<=box.max[2];z++)for(let y=box.min[1];y<=box.max[1];y++)for(let x=box.min[0];x<=box.max[0];x++)out.push([x,y,z]);return out;};
@@ -221,7 +221,7 @@ test('REGION unavailable on wrong Canvas major: explains needs, zero Painter cal
  });
 });
 
-test('PER_CELL chain on 0.5.0: image brief → Painter → Brush → Canvas → same build Undo',async()=>{
+test('PER_CELL chain on 0.5.2: image brief → Painter → Brush → Canvas → same build Undo',async()=>{
  const f=fixture();await withRuntime(f,async r=>{
   const before=await r.ws.describeWriteTools('s1');assert.deepEqual(codes(before.tools[0].availability),['SESSION_NOT_FOUND']);
   const {media,advance}=await imageBrief(r,f);const described=await r.ws.describeWriteTools('s1');
@@ -279,11 +279,16 @@ test('G2: actual Brush 0.5.0 package BrushV3 drives the PER_CELL path (real comp
  const B=await import(process.env.HW_BRUSH_PACKAGE_ENTRY);const f=fixture();f.brush=new B.BrushV3();
  assert.equal(B.version,'0.5.0');assert.equal(Object.hasOwn(f.brush,'contractHandshake'),false);
  await perCellFlow(f,`ACTUAL hanaworlds-brush@${B.version}`);
- assert.deepEqual(W.peerContractHandshake(f.brush),C.contractHandshake);assert.equal(W.peerProtocolHandshake(f.brush).profileVersion,'protocol-handshake/v1');
+ assert.deepEqual(W.peerContractHandshake(f.brush),B.contractHandshake);
+ assert.equal(W.peerContractHandshake(f.brush).contracts,'hanaworlds-contracts@0.5.0');
+ assert.equal(C.contractHandshake.contracts,'hanaworlds-contracts@0.5.2');
+ const advertised=W.peerProtocolHandshake(f.brush);assert.equal(advertised.profileVersion,'protocol-handshake/v1');
+ const compatible=C.checkProtocolCompatibility(advertised,[C.protocolRequirement('BUILD/V3',['BUILD/V3:per-cell-compile'])]);
+ log('K3_ACTUAL_BRUSH_CROSS_PATCH',{brushContract:W.peerContractHandshake(f.brush),workshopContract:C.contractHandshake,advertised,compatible});
 });
 test('K3 per-cell Brush check = protocol major + capability: cross patch/hash accepted, wrong major / missing capability / no ProtocolHandshake named',async()=>{
  const f=fixture();
- const otherPatch=methodBrush(f,BUILD_PROTOCOL(3,undefined,'0.5.9-other-patch'),{...C.contractHandshake,contracts:'hanaworlds-contracts@0.5.1'});
+ const otherPatch=methodBrush(f,BUILD_PROTOCOL(3,undefined,'0.5.9-other-patch'),{...C.contractHandshake,contracts:'hanaworlds-contracts@0.5.99-fixture'});
  const wrongMajor=methodBrush(f,BUILD_PROTOCOL(4));
  const noCapability=methodBrush(f,BUILD_PROTOCOL(3,['region-build/v1:compile-mapblock-chunks']));
  const fn=()=>({});const functionOnly={contractHandshake:fn,protocolHandshake:fn};
@@ -295,7 +300,7 @@ test('K3 per-cell Brush check = protocol major + capability: cross patch/hash ac
  log('K3_BRUSH_PROTOCOL_CHECK',{crossPatchHash:ok,wrongMajor:a,missingCapability:b,invalidHandshakeValue:c});
 });
 test('K3 per-cell: Brush on another contracts patch/hash (same BUILD major + capability) builds and undoes',async()=>{
- const f=fixture();f.brush=methodBrush(f,BUILD_PROTOCOL(3,undefined,'0.5.9-other-patch'),{...C.contractHandshake,contracts:'hanaworlds-contracts@0.5.1'});
+ const f=fixture();f.brush=methodBrush(f,BUILD_PROTOCOL(3,undefined,'0.5.9-other-patch'),{...C.contractHandshake,contracts:'hanaworlds-contracts@0.5.99-fixture'});
  await perCellFlow(f,'FIXTURE other contracts patch, same BUILD major');
 });
 test('K3 per-cell: Brush losing the capability after validation is rejected at Advance with zero writes',async()=>{
