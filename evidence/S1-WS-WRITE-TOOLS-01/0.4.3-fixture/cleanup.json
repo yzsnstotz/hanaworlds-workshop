@@ -1,0 +1,14 @@
+{
+  "removed": [
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/node_modules",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/npm-cache",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/runtime-043-red",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/runtime-043-green",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/runtime-043-green-2"
+  ],
+  "scope": "own generated dependency/cache/test runtime only",
+  "gateTemporaryRuntime": "trap removed runtime directory including independent installs, npm-cache and fixtures; runtime.txt is preserved evidence",
+  "preserved": "all source, committed evidence, fixed input tarballs, prior E and packages, profile and rollback material",
+  "outsideCardCleanup": false,
+  "cleanupReceiptCorrection": "first archive check included runtime.txt in a directory glob; corrected to check directories; no gate or test failure"
+}

@@ -1,0 +1,71 @@
+[
+  {
+    "id": "hanaworlds-workshop@0.4.3",
+    "name": "hanaworlds-workshop",
+    "version": "0.4.3",
+    "size": 32327,
+    "unpackedSize": 113126,
+    "shasum": "5caa17351245b5b7a73c30475aee0107358a5dd5",
+    "integrity": "sha512-qK7YwsxB/OzDNSmsNWoqjcRpkzJTLybj0i6IeKx4Fz859eghEsPO6HDJU2StBKpfVUzHa7NnG/HYNgKZSQx7vg==",
+    "filename": "hanaworlds-workshop-0.4.3.tgz",
+    "files": [
+      {
+        "path": "GADGET.md",
+        "size": 16644,
+        "mode": 420
+      },
+      {
+        "path": "LICENSE",
+        "size": 1081,
+        "mode": 420
+      },
+      {
+        "path": "NOTICE",
+        "size": 1850,
+        "mode": 420
+      },
+      {
+        "path": "README.md",
+        "size": 1084,
+        "mode": 420
+      },
+      {
+        "path": "client.cjs",
+        "size": 30697,
+        "mode": 420
+      },
+      {
+        "path": "cordis.patch.yml",
+        "size": 72,
+        "mode": 420
+      },
+      {
+        "path": "package.json",
+        "size": 2331,
+        "mode": 420
+      },
+      {
+        "path": "src/image-attachment.mjs",
+        "size": 4402,
+        "mode": 420
+      },
+      {
+        "path": "src/index.mjs",
+        "size": 43491,
+        "mode": 420
+      },
+      {
+        "path": "src/projection-store.mjs",
+        "size": 3062,
+        "mode": 420
+      },
+      {
+        "path": "src/write-tools.mjs",
+        "size": 8412,
+        "mode": 420
+      }
+    ],
+    "entryCount": 11,
+    "bundled": []
+  }
+]

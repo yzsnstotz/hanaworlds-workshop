@@ -1,0 +1,18 @@
+{"evidence":"G2_PER_CELL_METHOD_SHAPED_BRUSH","workshop":"0.4.3","contracts":"hanaworlds-contracts@0.5.2","brush":"FIXTURE Painter4/Canvas5 other patch/hash; Brush fixture","brushHasProperty":{"contractHandshake":true,"protocolHandshake":"object"},"perCell":{"method":"PER_CELL","available":true,"unmet":[]},"regionDescriptor":{"method":"REGION","toolName":"hanaworlds_region_proposal","purpose":"Large fill or dig in one Canvas transaction: flatten or raise terrain, fill a basin, carve a valley or clear a slab.","inputType":"RegionProposal","typicalScale":"Hundreds to millions of cells across many 16×16×16 mapblocks, written per mapblock as one logical transaction with whole-region Undo. Typical scale is guidance for the skill, not a limit: Workshop has no size threshold or setting, never truncates a proposal, changes its target or switches method.","scaleUnit":"cells","requiredCapabilities":["canvas-region/v1:compressed-before-snapshot","canvas-region/v1:rollback-on-failure","canvas-region/v1:single-logical-transaction","canvas-region/v1:whole-region-undo","painter-region/v1:validate-region-proposal","region-build/v1:compile-mapblock-chunks"],"unavailableReason":"PEER_UNAVAILABLE: needs Painter service hanaworldsPainterRegionV1 (painter-region/v1); PEER_UNAVAILABLE: needs Brush service hanaworldsBrushRegionV1 (region-build/v1); PEER_UNAVAILABLE: needs Canvas service hanaworldsCanvasRegionV1 (canvas-region/v1)"},"outcome":"VERIFIED","undo":"VERIFIED","canvasWrites":1,"undoWrites":1,"media":{"attachmentRef":"sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3","storedBytesDigest":"ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3","projectionVariantId":null,"projectionBytesDigest":null,"mediaType":"image/png","bytes":96,"width":2,"height":2}}
+{"evidence":"K3_PAINTER_CANVAS_AVAILABILITY","workshop":"0.4.3","contracts":"hanaworlds-contracts@0.5.2","normal":{"method":"PER_CELL","available":true,"unmet":[]},"canvas5Declaration":"FIXTURE only","perCellCapabilityIds":"none published for Painter/Canvas; only Brush per-cell compile is required"}
+✔ K3 Painter/Canvas: cross patch/hash and methods accept normal image proposal → advance → same-build Undo (FIXTURE) (506.59075ms)
+✔ K3 Painter/Canvas: wrong major, no protocol, region-only and exact-only are named and unavailable (1.314833ms)
+{"evidence":"K3_PAINTER_CALL_REJECT","workshop":"0.4.3","contracts":"hanaworlds-contracts@0.5.2","error":{"code":"UNSUPPORTED_VERSION","phase":"validate","retryability":"AFTER_NEW_FACTS","mutationState":"NONE","transactionRef":null,"causeCode":null,"reason":"REQUIRED_FACT_UNKNOWN"},"painterCalls":0,"canvasWrites":0}
+✔ K3 Painter: protocol change before submission rejects without Painter/Canvas calls (161.884ms)
+{"evidence":"K3_CANVAS_ADVANCE_REJECT","workshop":"0.4.3","contracts":"hanaworlds-contracts@0.5.2","error":{"code":"UNSUPPORTED_VERSION","phase":"decode","retryability":"NEVER","mutationState":"NONE","transactionRef":null,"causeCode":null,"reason":"VERSION_UNSUPPORTED"},"canvasWrites":0,"brushCompiles":0}
+✔ K3 Canvas: protocol change before advance rejects with zero writes (224.551917ms)
+{"evidence":"K3_CANVAS_UNDO_REJECT","workshop":"0.4.3","contracts":"hanaworlds-contracts@0.5.2","error":{"code":"UNSUPPORTED_VERSION","phase":"decode","retryability":"NEVER","mutationState":"NONE","transactionRef":null,"causeCode":null,"reason":"VERSION_UNSUPPORTED"},"undoWrites":0}
+✔ K3 Canvas: missing declaration before Undo rejects with zero undo writes (323.180542ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1383.890333
