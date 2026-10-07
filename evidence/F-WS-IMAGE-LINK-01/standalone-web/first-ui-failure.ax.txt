@@ -1,0 +1,34 @@
+Browser tab: 1, Title: "Workshop · 图片链接", URL: "http://127.0.0.1:47605/".
+0 AXWebArea Workshop · 图片链接, URL: 127.0.0.1:47605/
+	1 container
+		2 link Description: HanaWorlds Workshop, Value: 127.0.0.1:47605/
+		3 text 本机开发网页
+		4 text IMAGE → ATTACHMENT
+		5 heading 把图片链接，带进对话。, Value: 1
+			6 text 把图片链接，带进对话。
+		7 text 下载真实图片，查看缩略图与尺寸，再读回它在示例对话中的附件状态。
+		8 text 示例对话 · FIXTURE
+		9 text 此页使用独立示例会话与持久化桥，不是 HanaWorlds App 的当前对话。图片通过真实 HTTP 下载、解码和附件存储；不调用模型，不写世界。
+		10 heading 01 图片链接, Value: 2
+			11 text 01  图片链接
+		12 container form
+			13 text HTTP / HTTPS 图片地址
+			14 text field (settable) HTTP / HTTPS 图片地址, Value: http://127.0.0.1:47605/sample.png, ID: url
+			15 text PNG、JPEG、WebP 或 GIF · 请输入直接图片链接
+			16 button 下载并关联示例对话 ↗, ID: download
+				17 text 下载并关联示例对话
+				18 text ↗
+		19 button 填入本机示例 PNG（FIXTURE，2 × 2）, ID: sample
+		30 text 没有展示未经确认的附件结果。
+		31 text 未完成：session "workshop-example-9c0432d6-33c7-497b-9f25-ab708dcd114c" not found
+		21 text 示例会话
+		22 text workshop-example-9c0432d6-33c7-497b-9f25-ab708dcd114c
+		23 heading 02 附件读回, Value: 2
+			24 text 02  附件读回
+		25 container empty
+			26 text ▧
+			27 text 图片会显示在这里
+			28 text 下载完成后，再读回同一会话、同一附件。
+		29 text Workshop 图片链接开发入口 真实图片 · 示例会话
+
+The focused UI element is 0 AXWebArea Workshop · 图片链接, URL: 127.0.0.1:47605/

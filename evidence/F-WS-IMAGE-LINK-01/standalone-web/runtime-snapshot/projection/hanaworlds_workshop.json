@@ -1,0 +1,52 @@
+{
+  "unit": {
+    "name": "hanaworlds_workshop",
+    "version": 1
+  },
+  "global": null,
+  "tables": {
+    "sessions": {
+      "workshop-example-2509bf9b-8552-477b-838a-cb8d0dbe00e0": {
+        "coreIdentity": {
+          "id": "workshop-example-2509bf9b-8552-477b-838a-cb8d0dbe00e0",
+          "version": 4,
+          "createdAt": 1791382662210,
+          "cwd": "/Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/runtime/web/session-3n9nLF"
+        },
+        "state": {
+          "context": {
+            "currentSession": "workshop-example-2509bf9b-8552-477b-838a-cb8d0dbe00e0",
+            "activeWorldRef": null,
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "rev-85c790a1-b50c-4838-9364-d851768adf1c",
+            "selectionRevision": "0",
+            "localContext": null
+          },
+          "turns": [],
+          "details": {},
+          "confirmed": {},
+          "pending": null,
+          "requests": {},
+          "contexts": {},
+          "builds": {},
+          "undos": {},
+          "images": {
+            "sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3": {
+              "media": {
+                "attachmentRef": "sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                "storedBytesDigest": "ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                "projectionVariantId": null,
+                "projectionBytesDigest": null,
+                "mediaType": "image/png",
+                "bytes": 96,
+                "width": 2,
+                "height": 2
+              },
+              "sourceMessageId": "workshop-link-f96ba2c8-a94e-4530-85d3-6c58830bcc35"
+            }
+          }
+        }
+      }
+    }
+  }
+}

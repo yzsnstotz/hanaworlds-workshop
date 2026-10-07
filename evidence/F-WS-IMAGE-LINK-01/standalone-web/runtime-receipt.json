@@ -1,0 +1,38 @@
+{
+  "ready": {
+    "event": "WORKSHOP_WEB_READY",
+    "pid": 75723,
+    "url": "http://127.0.0.1:47605/",
+    "sessionRef": "workshop-example-2509bf9b-8552-477b-838a-cb8d0dbe00e0",
+    "runtime": "/Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/runtime/web/session-3n9nLF",
+    "fixture": {
+      "kind": "FIXTURE",
+      "label": "示例对话（FIXTURE）",
+      "writer": "示例 Session 持久化桥；非正式 App Host",
+      "modelCalls": 0,
+      "worldWrites": 0
+    }
+  },
+  "files": [
+    {
+      "path": "/Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/runtime/web/session-3n9nLF/core/--Users-yzliu-.cache-hanaworlds-runs-F-WS-IMAGE-LINK-01-runtime-web-session-3n9nLF--/workshop-example-2509bf9b-8552-477b-838a-cb8d0dbe00e0/session.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/runtime/web/session-3n9nLF/core/--Users-yzliu-.cache-hanaworlds-runs-F-WS-IMAGE-LINK-01-runtime-web-session-3n9nLF--/workshop-example-2509bf9b-8552-477b-838a-cb8d0dbe00e0/session.v4.jsonl",
+      "bytes": 1864,
+      "sha256": "5941e220a418639136e165a393f6997b8b5fb0070927779711e52ca77faaf05c"
+    },
+    {
+      "path": "/Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/runtime/web/session-3n9nLF/media/attachments/v1/objects/ff/ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+      "bytes": 96,
+      "sha256": "ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3"
+    },
+    {
+      "path": "/Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/runtime/web/session-3n9nLF/projection/hanaworlds_workshop.json",
+      "bytes": 1756,
+      "sha256": "40cea0cc6b62ef6e3b42cbc6bfe65d4b54886deca6976e51d40f9f58560bbcbd"
+    }
+  ]
+}

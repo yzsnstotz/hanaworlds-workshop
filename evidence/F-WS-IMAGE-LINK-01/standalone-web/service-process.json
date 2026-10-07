@@ -1,0 +1,9 @@
+{
+  "pid": 75723,
+  "command": [
+    "/Users/yzliu/.local/share/fnm/node-versions/v24.13.1/installation/bin/node",
+    "/Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/web/server.mjs"
+  ],
+  "observedCommand": "/Users/yzliu/.local/share/fnm/node-versions/v24.13.1/installation/bin/node /Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/web/server.mjs",
+  "listener": "COMMAND   PID  USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\nnode    75723 yzliu   12u  IPv4 0x2bd94e6b3ac1253f      0t0  TCP 127.0.0.1:47605 (LISTEN)\n"
+}

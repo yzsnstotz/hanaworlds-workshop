@@ -1,0 +1,8 @@
+{
+  "pid": 74483,
+  "command": [
+    "/Users/yzliu/.local/share/fnm/node-versions/v24.13.1/installation/bin/node",
+    "/Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/web/server.mjs"
+  ],
+  "observedCommand": "/Users/yzliu/.local/share/fnm/node-versions/v24.13.1/installation/bin/node /Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/web/server.mjs"
+}

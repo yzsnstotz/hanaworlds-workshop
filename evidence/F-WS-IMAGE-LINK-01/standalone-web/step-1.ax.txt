@@ -1,0 +1,45 @@
+Browser tab: 1, Title: "Workshop · 图片链接", URL: "http://127.0.0.1:47605/".
+1 AXWebArea Workshop · 图片链接, URL: 127.0.0.1:47605/
+	2 container
+		3 link Description: HanaWorlds Workshop, Value: 127.0.0.1:47605/
+		4 text 本机开发网页
+		5 text IMAGE → ATTACHMENT
+		6 heading 把图片链接，带进对话。, Value: 1
+			7 text 把图片链接，带进对话。
+		8 text 下载真实图片，查看缩略图与尺寸，再读回它在示例对话中的附件状态。
+		9 text 示例对话 · FIXTURE
+		10 text 此页使用独立示例会话与持久化桥，不是 HanaWorlds App 的当前对话。图片通过真实 HTTP 下载、解码和附件存储；不调用模型，不写世界。
+		11 heading 01 图片链接, Value: 2
+			12 text 01  图片链接
+		13 container form
+			14 text HTTP / HTTPS 图片地址
+			15 text field (settable) HTTP / HTTPS 图片地址, Value: http://127.0.0.1:47605/sample.png, ID: url
+			16 text PNG、JPEG、WebP 或 GIF · 请输入直接图片链接
+			17 button 下载并关联示例对话 ↗, ID: download
+				18 text 下载并关联示例对话
+				31 text ↗
+		20 button 填入本机示例 PNG（FIXTURE，2 × 2）, ID: sample
+		32 text 已读回同一示例对话中的同一图片附件。
+		22 text 示例会话
+		23 text workshop-example-2509bf9b-8552-477b-838a-cb8d0dbe00e0
+		24 heading 02 附件读回, Value: 2
+			25 text 02  附件读回
+		33 container result
+			34 image Description: 真实下载并读回的图片, ID: image
+			35 text ● 已关联示例对话 · FIXTURE
+			36 definition list
+				37 container 类型
+					38 text 类型
+				39 text image/png
+				40 container 尺寸
+					41 text 尺寸
+				42 text 2 × 2 px
+				43 container 实际存储
+					44 text 实际存储
+				45 text 96 B
+			46 button 再次读回附件状态, ID: read
+			47 button (collapsed) 附件详情, Secondary Actions: Expand
+				48 text 附件详情
+		30 text Workshop 图片链接开发入口 真实图片 · 示例会话
+
+The focused UI element is 1 AXWebArea Workshop · 图片链接, URL: 127.0.0.1:47605/

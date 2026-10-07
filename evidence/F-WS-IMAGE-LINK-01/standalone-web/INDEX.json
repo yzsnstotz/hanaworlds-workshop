@@ -1,0 +1,137 @@
+[
+  {
+    "path": "REPORT-before-standalone-web.md",
+    "bytes": 9746,
+    "sha256": "29d3803542968beac5b11dc192487136dc446903ffb9a98213f96077c20edfbd"
+  },
+  {
+    "path": "browser-console.json",
+    "bytes": 2,
+    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  {
+    "path": "delivery-receipt.json",
+    "bytes": 1680,
+    "sha256": "a6a9476212a8dd71099e8e73ee3ff100b24c9bc978fa0eb9d5c48b9a29e7c32f"
+  },
+  {
+    "path": "dependency-install.log",
+    "bytes": 352,
+    "sha256": "87837a13a3a32125855f26c2d9b030a4608008590a8042df825f074d63f95357"
+  },
+  {
+    "path": "first-ui-failure.ax.txt",
+    "bytes": 1792,
+    "sha256": "2986588386abab64a8335f87343e517af265542299ad957a3fbcbe8b1f8c8745"
+  },
+  {
+    "path": "first-ui-failure.jpg",
+    "bytes": 62920,
+    "sha256": "e8021975062f3b51a8f1953d9ba6fcfc964cd2822fd41b6716e5b589b4c62ec7"
+  },
+  {
+    "path": "native-events.json",
+    "bytes": 47201,
+    "sha256": "0d7a428503f001a0b971f19c7717c2392bdfd51a3c8660b1c0f27d16bed9620a"
+  },
+  {
+    "path": "new-entry-green.log",
+    "bytes": 231,
+    "sha256": "edb897922dfa0c51274c33bff6f683cc043b1779c9f0998df436a5b9cb3a4c79"
+  },
+  {
+    "path": "new-entry-red.log",
+    "bytes": 1415,
+    "sha256": "6450618ff1c59b74add5df8db23ebe17e7c50c9b063803b8eb984d71e0bf8cb1"
+  },
+  {
+    "path": "non-image.ax.txt",
+    "bytes": 1732,
+    "sha256": "3d3b2fbd6ef6bc598be5bcf6bd8a9f143235e927a57d34f79a655add12794026"
+  },
+  {
+    "path": "non-image.jpg",
+    "bytes": 58574,
+    "sha256": "acd1d3050e16f77e6fb5f4802432f35de34ccec22939e7a9c317fc75fe398198"
+  },
+  {
+    "path": "readback-details.ax.txt",
+    "bytes": 2383,
+    "sha256": "3e6eac7e935b012a75c67c6323ea4947795b8dd8623a0f46a03af5e46f407bab"
+  },
+  {
+    "path": "readback-details.jpg",
+    "bytes": 77402,
+    "sha256": "604bf0bb5f268bbc53698f13032f253c022acfc9ba9ac5e1c9417b8b152bbc7f"
+  },
+  {
+    "path": "recovery.ax.txt",
+    "bytes": 2377,
+    "sha256": "a1053e3b58eed869700c2ef2587ad89ed031e7e85b55437498f1fe76f9dd37cb"
+  },
+  {
+    "path": "recovery.jpg",
+    "bytes": 77308,
+    "sha256": "80a436183afc3eb1bba706f89efc6abe5dfb65c5404e810b2c23fd9e9cfe7020"
+  },
+  {
+    "path": "runtime-receipt.json",
+    "bytes": 1820,
+    "sha256": "7f1c3f29ae4f7aebb2f2e90074c1024153937ed65930ca4b032a468e946d485c"
+  },
+  {
+    "path": "runtime-snapshot/core/--Users-yzliu-.cache-hanaworlds-runs-F-WS-IMAGE-LINK-01-runtime-web-session-3n9nLF--/workshop-example-2509bf9b-8552-477b-838a-cb8d0dbe00e0/session.lock",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "runtime-snapshot/core/--Users-yzliu-.cache-hanaworlds-runs-F-WS-IMAGE-LINK-01-runtime-web-session-3n9nLF--/workshop-example-2509bf9b-8552-477b-838a-cb8d0dbe00e0/session.v4.jsonl",
+    "bytes": 1864,
+    "sha256": "5941e220a418639136e165a393f6997b8b5fb0070927779711e52ca77faaf05c"
+  },
+  {
+    "path": "runtime-snapshot/media/attachments/v1/objects/ff/ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+    "bytes": 96,
+    "sha256": "ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3"
+  },
+  {
+    "path": "runtime-snapshot/projection/hanaworlds_workshop.json",
+    "bytes": 1756,
+    "sha256": "40cea0cc6b62ef6e3b42cbc6bfe65d4b54886deca6976e51d40f9f58560bbcbd"
+  },
+  {
+    "path": "server.log",
+    "bytes": 788,
+    "sha256": "dab87a75823087e2704bc6e96a5eadd970d87326312d9faa707b75161620fb68"
+  },
+  {
+    "path": "service-process-first.json",
+    "bytes": 380,
+    "sha256": "1bb3b410048df17afda5d9c5ee9db1816195f474b3d1cba9b6dea1b332c05420"
+  },
+  {
+    "path": "service-process.json",
+    "bytes": 560,
+    "sha256": "4d84455659c390623a7ac40f5cbdb104e5ab3801b2c223b2275a954bc8b2952b"
+  },
+  {
+    "path": "session-init-green.log",
+    "bytes": 233,
+    "sha256": "f53ffd1290f0a5ee0d2555a129e98a5836fd213c716258bc4c40f887e66b40e4"
+  },
+  {
+    "path": "session-init-red.log",
+    "bytes": 1214,
+    "sha256": "8fa448d79b576daddf5d9297f8aa41a6ccb2d41ee8477c88f30172342118d810"
+  },
+  {
+    "path": "step-1.ax.txt",
+    "bytes": 2070,
+    "sha256": "3523704164e07efa08acb596b013d80afdc4d05c247cf15124055011ca5bf2bc"
+  },
+  {
+    "path": "step-1.jpg",
+    "bytes": 65863,
+    "sha256": "98fb86eef3e68751251c0601aadd4c4c20a5cb3e07bcdb3c954ad470af561ba9"
+  }
+]
