@@ -12,6 +12,7 @@ const original=before.entries.find(e=>e.transactionId===before.headTransactionId
 const row=after.entries.find(e=>e.transactionId===receipt.transactionId);
 const receiptDigest=C.digestValue('receipt',receipt).sha256;
 const originalIndex=before.entries.findIndex(e=>e.transactionId===original.transactionId);
-const expectedAfterHead=before.entries[originalIndex-1]?.transactionId??null;
+const historicalPreviousHead=before.entries[originalIndex-1]?.transactionId??null;
+const expectedAfterHead=process.argv.includes('--expect-previous-head')?historicalPreviousHead:receipt.transactionId;
 const predicates={transactionId:row?.transactionId===receipt.transactionId,originTransactionId:row?.originTransactionId===original.transactionId,status:row?.status==='VERIFIED',receiptDigest:row?.receiptDigest===receiptDigest,readbackDigest:row?.expectedAfterReadbackDigest===receipt.readbackDigest,operationDigest:row?.operationDigest===receipt.operationDigest,historyRevision:row?.historyRevision===after.historyRevision,affectedObjectRefs:C.canonicalJSON(row?.affectedObjectRefs)===C.canonicalJSON(original.affectedObjectRefs),historyRevisionAdvanced:after.historyRevision!==before.historyRevision,workshopExpectedAfterHead:after.headTransactionId===expectedAfterHead};
-console.log(JSON.stringify({boundary:'actual Canvas public request/response only; no peer private code',receipt,before,after,expectedAfterHead,receiptDigest,predicates,failedPredicates:Object.entries(predicates).filter(([,v])=>!v).map(([k])=>k)},null,2));
+console.log(JSON.stringify({boundary:'actual Canvas public request/response only; no peer private code',receipt,before,after,expectedAfterHead,historicalPreviousHead,receiptDigest,predicates,failedPredicates:Object.entries(predicates).filter(([,v])=>!v).map(([k])=>k)},null,2));

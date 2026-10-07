@@ -421,8 +421,8 @@ export class WorkshopV3 {
   const request=this.#child(body,'undo',{objectRef:matches[0].object.objectRef,transactionId:`undo-${randomUUID()}`,historyTransactionId:build.receipt.transactionId,expectedHistoryRevision:body.expectedHistoryRevision,expectedWorldRevision:worldRevisions[0],expectedObjectRevisions:objectRevisions,intentDigest,surfaceActionDigest:digest('surface-action',action)});
   state.undos[turn.turnRef]={request,action,result:null};await this.#save(body.sessionRef,core,state);await this.#current(body,state);
   const receipt=await this.#canvas('Undo',request);if(receipt.status!=='VERIFIED')fail('RECOVERY_PENDING',{mutationState:'UNKNOWN',transactionRef:request.transactionId});
-  const originalIndex=matches[0].history.entries.findIndex(e=>e.transactionId===build.receipt.transactionId);
-  const expectedAfterHead=matches[0].history.entries[originalIndex-1]?.transactionId??null;
+  // Canvas appends the verified Undo transaction to durable history.
+  const expectedAfterHead=receipt.transactionId;
   const after=[];
   for(const m of matches){const history=await this.#canvas('HistoryQuery',this.#child(body,`undo-after:${m.object.objectRef}`,{objectRef:m.object.objectRef,expectedHistoryRevision:null}));
    const row=history.entries.find(e=>e.transactionId===receipt.transactionId&&e.originTransactionId===build.receipt.transactionId&&e.status==='VERIFIED'&&e.receiptDigest===digest('receipt',receipt)&&e.expectedAfterReadbackDigest===receipt.readbackDigest&&e.operationDigest===receipt.operationDigest&&e.historyRevision===history.historyRevision&&same(e.affectedObjectRefs,m.entry.affectedObjectRefs));

@@ -48,7 +48,7 @@ function fixture(){
    if(op==='AnalyzeAffectedObjects')return ok({contractVersion:'canvas/v5',worldRef:q.worldRef,worldRevision:q.expectedRevision,registryRevision:q.expectedRegistryRevision,selectionRevision:q.expectedSelectionRevision,operationDigest:q.operationDigest,orderedSelectedRefs:[],affectedObjectRefs:[]});
    if(op==='ApplyRecoverableCommit'){f.writes++;f.receipt={contractVersion:'canvas/v5',transactionId:q.transactionId,operationDigest:q.operationDigest,transactionPayloadDigest:'a'.repeat(64),status:'VERIFIED',previousWorldRevision:q.expectedWorldRevision,observedWorldRevision:'world-after',readbackDigest:'c'.repeat(64),restoreStatus:'NOT_REQUIRED',error:null,localContext:clone(f.local)};f.history=[row(f.receipt)];return ok(f.receipt);}
    if(op==='Readback')return ok(f.receipt);
-   if(op==='HistoryQuery')return ok({worldRef:q.worldRef,objectRef:q.objectRef,historyRevision:f.undone?'history-2':'history-1',headTransactionId:f.undone?null:f.receipt.transactionId,entries:clone(f.history),undoAvailable:!f.undone,redoAvailable:!!f.undone});
+   if(op==='HistoryQuery')return ok({worldRef:q.worldRef,objectRef:q.objectRef,historyRevision:f.undone?'history-2':'history-1',headTransactionId:f.undone?(f.badUndoHead?null:f.history.at(-1).transactionId):f.receipt.transactionId,entries:clone(f.history),undoAvailable:!f.undone,redoAvailable:!!f.undone});
    if(op==='InspectObject')return ok({...clone(sample.request.targetFacts),source:'INSPECTED',objectRef:'object-1',worldRevision:'world-after',objectRevision:'object-1',buildDigest:null,planRevision:null});
    if(op==='Undo'){f.undoWrites++;f.undone=true;const r={...f.receipt,transactionId:q.transactionId,operationDigest:'e'.repeat(64),previousWorldRevision:'world-after',observedWorldRevision:'world-undo',readbackDigest:'b'.repeat(64)};f.history.push({...row(r),originTransactionId:q.historyTransactionId,historyRevision:'history-2'});return ok(r);}
    throw Error(`unexpected fixture operation ${op}`);}};
@@ -235,7 +235,7 @@ test('PER_CELL chain on 0.5.2: image brief → Painter → Brush → Canvas → 
   assert.deepEqual((await r.ws.describeWriteTools('s1')).currentBuild,{turnRef:'image-turn',method:'PER_CELL',outcome:'VERIFIED',undo:null});
   const regionAdvance=await r.ws.advanceRegionBuild({...advance,requestId:'not-region'});assert.equal(regionAdvance.error?.code,'TARGET_REQUIRED');
   const undo=await call(r,'UndoCurrentBuild',{requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:'history-1'});
-  assert.equal(undo.status,'VERIFIED');assert.equal(f.undoWrites,1);assert.equal(f.modelCalls,0);
+  assert.equal(undo.status,'VERIFIED');assert.equal(undo.afterHead.headTransactionId,f.history.at(-1).transactionId);assert.equal(f.undoWrites,1);assert.equal(f.modelCalls,0);
   log('PER_CELL_CHAIN',{before:before.tools.map(t=>t.availability),after:described.tools.map(t=>t.availability),media,outcome:built.outcome,undo:undo.status,canvasWrites:f.writes,undoWrites:f.undoWrites,peers:'FIXTURE'});
  });
 });
@@ -270,7 +270,7 @@ async function perCellFlow(f,label){
   assert.deepEqual(structuredClone(f.painterContexts[0].referenceBrief.media),[media]);
   const built=await call(r,'AdvanceCurrentBuild',advance);assert.equal(built.outcome,'VERIFIED');assert.equal(f.writes,1);
   const undo=await call(r,'UndoCurrentBuild',{requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:'history-1'});
-  assert.equal(undo.status,'VERIFIED');assert.equal(f.undoWrites,1);assert.equal(f.modelCalls,0);
+  assert.equal(undo.status,'VERIFIED');assert.equal(undo.afterHead.headTransactionId,f.history.at(-1).transactionId);assert.equal(f.undoWrites,1);assert.equal(f.modelCalls,0);
   log('G2_PER_CELL_METHOD_SHAPED_BRUSH',{brush:label,brushHasProperty:{contractHandshake:'contractHandshake' in f.brush,protocolHandshake:typeof f.brush.protocolHandshake},perCell:cells.availability,regionDescriptor:region.descriptor,outcome:built.outcome,undo:undo.status,canvasWrites:f.writes,undoWrites:f.undoWrites,media});
  });
 }
@@ -370,5 +370,17 @@ test('K3 Canvas: missing declaration before Undo rejects with zero undo writes',
   const out=await r.ws.call('UndoCurrentBuild',{...base,requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:'history-1'});
   assert.equal(out.error?.code,'UNSUPPORTED_VERSION');assert.equal(f.undoWrites,0);
   log('K3_CANVAS_UNDO_REJECT',{error:out.error,undoWrites:0});
+ });
+});
+
+// Deliberately inconsistent public HistoryView: schema-valid, but not the verified Undo head.
+test('Undo history: rejects a head unrelated to its verified Undo receipt',async()=>{
+ const f=fixture();f.badUndoHead=true;await withRuntime(f,async r=>{
+  const {advance}=await imageBrief(r,f);const context=await r.ws.readWriteProposalContext('PER_CELL',{...advance,requestId:'read-context'});
+  assert.equal((await r.ws.submitBuildProposal({...context,requestId:'proposal',proposal:clone(sample.request.proposal)})).error,null);
+  assert.equal((await call(r,'AdvanceCurrentBuild',advance)).outcome,'VERIFIED');
+  const out=await r.ws.call('UndoCurrentBuild',{...base,requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:'history-1'});
+  assert.equal(out.error?.code,'READBACK_FAILED');assert.equal(out.error?.mutationState,'UNKNOWN');assert.equal(f.undoWrites,1);
+  log('UNDO_HEAD_REJECT',{error:out.error,head:null,verifiedUndoTransaction:f.history.at(-1).transactionId,undoWrites:1,peers:'FIXTURE'});
  });
 });

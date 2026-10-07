@@ -33,6 +33,6 @@ HW_WORKSHOP_PACKAGE_ENTRY="$TASK_TEMP/node_modules/hanaworlds-workshop/src/index
 TASK_RESULT=$?
 set -e
 if test -f "$TASK_E/public-canvas-trace.json"; then
-  node analyse-actual-undo.mjs "$TASK_E/public-canvas-trace.json" > "$TASK_E/undo-correlation.json"
+  node analyse-actual-undo.mjs "$TASK_E/public-canvas-trace.json" --expect-previous-head > "$TASK_E/undo-correlation.json"
 fi
 exit "$TASK_RESULT"

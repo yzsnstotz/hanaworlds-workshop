@@ -42,7 +42,7 @@ function fixture() {
      return response(f.receipt);
    }
    if(op==='Readback')return response(f.badReadback?{...f.receipt,readbackDigest:'f'.repeat(64)}:f.receipt);
-   if(op==='HistoryQuery')return response({worldRef:q.worldRef,objectRef:q.objectRef,historyRevision:f.undone?'history-2':'history-1',headTransactionId:f.undone?null:f.receipt.transactionId,entries:clone(f.history),undoAvailable:!f.undone,redoAvailable:!!f.undone});
+   if(op==='HistoryQuery')return response({worldRef:q.worldRef,objectRef:q.objectRef,historyRevision:f.undone?'history-2':'history-1',headTransactionId:f.undone?(f.badUndoHead?null:f.history.at(-1).transactionId):f.receipt.transactionId,entries:clone(f.history),undoAvailable:!f.undone,redoAvailable:!!f.undone});
    if(op==='InspectObject')return response({...clone(sample.request.targetFacts),source:'INSPECTED',objectRef:'object-1',worldRevision:'world-after',objectRevision:'object-1',buildDigest:null,planRevision:null});
    if(op==='Undo'){
      f.undoWrites++;f.undoRequest=clone(q);f.undone=true;f.worldNodes=[];

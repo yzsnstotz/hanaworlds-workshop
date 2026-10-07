@@ -101,7 +101,7 @@ async function withRuntime(f,fn){
   const append=async(id,event)=>{const w=await ctx.sessionPersistence.open(id,'write');try{const log=await w.read();await w.append([{...event,seq:log.events.length}]);}finally{await w.close();}};
   await fn({ctx,ws,append,url:`http://127.0.0.1:${server.address().port}/picture`},root);
  }finally{
-  if(process.env.HW_EVIDENCE_DIR){const fs=await import('node:fs/promises');await mkdir(process.env.HW_EVIDENCE_DIR,{recursive:true});await fs.writeFile(join(process.env.HW_EVIDENCE_DIR,'last-adapter-trace.json'),JSON.stringify(f.calls,null,2)+'\n');await fs.writeFile(join(process.env.HW_EVIDENCE_DIR,'public-canvas-trace.json'),JSON.stringify(f.canvasCalls,null,2)+'\n');await fs.cp(root,join(process.env.HW_EVIDENCE_DIR,'durable-runtime'),{recursive:true});}
+  if(process.env.HW_EVIDENCE_DIR){const fs=await import('node:fs/promises');await mkdir(process.env.HW_EVIDENCE_DIR,{recursive:true});await fs.writeFile(join(process.env.HW_EVIDENCE_DIR,'last-adapter-trace.json'),JSON.stringify(f.calls,null,2)+'\n');await fs.writeFile(join(process.env.HW_EVIDENCE_DIR,'public-canvas-trace.json'),JSON.stringify(f.canvasCalls,null,2)+'\n');await fs.writeFile(join(process.env.HW_EVIDENCE_DIR,'world-fixture-after.json'),JSON.stringify({records:f.records([[0,0,3],[0,1,3]]),buildWrites:f.writes,undoWrites:f.undoWrites,modelCalls:f.modelCalls},null,2)+'\n');await fs.cp(root,join(process.env.HW_EVIDENCE_DIR,'durable-runtime'),{recursive:true});}
   if(ws)await ws.projectionStore.close();await ctx.fiber.dispose();server.closeAllConnections();await new Promise(r=>server.close(r));await rm(root,{recursive:true,force:true});
  }
 }
@@ -131,6 +131,7 @@ test('ACTUAL three public peers: image proposal → real compile → durable Can
  const f=adapterFixture();await withRuntime(f,async(r,root)=>{
   const peers={painter:f.painter,brush:f.brush,canvas:f.canvas};
   assert.equal(W.evaluateWriteMethod('PER_CELL',{ports:peers}).available,true);
+  C.checkProtocolCompatibility(W.peerProtocolHandshake(f.painter),[C.protocolRequirement('painter-region/v1',W.WRITE_METHOD_PORTS.REGION.find(s=>s.field==='painterRegion').capabilities)]);
   for(const spec of W.WRITE_METHOD_PORTS.PER_CELL)C.checkProtocolCompatibility(W.peerProtocolHandshake(peers[spec.field]),[C.protocolRequirement(spec.wire,spec.capabilities,spec.minMinor??0)]);
   const {media,advance}=await imageBrief(r,f);const described=await r.ws.describeWriteTools('s1');assert.equal(described.tools[0].availability.available,true);assert.equal(described.tools[1].descriptor.method,'REGION');
   const context=await r.ws.readWriteProposalContext('PER_CELL',{...advance,requestId:'read-context'});
@@ -138,9 +139,24 @@ test('ACTUAL three public peers: image proposal → real compile → durable Can
   assert.ok(f.painterFacts.length>=2);assert.deepEqual(f.painterFacts[0].sourceContext.referenceBrief.media,[media]);
   const built=await call(r,'AdvanceCurrentBuild',advance);assert.equal(built.outcome,'VERIFIED');assert.equal(f.writes,1);assert.equal(f.records([[0,1,3]])[0].nodeName,'fixture:stone');
   const inventory=await f.canvas.call('ListObjects',{contractVersion:'canvas/v5',sessionRef:'s1',requestId:'objects',worldRef:f.local.worldRef,expectedRevision:null,localContext:f.local});assert.equal(inventory.error,null);assert.equal(inventory.result.objects.length,1);
+  if(process.env.HW_EVIDENCE_DIR){const fs=await import('node:fs/promises');await fs.cp(join(root,'canvas'),join(process.env.HW_EVIDENCE_DIR,'canvas-durable-before-undo'),{recursive:true});await fs.cp(join(root,'projection'),join(process.env.HW_EVIDENCE_DIR,'workshop-durable-before-undo'),{recursive:true});}
   const object=inventory.result.objects[0];f.targetObject=clone(object);const history=await f.canvas.call('HistoryQuery',{contractVersion:'canvas/v5',sessionRef:'s1',requestId:'history',worldRef:f.local.worldRef,objectRef:object.objectRef,expectedHistoryRevision:null,localContext:f.local});assert.equal(history.error,null);assert.equal(history.result.headTransactionId,built.receipt.transactionId);
-  const undo=await call(r,'UndoCurrentBuild',{requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:history.result.historyRevision});assert.equal(undo.status,'VERIFIED');assert.equal(f.undoWrites,1);assert.equal(f.records([[0,1,3]])[0].nodeName,'air');assert.equal(f.modelCalls,0);
+  const undo=await call(r,'UndoCurrentBuild',{requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:history.result.historyRevision});assert.equal(undo.status,'VERIFIED');const actualUndo=f.canvasCalls.find(x=>x.operation==='Undo').response.result;assert.equal(undo.afterHead.headTransactionId,actualUndo.transactionId);assert.notEqual(undo.afterHead.historyRevision,history.result.historyRevision);assert.equal(f.undoWrites,1);assert.equal(f.records([[0,1,3]])[0].nodeName,'air');assert.equal(f.modelCalls,0);
   if(process.env.HW_EVIDENCE_DIR){const fs=await import('node:fs/promises');await fs.cp(join(root,'canvas'),join(process.env.HW_EVIDENCE_DIR,'canvas-durable-after-undo'),{recursive:true});await fs.cp(join(root,'projection'),join(process.env.HW_EVIDENCE_DIR,'workshop-durable-after-undo'),{recursive:true});}
   console.log(JSON.stringify({evidence:'ACTUAL_THREE_PEER_NORMAL',contracts:C.contractHandshake,handshakes:Object.fromEntries(Object.entries(peers).map(([k,p])=>[k,W.peerProtocolHandshake(p)])),described,media,proposal:proposal.response,built,history:history.result,undo,adapterWrites:f.writes,adapterUndoWrites:f.undoWrites,worldAfterUndo:f.records([[0,1,3]]),modelCalls:f.modelCalls,boundary:'actual Workshop/Painter/Brush/Canvas; Adapter/world/native/Host facts FIXTURE'}));
  });
+});
+
+test('ACTUAL public peer requirements: both descriptors and REGION capabilities; named synthetic major/capability refusal',()=>{
+ // Painter service handshake is exercised by the normal runtime test; module declarations below are read-only.
+ const brush=new B.BrushV3();
+ // The public per-cell and region requirements stay in the two descriptors.
+ for(const method of W.WRITE_METHODS){const d=W.describeWriteMethod(method,{ports:{}}).descriptor;C.validateType('WriteMethodDescriptor',d);assert.match(d.typicalScale,/not a limit/);assert.match(d.typicalScale,/never truncates/);}
+ C.checkProtocolCompatibility(W.peerProtocolHandshake(brush),[C.protocolRequirement('BUILD/V3',['BUILD/V3:per-cell-compile']),C.protocolRequirement('region-build/v1',['region-build/v1:compile-mapblock-chunks'])]);
+ C.checkProtocolCompatibility(V.canvasProtocolHandshake,[C.protocolRequirement('canvas-region/v1',W.WRITE_METHOD_PORTS.REGION.find(s=>s.field==='canvasRegion').capabilities)]);
+ const hs=W.peerProtocolHandshake(brush);const altered=clone(hs);altered.protocols.find(p=>p.protocol==='BUILD').major=4;
+ assert.throws(()=>C.checkProtocolCompatibility(altered,[C.protocolRequirement('BUILD/V3',['BUILD/V3:per-cell-compile'])]),e=>e.code==='UNSUPPORTED_VERSION');
+ const missing=clone(hs);missing.capabilities=missing.capabilities.filter(c=>c!=='BUILD/V3:per-cell-compile');
+ assert.throws(()=>C.checkProtocolCompatibility(missing,[C.protocolRequirement('BUILD/V3',['BUILD/V3:per-cell-compile'])]),e=>e.code==='CAPABILITY_UNAVAILABLE');
+ console.log(JSON.stringify({evidence:'ACTUAL_PUBLIC_REQUIREMENTS',brush:hs,canvasRegion:V.canvasProtocolHandshake,boundary:'actual public declarations; modified negative handshakes synthetic, no peer business response replacement'}));
 });
