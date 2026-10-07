@@ -1,0 +1,13 @@
+{"evidence":"PANEL_REAL_SESSION_HTTP_CORE_ATTACHMENTS","session":"s1","image":{"attachmentId":"sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3","mediaType":"image/png","bytes":96,"width":2,"height":2},"digest":"ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3","worldWrites":0,"modelCalls":0,"hostPersistenceLifecycle":"FIXTURE"}
+✔ panel link is downloaded as real bytes and read back as an image in the same real Session without model/world calls (165.632084ms)
+✔ panel rejects a borrowed foreign Session and undecodable bytes, and cannot read an unassociated image (60.12875ms)
+{"evidence":"OFFICIAL_SRC_GATEWAY_NEW_ENDPOINTS_REAL_HTTP_ATTACHMENTS","namespace":"hanaworldsWorkshopImageLinks","methods":["downloadLink","readLink"],"hostAgentPersistence":"FIXTURE","modelCalls":0,"worldWrites":0,"image":{"attachmentId":"sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3","mediaType":"image/png","bytes":96,"width":2,"height":2}}
+✔ new SRC-only Gateway endpoints dispatch JSON to real image download and same Session attachment readback (140.594708ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 487.882791

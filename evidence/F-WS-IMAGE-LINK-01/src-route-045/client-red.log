@@ -1,0 +1,80 @@
+✖ image link panel publishes success only after a separate same-Session readback (0.604ms)
+✖ image link panel refuses missing Session and discards an old Session reply after selection changes (0.107167ms)
+✖ image link panel keeps a decode/association failure visible and does not publish an image (0.081708ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 37.448375
+
+✖ failing tests:
+
+test at test/image-panel-client.test.mjs:11:1
+✖ image link panel publishes success only after a separate same-Session readback (0.604ms)
+  AssertionError [ERR_ASSERTION]: image panel controller is exported
+  + actual - expected
+  
+  + 'undefined'
+  - 'function'
+  
+      at TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/test/image-panel-client.test.mjs:12:9)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1103:25)
+      at Test.start (node:internal/test_runner/test:1000:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/image-panel-client.test.mjs:23:1
+✖ image link panel refuses missing Session and discards an old Session reply after selection changes (0.107167ms)
+  AssertionError [ERR_ASSERTION]: image panel controller is exported
+  + actual - expected
+  
+  + 'undefined'
+  - 'function'
+  
+      at TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/test/image-panel-client.test.mjs:24:9)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1103:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:785:18)
+      at Test.postRun (node:internal/test_runner/test:1232:19)
+      at Test.run (node:internal/test_runner/test:1160:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/image-panel-client.test.mjs:31:1
+✖ image link panel keeps a decode/association failure visible and does not publish an image (0.081708ms)
+  AssertionError [ERR_ASSERTION]: image panel controller is exported
+  + actual - expected
+  
+  + 'undefined'
+  - 'function'
+  
+      at TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/test/image-panel-client.test.mjs:32:9)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1103:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:785:18)
+      at Test.postRun (node:internal/test_runner/test:1232:19)
+      at Test.run (node:internal/test_runner/test:1160:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:785:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

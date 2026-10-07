@@ -1,0 +1,78 @@
+{
+  "artifact_source": "272b0afa586ffcc856badf4c77af01b2fcc82ef1",
+  "version": "0.4.5",
+  "package": "/Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/_evidence/package-045/hanaworlds-workshop-0.4.5.tgz",
+  "bytes": 38181,
+  "sha256": "affddfc6b058015d94094c42046b30107fdd3492e93a879b52b2f7044d03c068",
+  "published_file_count": 13,
+  "byte_identical_to_frozen_source": true,
+  "files": [
+    {
+      "path": "LICENSE",
+      "bytes": 1081,
+      "sha256": "42fce829e7fe1fc4926ba886ac3e9e2bce7b13f7edba709064b35d3646945b6d"
+    },
+    {
+      "path": "NOTICE",
+      "bytes": 3398,
+      "sha256": "7b84700f42973e6b3ec479ff744562cd7a12b722b6f5337954e31291918eff1f"
+    },
+    {
+      "path": "client.cjs",
+      "bytes": 37189,
+      "sha256": "0b38246e12db8894a81c4a5a9e4e1c77a56334b85f5e7e71321c55361951552b"
+    },
+    {
+      "path": "package.json",
+      "bytes": 3207,
+      "sha256": "6c78fd3f5b0f5cc5938fb9ab35198b8dfe207d65b430978407f331a5d817074a"
+    },
+    {
+      "path": "GADGET.md",
+      "bytes": 16880,
+      "sha256": "e3deb48966691cc19516eeb90d9b684c25a657e75d7ee37857c0434cdf5b4b5f"
+    },
+    {
+      "path": "README.md",
+      "bytes": 3388,
+      "sha256": "8908f2c7e9052cc6b159bde9238749beba5865c47c14f4c6e244ba6f9be01b20"
+    },
+    {
+      "path": "src/image-attachment.mjs",
+      "bytes": 4402,
+      "sha256": "002ffa3452bbbb005b706fde2a88a979761d6afb1bb4b5ee5b69862e06f4b3da"
+    },
+    {
+      "path": "src/index.mjs",
+      "bytes": 45757,
+      "sha256": "7ded508cbb881c929102c63b569fd1879e08d44cf03456060c8ac32ca94d3dd0"
+    },
+    {
+      "path": "lib/panel-host.mjs",
+      "bytes": 5151,
+      "sha256": "bf10e59683d76d7b8a67e1ed4de498be0f39375c042926c4735f3ae8b164348e"
+    },
+    {
+      "path": "src/projection-store.mjs",
+      "bytes": 3062,
+      "sha256": "b8d9a68dd24a9c139c53c1fb28e90a4d2371538b7d39a73a2ef4dc3fd7b1af27"
+    },
+    {
+      "path": "src/write-tools.mjs",
+      "bytes": 8412,
+      "sha256": "2293744e608e96427d2a7f0462bf332ffad4917940b55648b11e5618efb622be"
+    },
+    {
+      "path": "panel/src/index.ts",
+      "bytes": 1665,
+      "sha256": "7b2fce49778492f88d2a30ebf4e2bbed67ede8d4ed2491f816f54f57026e5daf"
+    },
+    {
+      "path": "cordis.patch.yml",
+      "bytes": 72,
+      "sha256": "f435f68bc4cfd7dd5fd2ac85e519f613d5cee4fba3cb3ae3cbc64d39bdddf211"
+    }
+  ],
+  "route": "SRC_ONLY_NEW_ENDPOINTS",
+  "prior_strict_failure": "Preserved; not retried or declared repaired."
+}
