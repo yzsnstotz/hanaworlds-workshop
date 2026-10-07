@@ -1,0 +1,1 @@
+public admission diagnostic exit=0

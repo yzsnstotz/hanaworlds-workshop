@@ -1,0 +1,11 @@
+{
+  "firstIncorrectCall": {
+    "nativeChunk": "e93e7a",
+    "rootHelper": "Painter root protocolHandshake() was incorrectly called without its required arguments; SCHEMA_INVALID was a diagnostic invocation error, not the peer defect.",
+    "correction": "Use documented actual Cordis-provided service protocolHandshake()."
+  },
+  "profileFiles": [],
+  "noWorldBusinessCalls": true,
+  "privateSourceRead": false,
+  "scope": "PUBLIC_PROTOCOL_ADMISSION_ONLY"
+}
