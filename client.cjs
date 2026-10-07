@@ -510,6 +510,68 @@ window.__ModuleLoader__.load({
           '发送')));
     }
 
+    const IMAGE_PANEL_ID = 'hanaworlds-workshop-image-links';
+    function createImageLinkFlow({ rpc, currentSessionRef, currentSessionTitle }) {
+      const listeners = new Set();
+      let generation = 0, controller;
+      let state = { sessionRef: currentSessionRef(), title: currentSessionTitle?.() ?? '', busy: false, result: null, error: '' };
+      const snapshot = () => state;
+      const publish = patch => { state = { ...state, ...patch }; for (const listener of listeners) listener(state); };
+      const subscribe = listener => { listeners.add(listener); return () => listeners.delete(listener); };
+      const refreshSession = () => {
+        const sessionRef = currentSessionRef();
+        if (state.sessionRef !== sessionRef) {
+          generation++; controller?.abort();
+          publish({ sessionRef, title: currentSessionTitle?.() ?? '', busy: false, result: null, error: '' });
+        } else if (currentSessionTitle) publish({ title: currentSessionTitle() });
+      };
+      async function download(url) {
+        if (state.busy) return false;
+        const sessionRef = currentSessionRef();
+        if (typeof sessionRef !== 'string' || !sessionRef) {
+          publish({ sessionRef: null, result: null, error: '请先打开一个真实对话，再打开 Workshop 开发面板。' });
+          return false;
+        }
+        const token = ++generation; controller = new AbortController();
+        publish({ sessionRef, busy: true, result: null, error: '' });
+        const current = () => token === generation && currentSessionRef() === sessionRef;
+        try {
+          const downloaded = await rpc('hanaworldsWorkshopImageLinks/downloadLink', { sessionRef, url }, controller.signal);
+          if (!current()) throw Error('当前对话已改变，旧对话的下载结果未展示。');
+          if (downloaded.sessionRef !== sessionRef || downloaded.status !== 'ATTACHED') throw Error('附件与当前对话不一致。');
+          const readback = await rpc('hanaworldsWorkshopImageLinks/readLink', { sessionRef, attachmentRef: downloaded.image.attachmentId }, controller.signal);
+          if (!current()) throw Error('当前对话已改变，旧对话的下载结果未展示。');
+          if (readback.sessionRef !== sessionRef || readback.status !== 'ATTACHED' || readback.image.attachmentId !== downloaded.image.attachmentId) throw Error('图片附件读回不一致。');
+          publish({ result: readback }); return true;
+        } catch (error) {
+          if (token === generation) publish({ result: null, error: String(error?.message ?? error) });
+          return false;
+        } finally { if (token === generation) publish({ busy: false }); }
+      }
+      return { snapshot, subscribe, download, refreshSession, dispose() { generation++; controller?.abort(); listeners.clear(); } };
+    }
+    function ImageLinkPanel({ flow }) {
+      const [view, setView] = React.useState(flow.snapshot());
+      const [url, setURL] = React.useState('');
+      React.useEffect(() => flow.subscribe(setView), [flow]);
+      const image = view.result?.image;
+      return h('section', { style: { padding: 'calc(var(--dsh-frame-top-clearance, 0px) + 24px) 32px 32px', maxWidth: '760px', margin: '0 auto' } },
+        h('p', { style: { opacity: 0.65, fontSize: '13px' } }, 'Workshop · 图片链接'),
+        h('h1', null, '把图片带入当前对话'),
+        h('p', null, '贴入直达图片的链接，下载真实图片并关联到当前对话。'),
+        h('p', { role: 'status' }, view.sessionRef ? `当前对话：${view.title || '未命名对话'}` : '当前没有可确认身份的对话。请先打开一个对话。'),
+        h('form', { onSubmit(event) { event.preventDefault(); void flow.download(url); } },
+          h('label', { htmlFor: 'workshop-image-link-url', style: { display: 'block', marginBottom: '8px' } }, '图片链接'),
+          h('input', { id: 'workshop-image-link-url', type: 'url', value: url, placeholder: 'https://…/image.png', onChange: event => setURL(event.target.value), style: { width: '100%', padding: '12px', marginBottom: '12px' }, disabled: view.busy }),
+          h('button', { type: 'submit', disabled: !view.sessionRef || view.busy || !url.trim() }, view.busy ? '正在下载并读回…' : '下载到当前对话')),
+        view.error ? h('p', { role: 'alert', style: { color: '#cf5252' } }, view.error) : null,
+        image ? h('div', { style: { marginTop: '24px' } },
+          h('img', { alt: '已下载并关联当前对话的图片', src: `data:${image.mediaType};base64,${view.result.data}`, style: { maxWidth: '100%', maxHeight: '360px', objectFit: 'contain', borderRadius: '8px' } }),
+          h('p', null, `${image.mediaType} · ${image.width} × ${image.height} · ${image.bytes} bytes`),
+          h('p', { role: 'status' }, '已关联到当前对话，并已读回同一图片。'),
+          h('details', null, h('summary', null, '附件详情'), h('p', null, image.attachmentId))) : null);
+    }
+
     function WorkshopIcon() {
       return h('span', { 'aria-hidden': 'true' }, '✿');
     }
@@ -522,6 +584,26 @@ window.__ModuleLoader__.load({
         window.hanaworldsWorkshopTransport;
       const invoke = typeof transport?.invoke === 'function'
         ? (command, args) => transport.invoke(command, args) : desktopInvoke;
+      // Session catalog has no "current" field. Its public mainView reference
+      // source identifies the Session retained by the actual conversation owner.
+      const selectedSession = () => {
+        const catalog = ctx.sessions.list.getSnapshot();
+        const entries = Object.entries(catalog.byId).filter(([,row]) => (row.retainedBy?.mainView ?? 0) > 0);
+        return entries.length === 1 ? entries[0] : null;
+      };
+      const imageFlow = createImageLinkFlow({
+        currentSessionRef: () => selectedSession()?.[0] ?? null,
+        currentSessionTitle: () => selectedSession()?.[1]?.title ?? '',
+        rpc: async (endpoint, args, signal) => {
+          const response = await ctx.connection.rpc.call('/api', endpoint, { args }, signal);
+          if (!response.ok) throw Error(`${response.error.code}: ${response.error.message}`);
+          return response.value;
+        },
+      });
+      const unsubscribeImages = ctx.sessions.list.subscribe(() => imageFlow.refreshSession());
+      ctx.effect(() => () => { unsubscribeImages(); imageFlow.dispose(); }, 'workshop.image-panel');
+      ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: IMAGE_PANEL_ID }, () => h(ImageLinkPanel, { flow: imageFlow })));
+      ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: IMAGE_PANEL_ID, order: 31, label: () => 'Workshop 开发面板' }, WorkshopIcon));
       const flow = createWorkshopFlow({ invoke,
         legacyHistory: typeof transport?.legacyHistory === 'function'
           ? (action, input) => transport.legacyHistory(action, input) : null,
@@ -540,7 +622,8 @@ window.__ModuleLoader__.load({
       }, WorkshopIcon));
     }
 
-    module.exports = { name: PANEL_ID, inject: ['slots', 'layout', 'sessions'], apply,
+    module.exports = { name: PANEL_ID, inject: ['slots', 'layout', 'sessions', 'connection'], apply,
+      createImageLinkFlow, ImageLinkPanel,
       WorkshopChoiceFrame, createWorkshopFlow, WorkshopPanel };
     return module.exports;
   },

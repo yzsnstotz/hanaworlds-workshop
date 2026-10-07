@@ -32,3 +32,11 @@ F-WS-IMAGE-LINK-01 partial build additions (2026-10-07):
 @deepseek-ai/dsh-typert-generator 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · Official Remote binding/generator and compiler dependencies; generator only at build time.
 typescript 6.0.3 · Apache-2.0 · https://registry.npmjs.org/ · Official Remote binding/generator and compiler dependencies; generator only at build time.
 @jridgewell/gen-mapping 0.3.13 · MIT · https://registry.npmjs.org/ · Official Remote binding/generator and compiler dependencies; generator only at build time.
+
+F-WS-IMAGE-LINK-01 current SRC route additions:
+@deepseek-ai/dsh-typert-protocol 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · official Host Remote markers and binding.
+typescript 6.0.3 · Apache-2.0 · https://registry.npmjs.org/ · build-only standard decorator compilation.
+@deepseek-ai/dsh-api-gateway 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · component check of official public Gateway invocation.
+@deepseek-ai/dsh-typert-registry 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · component check registry composition (no authored strict definition).
+@deepseek-ai/dsh-client-connection 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · public SDK declaration/transport component check.
+Historical strict-generator additions above remain evidence; generator is removed from the current build.

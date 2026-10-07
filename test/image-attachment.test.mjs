@@ -130,3 +130,25 @@ test('panel rejects a borrowed foreign Session and undecodable bytes, and cannot
  const h=await r.ctx.sessionPersistence.open('s1','read');const log=await h.read();await h.close();
  assert.equal(log.events.some(e=>e.type==='user/message'&&e.data.content.some(c=>c.type==='image')),false);
 }));
+
+test('new SRC-only Gateway endpoints dispatch JSON to real image download and same Session attachment readback',async()=>setup(async r=>{
+ const session=await panelSession(r);
+ const {default:Registry}=await import('@deepseek-ai/dsh-typert-registry');
+ const {default:Gateway}=await import('@deepseek-ai/dsh-api-gateway');
+ const {WorkshopImageLinkPanelService}=await import(process.env.HW_PANEL_ENTRY??'../lib/panel-host.mjs');
+ const {remoteMethods}=await import('@deepseek-ai/dsh-typert-protocol');
+ const ctx=new Context();ctx.provide('sessions',r.ws.sessions);ctx.provide('hanaworldsWorkshop',r.ws);
+ try {
+  await ctx.plugin(Registry).await();await ctx.plugin(Gateway).await();
+  const service=new WorkshopImageLinkPanelService(ctx);
+  assert.deepEqual(remoteMethods(service).map(m=>m.method),['downloadLink','readLink']);
+  const signal=new AbortController().signal;
+  await assert.rejects(ctx.typertGateway.invoke({namespace:'hanaworldsWorkshopImageLinks',method:'downloadLink',args:{sessionRef:'unbound',url:r.url},signal}),/LIVE_SESSION_NOT_FOUND/);
+  assert.equal(r.requests(),0);
+  const downloaded=await ctx.typertGateway.invoke({namespace:'hanaworldsWorkshopImageLinks',method:'downloadLink',args:{sessionRef:session.id,url:r.url},signal});
+  const readback=await ctx.typertGateway.invoke({namespace:'hanaworldsWorkshopImageLinks',method:'readLink',args:{sessionRef:session.id,attachmentRef:downloaded.image.attachmentId},signal});
+  assert.equal(readback.status,'ATTACHED');assert.equal(readback.sessionRef,session.id);assert.deepEqual(readback.image,downloaded.image);
+  assert.equal(sha(Buffer.from(readback.data,'base64')),readback.media.storedBytesDigest);
+  console.log(JSON.stringify({evidence:'OFFICIAL_SRC_GATEWAY_NEW_ENDPOINTS_REAL_HTTP_ATTACHMENTS',namespace:'hanaworldsWorkshopImageLinks',methods:remoteMethods(service).map(m=>m.method),hostAgentPersistence:'FIXTURE',modelCalls:0,worldWrites:0,image:readback.image}));
+ } finally {await ctx.fiber.dispose();}
+}));

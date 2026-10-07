@@ -18,14 +18,6 @@
     "./panel-host": {
       "types": "./panel/src/index.ts",
       "default": "./lib/panel-host.mjs"
-    },
-    "./typert": {
-      "types": "./lib/typert.host.d.ts",
-      "default": "./lib/typert.host.js"
-    },
-    "./remote": {
-      "types": "./lib/typert.remote-client.d.ts",
-      "default": "./lib/typert.remote-client.js"
     }
   },
   "files": [
@@ -39,12 +31,7 @@
     "NOTICE",
     "LICENSE",
     "lib/panel-host.mjs",
-    "lib/typert.host.js",
-    "lib/typert.host.d.ts",
-    "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts",
-    "panel/src/index.ts",
-    "panel/package.json"
+    "panel/src/index.ts"
   ],
   "dsh": {
     "client": {
@@ -52,7 +39,8 @@
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-sidebar",
         "@deepseek-ai/dsh-api-remotes",
-        "@deepseek-ai/dsh-client-ui-session"
+        "@deepseek-ai/dsh-client-ui-session",
+        "@deepseek-ai/dsh-client-connection"
       ],
       "external": [],
       "platform": "web"
@@ -62,13 +50,16 @@
     }
   },
   "scripts": {
-    "build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/write-tools.mjs && node scripts/build-panel.mjs",
+    "build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/write-tools.mjs && node scripts/build-image-panel.mjs",
     "test": "node --test test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/write-tools.test.mjs",
     "test:image": "node --test test/image-attachment.test.mjs",
     "test:text-normal": "node --test --test-name-pattern='local text proposal' test/local-world-runtime.test.mjs",
     "test:contracts-042": "node --test test/contracts-042-consumption.test.mjs",
     "test:write-tools": "node --test test/write-tools.test.mjs",
-    "build:panel": "node scripts/build-panel.mjs"
+    "build:panel": "node scripts/build-image-panel.mjs",
+    "test:panel": "node --test test/image-panel-client.test.mjs && node --test --test-name-pattern=\"panel \" test/image-attachment.test.mjs",
+    "prepack": "npm run build",
+    "test:src-gateway": "node --test --test-name-pattern=\"new SRC-only\" test/image-attachment.test.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -83,10 +74,13 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-api-gateway": "0.2.0-rc.2",
     "@deepseek-ai/dsh-attachment-local": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
     "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.0-rc.2",
     "@deepseek-ai/dsh-storage-json": "0.2.0-rc.2",
     "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-typert-generator": "0.2.0-rc.2"
+    "@deepseek-ai/dsh-typert-registry": "0.2.0-rc.2",
+    "typescript": "6.0.3"
   }
 }

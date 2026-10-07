@@ -1,22 +1,30 @@
 import { Context } from '@deepseek-ai/cordis';
-import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import { Session } from '@deepseek-ai/dsh-session';
-export interface PanelImageRef { attachmentId: string; mediaType: string; bytes: number; width: number; height: number }
-export interface PanelMedia { attachmentRef: string; storedBytesDigest: string; projectionVariantId: string | null; projectionBytesDigest: string | null; mediaType: string; bytes: number; width: number; height: number }
-export interface PanelImageResult { sessionRef: string; status: 'ATTACHED'; sourceMessageId: string; media: PanelMedia; image: PanelImageRef; data: string }
-interface WorkshopPanelPort {
- downloadImageForPanel(session: Session, url: string, signal: AbortSignal): Promise<PanelImageResult>;
- readPanelImage(session: Session, attachmentId: string, signal: AbortSignal): Promise<PanelImageResult>;
-}
-/** Only the registered Host Session lookup can supply these Session objects. */
-export class WorkshopImagePanelService extends TypertRemoteService {
- constructor(ctx: Context) { super(ctx, 'hanaworldsWorkshopImages'); }
+import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
+import type { SessionStore } from '@deepseek-ai/dsh-session';
+/** New source-mode endpoints. No strict definition has ever been registered. */
+export class WorkshopImageLinkPanelService extends TypertRemoteService {
+ constructor(ctx: Context) { super(ctx,'hanaworldsWorkshopImageLinks'); }
  @Remote
- async download(session: Session, url: string, signal: AbortSignal): Promise<PanelImageResult> {
-  return (this.ctx.get('hanaworldsWorkshop') as WorkshopPanelPort).downloadImageForPanel(session,url,signal);
+ async downloadLink(sessionRef: string,url: string,signal: AbortSignal): Promise<unknown> {
+  try {
+   if(typeof sessionRef!=='string'||!sessionRef)throw Error('SESSION_REQUIRED');
+   const session=(this.ctx.get('sessions') as SessionStore).get(sessionRef as never);
+   if(!session)throw Error('LIVE_SESSION_NOT_FOUND');
+   return await this.ctx.get('hanaworldsWorkshop').downloadImageForPanel(session,url,signal);
+  } catch(error) {
+   throw new RemoteError('workshop-image-links/download-failed',(error as Error).message,{stage:'download',sessionRef});
+  }
  }
  @Remote
- async read(session: Session, attachmentId: string, signal: AbortSignal): Promise<PanelImageResult> {
-  return (this.ctx.get('hanaworldsWorkshop') as WorkshopPanelPort).readPanelImage(session,attachmentId,signal);
+ async readLink(sessionRef: string,attachmentRef: string,signal: AbortSignal): Promise<unknown> {
+  try {
+   if(typeof sessionRef!=='string'||!sessionRef)throw Error('SESSION_REQUIRED');
+   if(typeof attachmentRef!=='string'||!attachmentRef)throw Error('ATTACHMENT_REQUIRED');
+   const session=(this.ctx.get('sessions') as SessionStore).get(sessionRef as never);
+   if(!session)throw Error('LIVE_SESSION_NOT_FOUND');
+   return await this.ctx.get('hanaworldsWorkshop').readPanelImage(session,attachmentRef,signal);
+  } catch(error) {
+   throw new RemoteError('workshop-image-links/read-failed',(error as Error).message,{stage:'read',sessionRef});
+  }
  }
 }
