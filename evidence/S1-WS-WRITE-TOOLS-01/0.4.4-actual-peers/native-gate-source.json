@@ -1,0 +1,17 @@
+{
+  "source": "/Users/yzliu/.codex/sessions/2026/10/07/rollout-2026-10-07T08-36-02-01a11392-fae1-7862-8968-676841044b15.jsonl",
+  "lines": [
+    1,
+    1328,
+    1330,
+    1334,
+    1337,
+    1342,
+    1345
+  ],
+  "dispatchCallId": "call_W07SNxqabQjUldAv44mO4iuK",
+  "completionCallId": "call_xOr91Rsk42TbQKTGUnTkKtBi",
+  "execSession": 76915,
+  "completionChunk": "045899",
+  "nativeExitCode": 0
+}

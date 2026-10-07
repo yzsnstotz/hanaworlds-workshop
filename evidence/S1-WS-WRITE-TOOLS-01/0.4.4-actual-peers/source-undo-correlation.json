@@ -1,0 +1,96 @@
+{
+  "boundary": "actual Canvas public request/response only; no peer private code",
+  "receipt": {
+    "contractVersion": "canvas/v5",
+    "transactionId": "undo-7a2dd1e3-1d17-46cd-ad51-e8de5bb99266",
+    "operationDigest": "e60b06dc33cf6ad05413841651a3e4130fd90dfb366f0b90e5be4c01fc21e038",
+    "transactionPayloadDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "status": "VERIFIED",
+    "previousWorldRevision": "world-1",
+    "observedWorldRevision": "world-2",
+    "readbackDigest": "640d018ec730cb3f7544a9ad7def39fc37b216935b36d926cb2597776b65c0fb",
+    "restoreStatus": "NOT_REQUIRED",
+    "error": null,
+    "localContext": {
+      "connectionRef": "local-connection",
+      "connectionIncarnationRef": "socket-open-1",
+      "worldRef": "fixture-world",
+      "selectionRevision": "selection-eba4a1e5-5055-4ae4-9b49-31e3dfe657f0"
+    }
+  },
+  "before": {
+    "worldRef": "fixture-world",
+    "objectRef": "object-9eafac74-686d-4b30-a7ac-d672538656c9",
+    "historyRevision": "history-9852055c-abaf-485c-aa39-c519cc5c8162",
+    "headTransactionId": "build-61e3eabb-c78c-4634-a709-ab46376c14b6",
+    "entries": [
+      {
+        "transactionId": "build-61e3eabb-c78c-4634-a709-ab46376c14b6",
+        "originTransactionId": null,
+        "affectedObjectRefs": [
+          "object-9eafac74-686d-4b30-a7ac-d672538656c9"
+        ],
+        "operationDigest": "2e5aac23202473516c5d7d58a0f3e47e696dee9ab7b6dee7043094dc6953e038",
+        "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+        "expectedAfterReadbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+        "receiptDigest": "1e6955eff3d15b32baa8f4f5a5ef400459bd30f56fca69396597bc4375b712b5",
+        "historyRevision": "history-9852055c-abaf-485c-aa39-c519cc5c8162",
+        "status": "VERIFIED"
+      }
+    ],
+    "undoAvailable": true,
+    "redoAvailable": false
+  },
+  "after": {
+    "worldRef": "fixture-world",
+    "objectRef": "object-9eafac74-686d-4b30-a7ac-d672538656c9",
+    "historyRevision": "history-a17655a8-a2ea-4c0b-8571-f89236445396",
+    "headTransactionId": "undo-7a2dd1e3-1d17-46cd-ad51-e8de5bb99266",
+    "entries": [
+      {
+        "transactionId": "build-61e3eabb-c78c-4634-a709-ab46376c14b6",
+        "originTransactionId": null,
+        "affectedObjectRefs": [
+          "object-9eafac74-686d-4b30-a7ac-d672538656c9"
+        ],
+        "operationDigest": "2e5aac23202473516c5d7d58a0f3e47e696dee9ab7b6dee7043094dc6953e038",
+        "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+        "expectedAfterReadbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+        "receiptDigest": "1e6955eff3d15b32baa8f4f5a5ef400459bd30f56fca69396597bc4375b712b5",
+        "historyRevision": "history-9852055c-abaf-485c-aa39-c519cc5c8162",
+        "status": "VERIFIED"
+      },
+      {
+        "transactionId": "undo-7a2dd1e3-1d17-46cd-ad51-e8de5bb99266",
+        "originTransactionId": "build-61e3eabb-c78c-4634-a709-ab46376c14b6",
+        "affectedObjectRefs": [
+          "object-9eafac74-686d-4b30-a7ac-d672538656c9"
+        ],
+        "operationDigest": "e60b06dc33cf6ad05413841651a3e4130fd90dfb366f0b90e5be4c01fc21e038",
+        "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+        "expectedAfterReadbackDigest": "640d018ec730cb3f7544a9ad7def39fc37b216935b36d926cb2597776b65c0fb",
+        "receiptDigest": "0acf7fe18681be65e5a6e304afa86ebc39e63e25ede1e6cb9e47dd74ff9ddcf5",
+        "historyRevision": "history-a17655a8-a2ea-4c0b-8571-f89236445396",
+        "status": "VERIFIED"
+      }
+    ],
+    "undoAvailable": false,
+    "redoAvailable": true
+  },
+  "expectedAfterHead": "undo-7a2dd1e3-1d17-46cd-ad51-e8de5bb99266",
+  "historicalPreviousHead": null,
+  "receiptDigest": "0acf7fe18681be65e5a6e304afa86ebc39e63e25ede1e6cb9e47dd74ff9ddcf5",
+  "predicates": {
+    "transactionId": true,
+    "originTransactionId": true,
+    "status": true,
+    "receiptDigest": true,
+    "readbackDigest": true,
+    "operationDigest": true,
+    "historyRevision": true,
+    "affectedObjectRefs": true,
+    "historyRevisionAdvanced": true,
+    "workshopExpectedAfterHead": true
+  },
+  "failedPredicates": []
+}

@@ -1,0 +1,33 @@
+{
+  "records": [
+    {
+      "position": [
+        0,
+        0,
+        3
+      ],
+      "nodeName": "fixture:stone",
+      "param1": 0,
+      "param2": 0,
+      "metadata": {},
+      "inventory": {},
+      "timer": null
+    },
+    {
+      "position": [
+        0,
+        1,
+        3
+      ],
+      "nodeName": "air",
+      "param1": 0,
+      "param2": 0,
+      "metadata": {},
+      "inventory": {},
+      "timer": null
+    }
+  ],
+  "buildWrites": 1,
+  "undoWrites": 1,
+  "modelCalls": 0
+}
