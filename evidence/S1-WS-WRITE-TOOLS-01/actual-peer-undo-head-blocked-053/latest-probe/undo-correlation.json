@@ -1,0 +1,97 @@
+{
+  "boundary": "actual Canvas public request/response only; no peer private code",
+  "receipt": {
+    "contractVersion": "canvas/v5",
+    "transactionId": "undo-ec68ec38-1f0a-4386-9d23-d42056014024",
+    "operationDigest": "b51e1be950db8555ecdf702235afa1189d84af81b773451fff7973932d8d0c63",
+    "transactionPayloadDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "status": "VERIFIED",
+    "previousWorldRevision": "world-1",
+    "observedWorldRevision": "world-2",
+    "readbackDigest": "640d018ec730cb3f7544a9ad7def39fc37b216935b36d926cb2597776b65c0fb",
+    "restoreStatus": "NOT_REQUIRED",
+    "error": null,
+    "localContext": {
+      "connectionRef": "local-connection",
+      "connectionIncarnationRef": "socket-open-1",
+      "worldRef": "fixture-world",
+      "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+    }
+  },
+  "before": {
+    "worldRef": "fixture-world",
+    "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+    "historyRevision": "history-b3b66230-9e3c-42f5-841c-b9688f72c450",
+    "headTransactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+    "entries": [
+      {
+        "transactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+        "originTransactionId": null,
+        "affectedObjectRefs": [
+          "object-e69b82da-2800-40f3-a509-50585652fe17"
+        ],
+        "operationDigest": "9de34c13392112526f35d35a532f9b47ba425ababd764457a597615f2681d942",
+        "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+        "expectedAfterReadbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+        "receiptDigest": "60ac526fae15bf1b3f621dd7b91e1dfea1666e12f1cc92f1a778cb704cf277b9",
+        "historyRevision": "history-b3b66230-9e3c-42f5-841c-b9688f72c450",
+        "status": "VERIFIED"
+      }
+    ],
+    "undoAvailable": true,
+    "redoAvailable": false
+  },
+  "after": {
+    "worldRef": "fixture-world",
+    "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+    "historyRevision": "history-f1c50e7e-d959-4ae6-be8f-dda6a4a59922",
+    "headTransactionId": "undo-ec68ec38-1f0a-4386-9d23-d42056014024",
+    "entries": [
+      {
+        "transactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+        "originTransactionId": null,
+        "affectedObjectRefs": [
+          "object-e69b82da-2800-40f3-a509-50585652fe17"
+        ],
+        "operationDigest": "9de34c13392112526f35d35a532f9b47ba425ababd764457a597615f2681d942",
+        "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+        "expectedAfterReadbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+        "receiptDigest": "60ac526fae15bf1b3f621dd7b91e1dfea1666e12f1cc92f1a778cb704cf277b9",
+        "historyRevision": "history-b3b66230-9e3c-42f5-841c-b9688f72c450",
+        "status": "VERIFIED"
+      },
+      {
+        "transactionId": "undo-ec68ec38-1f0a-4386-9d23-d42056014024",
+        "originTransactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+        "affectedObjectRefs": [
+          "object-e69b82da-2800-40f3-a509-50585652fe17"
+        ],
+        "operationDigest": "b51e1be950db8555ecdf702235afa1189d84af81b773451fff7973932d8d0c63",
+        "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+        "expectedAfterReadbackDigest": "640d018ec730cb3f7544a9ad7def39fc37b216935b36d926cb2597776b65c0fb",
+        "receiptDigest": "6d405e7f544713d25ff5017a695f4906a6a7b82a26903d37169cb68d68b1004b",
+        "historyRevision": "history-f1c50e7e-d959-4ae6-be8f-dda6a4a59922",
+        "status": "VERIFIED"
+      }
+    ],
+    "undoAvailable": false,
+    "redoAvailable": true
+  },
+  "expectedAfterHead": null,
+  "receiptDigest": "6d405e7f544713d25ff5017a695f4906a6a7b82a26903d37169cb68d68b1004b",
+  "predicates": {
+    "transactionId": true,
+    "originTransactionId": true,
+    "status": true,
+    "receiptDigest": true,
+    "readbackDigest": true,
+    "operationDigest": true,
+    "historyRevision": true,
+    "affectedObjectRefs": true,
+    "historyRevisionAdvanced": true,
+    "workshopExpectedAfterHead": false
+  },
+  "failedPredicates": [
+    "workshopExpectedAfterHead"
+  ]
+}
