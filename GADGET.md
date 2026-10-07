@@ -1,10 +1,10 @@
-# Workshop 0.4.2 — local-world skill business component
+# Workshop 0.4.3 — local-world skill business component
 
 Fresh profile only. Contracts 0.5.2 / source 6185622e977ef5136e9ef12219e0ba89dbba29db (tar e6c50766…); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
 ## Host assembly
 
-Cordis services: `hanaworldsWorkshop` and `hanaworldsWorkshopV3` refer to the same service. Inject real `sessionPersistence`, `storageDomain`, `hanaworldsCanvasV5`, `hanaworldsPainterV2PictureBlocks`, `hanaworldsBrushV3`, `hanaworldsCatalogue.read(worldRef)`, `hanaworldsSafetyProfile.read(worldRef)`, `hanaworldsCompilerConfig.read(worldRef)` and `hanaworldsCapabilities`. Compiler settings return `{compilationConfig,compilerRevision}`. Painter/Canvas per-cell services advertise exact `contractHandshake`; Brush advertises its public `ProtocolHandshake` for BUILD major 3 and `BUILD/V3:per-cell-compile`. No other plugin import, model loop, MCP or world mutator is included.
+Cordis services: `hanaworldsWorkshop` and `hanaworldsWorkshopV3` refer to the same service. Inject real `sessionPersistence`, `storageDomain`, `hanaworldsCanvasV5`, `hanaworldsPainterV2PictureBlocks`, `hanaworldsBrushV3`, `hanaworldsCatalogue.read(worldRef)`, `hanaworldsSafetyProfile.read(worldRef)`, `hanaworldsCompilerConfig.read(worldRef)` and `hanaworldsCapabilities`. Compiler settings return `{compilationConfig,compilerRevision}`. Per-cell services advertise public `ProtocolHandshake`: Painter requires painter major 4, Canvas requires canvas major 5, and Brush requires BUILD major 3 plus `BUILD/V3:per-cell-compile`. Package patch/hash is provenance only. No other plugin import, model loop, MCP or world mutator is included.
 
 Host must keep these ports in its internal runtime. Keep the three existing business categories as agent tools and derive the real Core Session and selected local context in Host. A model does not choose a service or call Canvas/Adapter mutators. `LocalRequestFacts` is generated from Workshop's own durable journal/current brief and fresh Canvas `ReadWorldSelectionContext`; it is never a tool input or a permission assertion.
 
@@ -102,7 +102,7 @@ The one building skill has two write methods, each published as a contracts
 free-text `typicalScale`, `scaleUnit:"cells"`, `requiredCapabilities`,
 `unavailableReason`; no threshold field). Root exports: `WRITE_METHODS`,
 `WRITE_METHOD_PORTS`, `writeToolSkillGuidance`, `evaluateWriteMethod`,
-`describeWriteMethod`.
+`describeWriteMethod`, `PER_CELL_PAINTER`, `PER_CELL_CANVAS`, `PER_CELL_BRUSH`.
 
 | method | toolName (suggested to Host) | input | typical scale (guidance, not a limit) |
 | --- | --- | --- | --- |
@@ -122,13 +122,18 @@ major 3, the required minor and capability. Descriptor availability and
 `AdvanceCurrentBuild` share `PER_CELL_BRUSH`; package patch/source/hash never
 decide Brush compatibility. Wrong major or absent protocol is
 `UNSUPPORTED_VERSION`; missing capability is `CAPABILITY_UNAVAILABLE`.
-Painter/Canvas per-cell checks remain exact on contracts 0.5.2.
+Painter and Canvas also require their public `ProtocolHandshake`: painter major 4
+and canvas major 5, minor >= 0. The current public contract defines no distinct
+per-cell capability token for these two wires; none is invented or borrowed
+from region. `PER_CELL_PAINTER` and `PER_CELL_CANVAS` are shared by descriptor
+availability and real calls (proposal validation and all Canvas reads, advance,
+readback and Undo). An exact package handshake, status wire text or region-only
+ProtocolHandshake does not substitute for these declarations.
 
 Peer handshakes are read from each peer's public shape (0.4.1, G2): a plain
 value property, or the public methods `handshake()` / `protocolHandshake()` /
 `status().contractHandshake|protocolHandshake` — BrushV3 publishes only these
-methods. Painter/Canvas values go to exact `checkContractHandshake`; Brush
-values go to `checkProtocolCompatibility`; a function is never treated as a handshake and
+methods. All per-cell peers use `checkProtocolCompatibility`; a function is never treated as a handshake and
 the Host needs no alias property. Exported helpers: `peerContractHandshake`,
 `peerProtocolHandshake`.
 
@@ -162,11 +167,25 @@ Service methods:
 `npm run test:write-tools`: real Workshop, Cordis, Core JSONL, domain storage,
 attachments, Tools and HTTP; Painter/Brush/Canvas (cell and region) and the world
 are FIXTURE built with the contract's own region helpers.
-`scripts/gate-write-tools.sh <evidence-dir> <contracts-0.5.2-tar> <brush-0.5.0-tar> <workshop-0.4.1-tar>`
-repeats it and the affected per-cell regression on a clean archive and the packed
+The historical 0.4.2 Brush-only gate `scripts/gate-write-tools.sh <evidence-dir> <contracts-0.5.2-tar> <brush-0.5.0-tar> <workshop-0.4.1-tar>`
+repeated it and the affected per-cell regression on a clean archive and the packed
 tarball, uses the actual Brush 0.5.0 `BrushV3` as the external public seam, and
 requires the previous 0.4.1 package to reject the same cross-patch Brush fixture
 flow with UNSUPPORTED_VERSION. The baseline uses its own contracts 0.5.0 for
 Painter/Canvas to isolate the Brush exact-package defect. Actual Brush compile
 is exercised in both current source and packed runtimes; Painter/Canvas/world,
 model choice and product UI are FIXTURE or NOT_RUN here.
+
+
+## Current peer-protocol fixture delivery (0.4.3)
+
+`scripts/gate-peer-protocol-fixture.sh <new-E> <contracts-0.5.2-tar> <workshop-0.4.2-tar>`
+checks both descriptions, affected per-cell business and named protocol rejection
+on committed source and an independently installed package. All Painter,
+Canvas, Brush, Host and world ports in this gate are explicit FIXTURE.
+Canvas5 is the required future public declaration, not a claim about Canvas0.5.1
+(694ae85a), which has already been shown to lack it. The 0.4.2 package must reject
+the identical cross-patch Painter/Canvas fixture flow with UNSUPPORTED_VERSION.
+The final real three-peer public-package gate awaits PM delivery of the new
+Canvas package identity. Fixture success does not grant final public-consumption
+PASS, product readiness or acceptance. No actual package declaration is forged.

@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import * as C from 'hanaworlds-contracts';
 import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, mediaBinding, imageRef, imageDigest } from './image-attachment.mjs';
-import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH } from './write-tools.mjs';
-export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH } from './write-tools.mjs';
+import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
+export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
 const VERSION = 'session/v3', CANVAS = 'canvas/v5';
 const copy = structuredClone, revision = () => `rev-${randomUUID()}`;
 const same = (a,b) => C.canonicalJSON(a) === C.canonicalJSON(b);
@@ -39,11 +39,10 @@ export class WorkshopV3 {
   const prior=state.context.sessionRevision;state.context.sessionRevision=nextRevision;
   await this.projectionStore.replace(id,core.identity,prior,state);
  }
- /** Brush on the K3 per-cell path: public ProtocolHandshake, same BUILD major and capability. */
- #protocolPeer(port,{wire,capabilities}) {if(!port)fail('CAPABILITY_UNAVAILABLE');C.checkProtocolCompatibility(peerProtocolHandshake(port)??null,[C.protocolRequirement(wire,capabilities)]);return port;}
- #peer(port,wire) {if(!port)fail('CAPABILITY_UNAVAILABLE');C.checkContractHandshake(peerContractHandshake(port),{wires:[wire],factProfiles:['target-facts/v4']});return port;}
+ /** K3 peers: actual public ProtocolHandshake, required wire major/minor and capabilities. */
+ #protocolPeer(port,{wire,capabilities,minMinor=0}) {if(!port)fail('CAPABILITY_UNAVAILABLE');C.checkProtocolCompatibility(peerProtocolHandshake(port)??null,[C.protocolRequirement(wire,capabilities,minMinor)]);return port;}
  async #canvas(op,request) {
-  const port=this.#peer(this.canvas,CANVAS);C.validateBoundRequest(CANVAS,op,request);
+  const port=this.#protocolPeer(this.canvas,PER_CELL_CANVAS);C.validateBoundRequest(CANVAS,op,request);
   const response=C.validateBoundResponse(CANVAS,op,request,await port.call(op,copy(request)));
   if(port!==this.canvas)fail('CURRENT_WORLD_MISMATCH');
   if(response.error){const error=new Error(response.error.code);error.publicError=response.error;throw error;}
@@ -278,7 +277,7 @@ export class WorkshopV3 {
   try {
    if(!WRITE_METHODS.includes(method)){availability=evaluateWriteMethod(method,this.#writeFacts());fail('CAPABILITY_UNAVAILABLE');}
    request=copy(region?C.validateRegionProposalRequest(raw):C.validateBuildProposalRequest(raw));return await this.#lock(request.sessionRef,async()=>{
-   availability=evaluateWriteMethod(method,this.#writeFacts());if(!availability.available)fail('CAPABILITY_UNAVAILABLE');
+   availability=evaluateWriteMethod(method,this.#writeFacts());if(!availability.available)fail(!region&&availability.unmet.some(u=>u.code==='UNSUPPORTED_VERSION')?'UNSUPPORTED_VERSION':'CAPABILITY_UNAVAILABLE');
    const {core,state}=await this.#load(request.sessionRef);const stored=Object.values(state.contexts).find(x=>x.invocationId===request.invocationId);
    if(!stored||(stored.method??'PER_CELL')!==method||state.contexts[state.currentContextId]!==stored)fail(stored&&(stored.method??'PER_CELL')!==method?'REPLAY_MISMATCH':'TARGET_FACTS_STALE');
    if(region){
@@ -288,7 +287,7 @@ export class WorkshopV3 {
    if(stored.response)return {availability,response:copy(stored.response)};
    if(stored.request&&!same(stored.request,request))fail('REPLAY_MISMATCH');
    const {turn}=this.#turn(state);if(state.builds[turn.turnRef]?.dispatched||state.builds[turn.turnRef]?.region?.dispatched)fail('TRANSACTION_CONFLICT');
-   const painter=region?this.painterRegion:this.#peer(this.painter,'painter/v4');stored.request=copy(request);await this.#save(request.sessionRef,core,state);
+   const painter=region?this.painterRegion:this.#protocolPeer(this.painter,PER_CELL_PAINTER);stored.request=copy(request);await this.#save(request.sessionRef,core,state);
    const response=region?C.validateRegionProposalResponse(request,await painter.call('ValidateRegionProposal',copy(request))):C.validateBuildProposalResponse(request,await painter.call('ValidateBuildProposal',copy(request)));
    if(region){if(!same(await this.#regionContext(request,state,stored),stored.context))fail('TARGET_FACTS_STALE');}
    else C.validateBuildProposalContext(request,await this.#proposalFacts(request,state,stored));

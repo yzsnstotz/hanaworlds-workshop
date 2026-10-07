@@ -19,7 +19,7 @@ function fixture() {
  const f={local:clone(sample.request.localContext),calls:[],writes:0,undoWrites:0,modelCalls:0,history:[],receipt:null,rolledBack:false};
  f.context=()=>({currentSession:'s1',activeWorldRef:f.local.worldRef,orderedSelectedObjectRefs:[],sessionRevision:'canvas-selection-1',selectionRevision:f.local.selectionRevision,localContext:clone(f.local)});
  f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:[],model:null};
- f.painter={contractHandshake:C.contractHandshake,async call(op,q){assert.equal(op,'ValidateBuildProposal'); f.calls.push(op); C.validateBuildProposalRequest(q); C.validateBuildProposalContext(q,await f.readFacts(q));
+ f.painter={contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-building-exterior-painter',protocols:[{protocol:'painter',major:4,minor:0}],capabilities:[],provenance:{packageName:'hanaworlds-building-exterior-painter',packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}},async call(op,q){assert.equal(op,'ValidateBuildProposal'); f.calls.push(op); C.validateBuildProposalRequest(q); C.validateBuildProposalContext(q,await f.readFacts(q));
    const result=clone(sample.response.result); result.invocationId=q.invocationId;
    return {contractVersion:'painter/v4',requestId:q.requestId,result,error:null};}};
  // K3: Workshop checks Brush by its public ProtocolHandshake (BUILD major 3 + per-cell capability).
@@ -28,7 +28,7 @@ function fixture() {
    const projection={contractVersion:'operations/v3',buildDigest:q.buildDigest,compilerRevision:q.compilerRevision,compilationConfigDigest:q.compilationConfigDigest,worldRef:q.worldRef,frameDigest:q.targetFacts.frameDigest,catalogueDigest:q.catalogueDigest,targetFactsDigest:q.targetFactsDigest,effects};
    return {contractVersion:'BUILD/V3',requestId:q.requestId,result:{projection,operationDigest:D('operations',projection),readBounds:q.targetFacts.sampledBounds,writeBounds:q.build.declaredBounds},error:null};}};
  const row=receipt=>({transactionId:receipt.transactionId,originTransactionId:null,affectedObjectRefs:['object-1'],operationDigest:receipt.operationDigest,beforeImageDigest:'d'.repeat(64),expectedAfterReadbackDigest:receipt.readbackDigest,receiptDigest:D('receipt',receipt),historyRevision:'history-1',status:'VERIFIED'});
- f.canvas={contractHandshake:C.contractHandshake,async call(op,q){f.calls.push(op); C.validateBoundRequest('canvas/v5',op,q);
+ f.canvas={contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-canvas',protocols:[{protocol:'canvas',major:5,minor:0}],capabilities:[],provenance:{packageName:'hanaworlds-canvas',packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}},async call(op,q){f.calls.push(op); C.validateBoundRequest('canvas/v5',op,q);
    const response=result=>({contractVersion:'canvas/v5',requestId:q.requestId,result,error:null});
    if(op==='ReadWorldSelectionContext')return response({sessionRef:q.sessionRef,worldRef:q.worldRef,inventory:{capabilityRevision:'cap-1',connections:[]},selection:{status:'BOUND',connectionRef:f.local.connectionRef,context:f.context()}});
    assert.deepEqual(clone(q.localContext),f.local);

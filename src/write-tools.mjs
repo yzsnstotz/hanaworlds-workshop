@@ -8,20 +8,24 @@ import * as C from 'hanaworlds-contracts';
 export const WRITE_METHODS = Object.freeze(['PER_CELL', 'REGION']);
 const capsOf = wire => C.regionCapabilities.map(c => c.id).filter(id => id.startsWith(`${wire}:`)).sort();
 /** Host-injected ports Workshop checks per method; `field` is the Workshop port. */
-/** Brush per-cell requirement, shared by the descriptor, availability and Advance. */
+/** Per-cell requirements shared by descriptors, availability and each public call.
+ * Current public contracts define no separate Painter/Canvas per-cell capability id.
+ * Their wire major/minor must still be explicitly advertised; region claims do not substitute. */
 export const PER_CELL_BRUSH = Object.freeze({ wire: 'BUILD/V3', capabilities: Object.freeze(['BUILD/V3:per-cell-compile']) });
+export const PER_CELL_PAINTER = C.deepFreeze({wire:'painter/v4',minMinor:0,capabilities:[]});
+export const PER_CELL_CANVAS = C.deepFreeze({wire:'canvas/v5',minMinor:0,capabilities:[]});
 export const WRITE_METHOD_PORTS = C.deepFreeze({
- PER_CELL: [{ field: 'brush', service: 'hanaworldsBrushV3', label: 'Brush', wire: PER_CELL_BRUSH.wire, capabilities: [...PER_CELL_BRUSH.capabilities] }],
+ PER_CELL: [
+  {field:'painter',service:'hanaworldsPainterV2PictureBlocks',label:'Painter',...PER_CELL_PAINTER},
+  {field:'canvas',service:'hanaworldsCanvasV5',label:'Canvas',...PER_CELL_CANVAS},
+  { field: 'brush', service: 'hanaworldsBrushV3', label: 'Brush', wire: PER_CELL_BRUSH.wire, capabilities: [...PER_CELL_BRUSH.capabilities] },
+ ],
  REGION: [
   { field: 'painterRegion', service: 'hanaworldsPainterRegionV1', label: 'Painter', wire: 'painter-region/v1', capabilities: capsOf('painter-region/v1') },
   { field: 'brushRegion', service: 'hanaworldsBrushRegionV1', label: 'Brush', wire: 'region-build/v1', capabilities: capsOf('region-build/v1') },
   { field: 'canvasRegion', service: 'hanaworldsCanvasRegionV1', label: 'Canvas', wire: 'canvas-region/v1', capabilities: capsOf('canvas-region/v1') },
  ],
 });
-// Painter/Canvas per-cell peers keep the exact ContractHandshake (unchanged in this repair).
-// Brush is checked by its public ProtocolHandshake: BUILD major 3 + BUILD/V3:per-cell-compile
-// (contracts 0.5.2: K3 cross-patch/hash interop only via protocol major + capabilities).
-const LEGACY_EXACT = [['painter', 'painter/v4', 'Painter'], ['canvas', 'canvas/v5', 'Canvas']];
 const scaleNote = 'Typical scale is guidance for the skill, not a limit: Workshop has no size threshold or setting, never truncates a proposal, changes its target or switches method.';
 const BASE = C.deepFreeze({
  PER_CELL: {
@@ -60,22 +64,16 @@ export function peerProtocolHandshake(port) {
 const need = (code, needText, remedy) => ({ code, need: needText, remedy });
 function protocolUnmet(port, spec) {
  if (!port) return [need('PEER_UNAVAILABLE', `${spec.label} service ${spec.service} (${spec.wire})`, `Install/enable a ${spec.label} plugin providing ${spec.wire} in this Host.`)];
- try { C.checkProtocolCompatibility(peerProtocolHandshake(port) ?? null, [C.protocolRequirement(spec.wire, spec.capabilities)]); return []; }
+ try { C.checkProtocolCompatibility(peerProtocolHandshake(port) ?? null, [C.protocolRequirement(spec.wire, spec.capabilities, spec.minMinor ?? 0)]); return []; }
  catch (error) {
   if (!(error instanceof C.ContractError)) throw error;
-  return [need(error.code, `${spec.label} ProtocolHandshake with ${spec.wire} (same major) and ${spec.capabilities.join(', ')}`, `Install a ${spec.label} build advertising that protocol major and capabilities.`)];
+  return [need(error.code, `${spec.label} ProtocolHandshake with ${spec.wire} (same major, minor >= ${spec.minMinor ?? 0})${spec.capabilities.length ? ` and ${spec.capabilities.join(', ')}` : ''}`, `Install a ${spec.label} build advertising that protocol major and capabilities.`)];
  }
 }
 /** Pure availability from ports and optional Session facts: states what is missing and how to get it. */
 export function evaluateWriteMethod(method, facts) {
  if (!WRITE_METHODS.includes(method)) return { method, available: false, unmet: [need('UNKNOWN_WRITE_METHOD', `one of ${WRITE_METHODS.join(', ')}`, 'Choose a described write method.')] };
  const ports = facts.ports ?? {}, unmet = [];
- if (method === 'PER_CELL') for (const [field, wire, label] of LEGACY_EXACT) {
-  const port = ports[field];
-  if (!port) { unmet.push(need('PEER_UNAVAILABLE', `${label} service (${wire})`, `Install/enable the ${label} plugin in this Host.`)); continue; }
-  try { C.checkContractHandshake(peerContractHandshake(port), { wires: [wire], factProfiles: ['target-facts/v4'] }); }
-  catch (error) { if (!(error instanceof C.ContractError)) throw error; unmet.push(need('UNSUPPORTED_VERSION', `${label} advertising ${wire} on ${C.contractHandshake.contracts}`, `Install a ${label} build on the same contracts package.`)); }
- }
  for (const spec of WRITE_METHOD_PORTS[method]) unmet.push(...protocolUnmet(ports[spec.field], spec));
  if (facts.session) {
   if (!facts.session.found) unmet.push(need('SESSION_NOT_FOUND', 'an existing Workshop Session', 'Start or resume the Session first.'));
