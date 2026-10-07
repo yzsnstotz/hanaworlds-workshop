@@ -1,0 +1,146 @@
+{
+  "route": "WS-NATIVEFACTS-PUBLIC-INPUT",
+  "status": "BLOCKED_PUBLIC_INPUT_INCOMPLETE",
+  "files": [
+    {
+      "path": "audit-repeat.log",
+      "bytes": 169,
+      "sha256": "0a375a7ead20ec337e331f2b4448bcdf9e4fe2bc682b583c09140313272645e8"
+    },
+    {
+      "path": "canvas-public-E/INDEX.json",
+      "bytes": 17203,
+      "sha256": "f76deaf985905b48a0a3e711ca0fdec18339bdcdf4e3abc15e3b0edfd1d325e6"
+    },
+    {
+      "path": "canvas-public-E/inputs.json",
+      "bytes": 763,
+      "sha256": "3d39787e498c25490896be08291fa51f0b7bc552c69ef0c795f69a01090bc5d6"
+    },
+    {
+      "path": "canvas-public-E/packed-runtime/cell-after-same-transaction-undo.json",
+      "bytes": 20344,
+      "sha256": "22d77824e1cff5d04a1c49d6cebc314274a8b8579c8535dcc94488e1afed1b08"
+    },
+    {
+      "path": "canvas-public-E/packed-runtime/cell-before-normal-reopen.json",
+      "bytes": 12232,
+      "sha256": "0fa93883c5fec83397b615e10349fdadb3ba72e69ac67335e20aa2306e4f54f0"
+    },
+    {
+      "path": "canvas-public-E/packed-test.log",
+      "bytes": 1994,
+      "sha256": "7410b04d69df7e6cf5a1bbf41d313b6bac95311eaec74caaebe1b5678e779161"
+    },
+    {
+      "path": "canvas-public-E/receipt.json",
+      "bytes": 722,
+      "sha256": "d170aebea5251f312f4fd1817f2b1c8f2cfd24d7252dfb5c012d83d8e1d5d9e8"
+    },
+    {
+      "path": "canvas-public-E/source-runtime/cell-after-same-transaction-undo.json",
+      "bytes": 20344,
+      "sha256": "53ebcd5b808719051cb194906d57d11f9be173ade602382c89b842fc4c806ff6"
+    },
+    {
+      "path": "canvas-public-E/source-runtime/cell-before-normal-reopen.json",
+      "bytes": 12232,
+      "sha256": "3515052e0b8cfafd07dc696640dd9f61ce675b98e011fb8dc05fd3e66e7d06b7"
+    },
+    {
+      "path": "canvas-public-E/source-test.log",
+      "bytes": 1988,
+      "sha256": "8d3265cd9e5d161eefab74f80828aec1e445c19f75d0c5f2fa444ba93cc5190e"
+    },
+    {
+      "path": "canvas-public-E/steps.json",
+      "bytes": 8735,
+      "sha256": "e76eeb24fc9154332d266cfed3b591997ef0945453a65a590e433af39d718e9f"
+    },
+    {
+      "path": "canvas-public-package-docs/GADGET.md",
+      "bytes": 8311,
+      "sha256": "06dc3dd1f884c60dc0e25cdc6a8625b7148e520b49835d3738f234cde6babe9c"
+    },
+    {
+      "path": "canvas-public-package-docs/README.md",
+      "bytes": 3462,
+      "sha256": "6d9719812e6910d1cd13f26992dbabb7ac4dee793992a44e1d1421e69d2e34f0"
+    },
+    {
+      "path": "canvas-public-package-docs/package.json",
+      "bytes": 1364,
+      "sha256": "4c3c966b73a25d5a84d089b03af5b56427de4505b79392dc2aa3be22c8fdec07"
+    },
+    {
+      "path": "canvas-public-package-docs/types/index.d.ts",
+      "bytes": 3186,
+      "sha256": "c24f6bd6e58077ee59334eaf90ac8dc324ab999f5993c1f8c4547fff0feff2be"
+    },
+    {
+      "path": "cleanup.json",
+      "bytes": 203,
+      "sha256": "101fe048a16d0359a92021ca5cc4acbf83ca727d2df360e961ce72d2108b49de"
+    },
+    {
+      "path": "contracts-0.5.0/README.md",
+      "bytes": 25222,
+      "sha256": "17fc91643a90b74659f8119c065e01bacc6db8b046d5fb8a811d25ec7ce91921"
+    },
+    {
+      "path": "contracts-0.5.0/package.json",
+      "bytes": 1690,
+      "sha256": "391786730d0aad1cbcdae967ed35f087985c3b4945482f047ca5470f6d2febaf"
+    },
+    {
+      "path": "contracts-0.5.0/schemas/local/contracts.schema.json",
+      "bytes": 282159,
+      "sha256": "014909c164af20789412a430c9cc9779ab5933a79fb87076e87c59a7b2a17650"
+    },
+    {
+      "path": "contracts-0.5.0/types/local/contracts.d.ts",
+      "bytes": 103469,
+      "sha256": "8ce0b9d032b3cb11df497de281dcb3b557d7ccb2d7db84b1207e5eed37a4bab8"
+    },
+    {
+      "path": "contracts-0.5.0/types/local/index.d.ts",
+      "bytes": 13045,
+      "sha256": "d14d15bc9584e37545513d48764591413e494958a40f81b454201e3e682f0727"
+    },
+    {
+      "path": "contracts-0.5.2/README.md",
+      "bytes": 28638,
+      "sha256": "65fdddb051b95bbc135888d05052c6e532552d5191b5410d942138e32ef5bb73"
+    },
+    {
+      "path": "contracts-0.5.2/package.json",
+      "bytes": 1736,
+      "sha256": "60ea142df8b17be1cce6f3347dc8cebda948cc349fb16013a33d9ba6b3854ee1"
+    },
+    {
+      "path": "contracts-0.5.2/schemas/local/contracts.schema.json",
+      "bytes": 284120,
+      "sha256": "572edb46ea2307af5d54cbb39a3dac48a0a14d8b85e7224931d6c3eed637f09d"
+    },
+    {
+      "path": "contracts-0.5.2/types/local/contracts.d.ts",
+      "bytes": 104126,
+      "sha256": "5031bcf31d7e5acd7023ff510ffc417331c28016cd0f4d5f3d75edfbd5e9997a"
+    },
+    {
+      "path": "contracts-0.5.2/types/local/index.d.ts",
+      "bytes": 14356,
+      "sha256": "3799e231db9bf184b322a5e551c6c0d2ce0a83088b014c2aa0bbef2daaee56fc"
+    },
+    {
+      "path": "public-input-audit.json",
+      "bytes": 17449,
+      "sha256": "faf3f294ec7c668efd8e33ca865f2245570d0006bfe1fced6960d53f72beef5d"
+    },
+    {
+      "path": "repeat-public-audit.py",
+      "bytes": 1245,
+      "sha256": "fb97dc29ebcda338014516b75d2a46136e6f819847763b0f97acda48012438e5"
+    }
+  ]
+}

@@ -1,0 +1,462 @@
+{
+  "route": "WS-NATIVEFACTS-PUBLIC-INPUT",
+  "contracts": [
+    {
+      "version": "0.5.0",
+      "tar": "/Users/yzliu/.cache/hanaworlds-runs/S1-CONTRACT-REGION-V1-01/_evidence/final-050/hanaworlds-contracts-0.5.0.tgz",
+      "tarSHA256": "7fb42f1eaaf4988730f6cf254faecb84bbbb1d84e293558b66727c470181b31e",
+      "manifestExports": {
+        ".": {
+          "types": "./types/local/index.d.ts",
+          "import": "./dist/local/index.mjs"
+        },
+        "./schema": "./schemas/local/contracts.schema.json",
+        "./profile": "./schemas/local/profile.json",
+        "./fixtures/*": "./fixtures/local/*.json",
+        "./package.json": "./package.json"
+      },
+      "schemaDefinitions": 396,
+      "nativeTypes": [
+        "NativeControlEvidence",
+        "NativeControlInput",
+        "NativeControlLease",
+        "NativeControlQuery"
+      ],
+      "scopedTypes": [
+        "ScopedApplyRequest",
+        "ScopedApplyResponse",
+        "ScopedCell",
+        "ScopedCellAvailability",
+        "ScopedCells",
+        "ScopedObjectFootprint",
+        "ScopedObjectFootprints",
+        "ScopedPrepareRequest",
+        "ScopedPrepareResponse",
+        "ScopedPreparedTransaction",
+        "ScopedPreparedTransactionResult",
+        "ScopedQueryPreparedRequest",
+        "ScopedQueryPreparedResponse",
+        "ScopedTxProjection",
+        "ScopedWorldBinding"
+      ],
+      "publicValidationDeclarations": [
+        "export declare const schemaBundle: {readonly definitions: Readonly<Record<TypeName,unknown>>};",
+        "export declare const operationContracts: Readonly<Record<keyof OperationMap, ReadonlyArray<{operation:string;request:TypeName;response:TypeName}>>>;",
+        "export declare function validateType<K extends TypeName>(name:K,input:unknown):TypeMap[K];",
+        "export declare function validateBoundResponse<W extends keyof OperationMap,N extends keyof OperationMap[W]>(wire:W,name:N,request:unknown,response:unknown):OperationMap[W][N] extends {response:infer R}?R:never;"
+      ],
+      "nativeFactsMethodDeclared": false,
+      "returnTypeDefinitionPresent": false,
+      "relatedSchemas": {
+        "ScopedCell": {
+          "type": "object",
+          "properties": {
+            "position": {
+              "$ref": "#/definitions/Position"
+            },
+            "availability": {
+              "$ref": "#/definitions/ScopedCellAvailability"
+            },
+            "stateDigest": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Digest"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "position",
+            "availability",
+            "stateDigest"
+          ],
+          "additionalProperties": false,
+          "x-typeName": "ScopedCell"
+        },
+        "ScopedCells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ScopedCell"
+          },
+          "minItems": 1,
+          "x-typeName": "ScopedCells",
+          "x-order": "position numeric x,y,z",
+          "x-uniqueBy": "position"
+        },
+        "StateProfile": {
+          "type": "object",
+          "properties": {
+            "profileVersion": {
+              "const": "state-profile/v2"
+            },
+            "nodeFields": {
+              "$ref": "#/definitions/NodeFields"
+            },
+            "metadataMode": {
+              "const": "exact"
+            },
+            "inventoryMode": {
+              "const": "exact"
+            },
+            "timerMode": {
+              "const": "exact"
+            },
+            "derivedLightMode": {
+              "const": "recompute-with-readback"
+            }
+          },
+          "required": [
+            "profileVersion",
+            "nodeFields",
+            "metadataMode",
+            "inventoryMode",
+            "timerMode",
+            "derivedLightMode"
+          ],
+          "additionalProperties": false,
+          "x-typeName": "StateProfile"
+        },
+        "ScopedWorldBinding": {
+          "type": "object",
+          "properties": {
+            "transactionId": {
+              "$ref": "#/definitions/Ref"
+            },
+            "worldRef": {
+              "$ref": "#/definitions/Ref"
+            },
+            "operationDigest": {
+              "$ref": "#/definitions/Digest"
+            },
+            "stateProfile": {
+              "$ref": "#/definitions/StateProfile"
+            },
+            "checkedPositions": {
+              "$ref": "#/definitions/Positions"
+            },
+            "objects": {
+              "$ref": "#/definitions/ScopedObjectFootprints"
+            },
+            "cells": {
+              "$ref": "#/definitions/ScopedCells"
+            },
+            "localContext": {
+              "$ref": "#/definitions/LocalWorldContext"
+            }
+          },
+          "required": [
+            "transactionId",
+            "worldRef",
+            "operationDigest",
+            "stateProfile",
+            "checkedPositions",
+            "objects",
+            "cells",
+            "localContext"
+          ],
+          "additionalProperties": false,
+          "x-typeName": "ScopedWorldBinding"
+        }
+      }
+    },
+    {
+      "version": "0.5.2",
+      "tar": "/Users/yzliu/.cache/hanaworlds-runs/S1-CONTRACT-REGION-V1-01/_evidence/final-052/hanaworlds-contracts-0.5.2.tgz",
+      "tarSHA256": "e6c50766ffc821ca90e07c38f473456952ef650e8a321f676dc44ce7d7d72209",
+      "manifestExports": {
+        ".": {
+          "types": "./types/local/index.d.ts",
+          "import": "./dist/local/index.mjs"
+        },
+        "./schema": "./schemas/local/contracts.schema.json",
+        "./profile": "./schemas/local/profile.json",
+        "./fixtures/*": "./fixtures/local/*.json",
+        "./package.json": "./package.json"
+      },
+      "schemaDefinitions": 399,
+      "nativeTypes": [
+        "NativeControlEvidence",
+        "NativeControlInput",
+        "NativeControlLease",
+        "NativeControlQuery"
+      ],
+      "scopedTypes": [
+        "ScopedApplyRequest",
+        "ScopedApplyResponse",
+        "ScopedCell",
+        "ScopedCellAvailability",
+        "ScopedCells",
+        "ScopedObjectFootprint",
+        "ScopedObjectFootprints",
+        "ScopedPrepareRequest",
+        "ScopedPrepareResponse",
+        "ScopedPreparedTransaction",
+        "ScopedPreparedTransactionResult",
+        "ScopedQueryPreparedRequest",
+        "ScopedQueryPreparedResponse",
+        "ScopedTxProjection",
+        "ScopedWorldBinding"
+      ],
+      "publicValidationDeclarations": [
+        "export declare const schemaBundle: {readonly definitions: Readonly<Record<TypeName,unknown>>};",
+        "export declare const operationContracts: Readonly<Record<keyof OperationMap, ReadonlyArray<{operation:string;request:TypeName;response:TypeName}>>>;",
+        "export declare function validateType<K extends TypeName>(name:K,input:unknown):TypeMap[K];",
+        "export declare function validateBoundResponse<W extends keyof OperationMap,N extends keyof OperationMap[W]>(wire:W,name:N,request:unknown,response:unknown):OperationMap[W][N] extends {response:infer R}?R:never;"
+      ],
+      "nativeFactsMethodDeclared": false,
+      "returnTypeDefinitionPresent": false,
+      "relatedSchemas": {
+        "ScopedCell": {
+          "type": "object",
+          "properties": {
+            "position": {
+              "$ref": "#/definitions/Position"
+            },
+            "availability": {
+              "$ref": "#/definitions/ScopedCellAvailability"
+            },
+            "stateDigest": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Digest"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "position",
+            "availability",
+            "stateDigest"
+          ],
+          "additionalProperties": false,
+          "x-typeName": "ScopedCell"
+        },
+        "ScopedCells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ScopedCell"
+          },
+          "minItems": 1,
+          "x-typeName": "ScopedCells",
+          "x-order": "position numeric x,y,z",
+          "x-uniqueBy": "position"
+        },
+        "StateProfile": {
+          "type": "object",
+          "properties": {
+            "profileVersion": {
+              "const": "state-profile/v2"
+            },
+            "nodeFields": {
+              "$ref": "#/definitions/NodeFields"
+            },
+            "metadataMode": {
+              "const": "exact"
+            },
+            "inventoryMode": {
+              "const": "exact"
+            },
+            "timerMode": {
+              "const": "exact"
+            },
+            "derivedLightMode": {
+              "const": "recompute-with-readback"
+            }
+          },
+          "required": [
+            "profileVersion",
+            "nodeFields",
+            "metadataMode",
+            "inventoryMode",
+            "timerMode",
+            "derivedLightMode"
+          ],
+          "additionalProperties": false,
+          "x-typeName": "StateProfile"
+        },
+        "ScopedWorldBinding": {
+          "type": "object",
+          "properties": {
+            "transactionId": {
+              "$ref": "#/definitions/Ref"
+            },
+            "worldRef": {
+              "$ref": "#/definitions/Ref"
+            },
+            "operationDigest": {
+              "$ref": "#/definitions/Digest"
+            },
+            "stateProfile": {
+              "$ref": "#/definitions/StateProfile"
+            },
+            "checkedPositions": {
+              "$ref": "#/definitions/Positions"
+            },
+            "objects": {
+              "$ref": "#/definitions/ScopedObjectFootprints"
+            },
+            "cells": {
+              "$ref": "#/definitions/ScopedCells"
+            },
+            "localContext": {
+              "$ref": "#/definitions/LocalWorldContext"
+            }
+          },
+          "required": [
+            "transactionId",
+            "worldRef",
+            "operationDigest",
+            "stateProfile",
+            "checkedPositions",
+            "objects",
+            "cells",
+            "localContext"
+          ],
+          "additionalProperties": false,
+          "x-typeName": "ScopedWorldBinding"
+        }
+      }
+    }
+  ],
+  "canvas": {
+    "version": "0.5.2",
+    "artifact": "6d5905f033882cae36de463aab838c495d42604c",
+    "tarSHA256": "a441fac3088e8915e513e1f3e44ed6107a5fd43a75bac370365718b83538199d",
+    "publicEIndexSHA256": "f76deaf985905b48a0a3e711ca0fdec18339bdcdf4e3abc15e3b0edfd1d325e6",
+    "selectedAndVerified": [
+      "INDEX.json",
+      "inputs.json",
+      "receipt.json",
+      "steps.json",
+      "source-test.log",
+      "packed-test.log",
+      "source-runtime/cell-before-normal-reopen.json",
+      "source-runtime/cell-after-same-transaction-undo.json",
+      "packed-runtime/cell-before-normal-reopen.json",
+      "packed-runtime/cell-after-same-transaction-undo.json"
+    ],
+    "indexNames": [
+      "attempt-history/gate-cell-protocol-052/INDEX.json",
+      "attempt-history/gate-cell-protocol-052/cleanup.json",
+      "attempt-history/gate-cell-protocol-052/steps.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/INDEX.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/cleanup.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/consumer-install.log",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/consumer052-README.md",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/consumer052-types-local-contracts.d.ts",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/consumer052-types-local-index.d.ts",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/contract-byte-comparison.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/hanaworlds-canvas-0.5.2.tgz",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/inputs.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/node-version.log",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/npm-pack.log",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/npm-version.log",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/pack.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/packed-byte-comparison.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/packed-install.log",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/packed-runtime/cell-after-rollback.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/packed-runtime/cell-after-same-transaction-undo.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/packed-runtime/cell-before-normal-reopen.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/packed-test.log",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/runtime-resolution.log",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/source-build.log",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/source-npm-ci.log",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/source-runtime/cell-after-rollback.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/source-runtime/cell-after-same-transaction-undo.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/source-runtime/cell-before-normal-reopen.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/source-test.log",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/source-types.log",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/source050-README.md",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/source050-types-local-contracts.d.ts",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/source050-types-local-index.d.ts",
+      "attempt-history/gate-cell-protocol-052-4d24eb8/steps.json",
+      "attempt-history/gate-cell-protocol-052-4d24eb8.stdout",
+      "attempt-history/gate-cell-protocol-052-final/INDEX.json",
+      "attempt-history/gate-cell-protocol-052-final/cleanup.json",
+      "attempt-history/gate-cell-protocol-052-final/inputs.json",
+      "attempt-history/gate-cell-protocol-052-final/runtime-resolution.log",
+      "attempt-history/gate-cell-protocol-052-final/steps.json",
+      "attempt-history/gate-cell-protocol-052-final.stdout",
+      "attempt-history/gate-cell-protocol-052.stdout",
+      "attempt-history/protocol-052-development/cordis-install.log",
+      "attempt-history/protocol-052-development/green.log",
+      "attempt-history/protocol-052-development/npm-ci.log",
+      "attempt-history/protocol-052-development/precommit.log",
+      "attempt-history/protocol-052-development/red.log",
+      "attempt-history/protocol-052-development/typescript-install.log",
+      "cleanup.json",
+      "consumer-install.log",
+      "consumer-package-lock.json",
+      "consumer-package.json",
+      "consumer052-README.md",
+      "consumer052-types-local-contracts.d.ts",
+      "consumer052-types-local-index.d.ts",
+      "contract-byte-comparison.json",
+      "development-cleanup.json",
+      "gate-run.stdout",
+      "hanaworlds-canvas-0.5.2.tgz",
+      "inputs.json",
+      "native-gate-excerpt.jsonl",
+      "native-pointers.json",
+      "native-session-meta.jsonl",
+      "native-turn-context.jsonl",
+      "node-version.log",
+      "npm-pack.log",
+      "npm-version.log",
+      "old-051-red.log",
+      "old-install.log",
+      "old-package-lock.json",
+      "old-package.json",
+      "pack.json",
+      "packed-byte-comparison.json",
+      "packed-install.log",
+      "packed-package-lock.json",
+      "packed-package.json",
+      "packed-runtime/cell-after-rollback.json",
+      "packed-runtime/cell-after-same-transaction-undo.json",
+      "packed-runtime/cell-before-normal-reopen.json",
+      "packed-test.log",
+      "packed-types.log",
+      "receipt.json",
+      "runtime-resolution.log",
+      "source-build.log",
+      "source-npm-ci.log",
+      "source-package-lock.json",
+      "source-package.json",
+      "source-runtime/cell-after-rollback.json",
+      "source-runtime/cell-after-same-transaction-undo.json",
+      "source-runtime/cell-before-normal-reopen.json",
+      "source-test.log",
+      "source-types.log",
+      "source050-README.md",
+      "source050-types-local-contracts.d.ts",
+      "source050-types-local-index.d.ts",
+      "steps.json"
+    ],
+    "fixtureSourceOrFullNativeReturnFileInIndex": false,
+    "logs": "normal result statuses/handshakes only, not readScopedState arguments and full return",
+    "durableState": "contains before/after projections and receipts, not the method-level raw NativeFacts response",
+    "types": "CanvasV5 constructor nativeFacts:any; no complete readScopedState return declaration"
+  },
+  "result": "PUBLIC_INPUT_INCOMPLETE",
+  "preciseMissing": [
+    "public readScopedState(connectionRef,positions) method signature and complete return-envelope type",
+    "required field list / wrapper mapping to ScopedCells and StateProfile, with validation entry point",
+    "shareable normal raw return fixture bound to Canvas0.5.2 and actual Contracts0.5.0/consumer0.5.2"
+  ],
+  "notInferred": [
+    "ScopedWorldBinding is the full NativeFacts return",
+    "StateProfile location in method response",
+    "UNKNOWN/UNLOADED converted to KNOWN"
+  ],
+  "noNativeFactsRuntimeRetry": true,
+  "productionOrHarnessChanged": false,
+  "finalSourcePackedGate": "NOT_RUN",
+  "peerPrivateImplementationRead": false
+}
