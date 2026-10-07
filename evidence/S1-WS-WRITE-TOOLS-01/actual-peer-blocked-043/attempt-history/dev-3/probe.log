@@ -1,0 +1,26 @@
+objc[83440]: Class GNotificationCenterDelegate is implemented in both /Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/node_modules/hanaworlds-building-exterior-painter/node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.3.dylib (0x127f75a50) and /Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.7.dylib (0x12f915a50). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+✖ ACTUAL three public peers: image proposal → real compile → durable Canvas readback → same-build Undo (856.2905ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1176.349417
+
+✖ failing tests:
+
+test at ../actual-peers-043/test/actual-peer-runtime.test.mjs:122:1
+✖ ACTUAL three public peers: image proposal → real compile → durable Canvas readback → same-build Undo (856.2905ms)
+  Error: SCHEMA_INVALID
+      at #canvas (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/node_modules/hanaworlds-workshop/src/index.mjs:48:34)
+      at async file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/node_modules/hanaworlds-workshop/src/index.mjs:200:21
+      at async #lock (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/node_modules/hanaworlds-workshop/src/index.mjs:25:29)
+      at async file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/test/actual-peer-runtime.test.mjs:128:17
+      at async withRuntime (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/test/actual-peer-runtime.test.mjs:94:3)
+      at async TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/test/actual-peer-runtime.test.mjs:123:27)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    publicError: { code: 'SCHEMA_INVALID', phase: 'validate', retryability: 'AFTER_NEW_FACTS', mutationState: 'NONE', transactionRef: null, causeCode: null, reason: 'INVALID_SHAPE' }
+  }

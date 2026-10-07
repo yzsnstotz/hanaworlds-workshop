@@ -1,0 +1,64 @@
+{
+  "name": "hanaworlds-brush",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Pure deterministic BUILD/V3 to operations/v3 and region-build/v1 to mapblock region-operations/v1 compiler; contracts 0.5.0, no world mutation",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yzsnstotz/hanaworlds-brush.git"
+  },
+  "engines": {
+    "node": ">=24.13.1 <25"
+  },
+  "exports": {
+    ".": {
+      "types": "./types/index.d.mts",
+      "import": "./src/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "imports": {
+    "#contracts": {
+      "types": "./vendor/hanaworlds-contracts/types/local/index.d.ts",
+      "default": "./vendor/hanaworlds-contracts/dist/local/index.mjs"
+    },
+    "#contracts/fixtures/*": "./vendor/hanaworlds-contracts/fixtures/local/*.json"
+  },
+  "files": [
+    "src/",
+    "vendor/",
+    "cordis.patch.yml",
+    "GADGET.md",
+    "NOTICE",
+    "LICENSE",
+    "README.md",
+    "types/"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "node --check src/index.mjs && node --check src/compile.mjs && node --check src/expand.mjs && node --check src/region.mjs",
+    "test": "node --test test/local-build.test.mjs",
+    "verify:contracts": "node tools/verify-contracts-artifact.mjs",
+    "pack:artifact": "npm pack --ignore-scripts --pack-destination artifacts --json",
+    "vendor:contracts": "node tools/vendor-contracts.mjs",
+    "typecheck": "tsc --noEmit --strict --module nodenext --moduleResolution nodenext --target es2022 test/consumer.mts",
+    "gate": "bash tools/gate-local-build.sh",
+    "test:image": "node --test test/image-contracts.test.mjs",
+    "gate:image": "bash tools/gate-image-contracts.sh",
+    "test:region": "node --test test/region.test.mjs test/image-contracts.test.mjs",
+    "gate:region": "bash tools/gate-region.sh"
+  },
+  "dependencies": {
+    "canonicalize": "5.1.0"
+  },
+  "types": "./types/index.d.mts",
+  "devDependencies": {
+    "typescript": "5.8.3"
+  }
+}

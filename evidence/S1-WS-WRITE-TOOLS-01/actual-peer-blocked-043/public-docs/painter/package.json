@@ -1,0 +1,47 @@
+{
+  "name": "hanaworlds-building-exterior-painter",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "HanaWorlds local-world Painter: confirmed proposals to BUILD/V3 without world mutation",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yzsnstotz/hanaworlds-building-exterior-painter.git"
+  },
+  "engines": {
+    "node": ">=24.13.1 <25"
+  },
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "imports": {
+    "#contracts": "./vendor/hanaworlds-contracts/dist/local/index.mjs"
+  },
+  "files": [
+    "src",
+    "vendor",
+    "cordis.patch.yml",
+    "GADGET.md",
+    "LICENSE_AUDIT.md",
+    "NOTICE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "node --check src/index.mjs && node --check src/service.mjs && node --check src/model.mjs && node --check src/planner.mjs && node --check src/proposal.mjs && node --check src/local-context.mjs && node --check src/image-material.mjs && node --check src/pixels.mjs && node --check src/colour.mjs && node --check src/current-image-material.mjs && node --check src/region.mjs && node --check src/region-proposal.mjs",
+    "test": "node --test test/local-world.test.mjs",
+    "test:local-world": "node --test test/local-world.test.mjs",
+    "test:image-material": "node --test test/image-material.test.mjs",
+    "test:material-sources": "node --test test/material-sources.test.mjs",
+    "test:region": "node --test test/region-v1.test.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.2",
+    "canonicalize": "5.1.0",
+    "sharp": "0.35.3"
+  }
+}

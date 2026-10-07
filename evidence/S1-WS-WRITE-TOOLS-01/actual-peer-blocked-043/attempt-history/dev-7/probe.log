@@ -1,0 +1,42 @@
+objc[85016]: Class GNotificationCenterDelegate is implemented in both /Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/node_modules/hanaworlds-building-exterior-painter/node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.3.dylib (0x136c95a50) and /Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.7.dylib (0x13e915a50). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+✖ ACTUAL three public peers: image proposal → real compile → durable Canvas readback → same-build Undo (606.905209ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 913.8795
+
+✖ failing tests:
+
+test at ../actual-peers-043/test/actual-peer-runtime.test.mjs:122:1
+✖ ACTUAL three public peers: image proposal → real compile → durable Canvas readback → same-build Undo (606.905209ms)
+  AssertionError [ERR_ASSERTION]: {"contractVersion":"session/v3","requestId":"advance","result":null,"error":{"code":"SCHEMA_INVALID","phase":"decode","retryability":"NEVER","mutationState":"NONE","transactionRef":null,"causeCode":null,"reason":"INVALID_SHAPE"}}
+  + actual - expected
+  
+  + {
+  +   causeCode: null,
+  +   code: 'SCHEMA_INVALID',
+  +   mutationState: 'NONE',
+  +   phase: 'decode',
+  +   reason: 'INVALID_SHAPE',
+  +   retryability: 'NEVER',
+  +   transactionRef: null
+  + }
+  - null
+  
+      at call (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/test/actual-peer-runtime.test.mjs:101:81)
+      at async file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/test/actual-peer-runtime.test.mjs:131:15
+      at async withRuntime (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/test/actual-peer-runtime.test.mjs:94:3)
+      at async TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/test/actual-peer-runtime.test.mjs:123:27)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { code: 'SCHEMA_INVALID', phase: 'decode', retryability: 'NEVER', mutationState: 'NONE', transactionRef: null, causeCode: null, reason: 'INVALID_SHAPE' },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
