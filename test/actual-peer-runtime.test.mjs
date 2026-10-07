@@ -17,8 +17,7 @@ import * as C from 'hanaworlds-contracts';
 import { gzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 
-import {createRequire} from 'node:module';
-import {pathToFileURL} from 'node:url';
+import {createFixtureNativeFactsPort,validateNativeFactsScopedState} from 'hanaworlds-canvas/examples/native-facts-consumer.mjs';
 const entry=process.env.HW_WORKSHOP_PACKAGE_ENTRY??new URL('../src/index.mjs',import.meta.url).href;
 const {default:plugin,...W}=await import(entry);
 const B=await import('hanaworlds-brush');
@@ -40,7 +39,8 @@ function adapterFixture(){
  f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:['image/png'],model:null};
  const projection=(q,positions)=>({worldRef:q.worldRef,coveredPositions:clone(positions),records:records(positions),stateProfile:clone(q.stateProfile??stateProfile)});
  const receipt=(q,payload,operationDigest,before,after)=>({contractVersion:'canvas/v5',transactionId:q.transactionId,operationDigest,transactionPayloadDigest:payload,status:'VERIFIED',previousWorldRevision:before,observedWorldRevision:after,readbackDigest:D('readback',projection(q,q.scope?.checkedPositions??f.original.get(q.originTransactionId).positions)),restoreStatus:'NOT_REQUIRED',error:null,localContext:clone(q.localContext)});
- f.native={async readScopedState(connectionRef,positions,...options){f.calls.push({native:'readScopedState',connectionRef,positions:clone(positions),options:clone(options)});assert.equal(connectionRef,f.local.connectionRef);return {cells:positions.map(position=>({position:clone(position),availability:'KNOWN',stateDigest:createHash('sha256').update('HanaWorlds|adapter-scoped-cell/v1\n'+C.canonicalJSON({profile:stateProfile,record:records([position])[0]})).digest('hex')}))};}};
+ // NativeFacts comes only from Canvas0.5.3's complete public fixed provider.
+
  f.adapter={contractHandshake:C.contractHandshake,async call(op,q){
   f.calls.push({adapter:op,request:clone(q)});C.validateBoundRequest('world-adapter/v6',op,q);
   const ok=result=>{try{return C.validateBoundResponse('world-adapter/v6',op,q,{contractVersion:'world-adapter/v6',requestId:q.requestId,result,error:null});}catch(e){console.error('ADAPTER_FIXTURE_SCHEMA',op,e,JSON.stringify(result));throw e;}};
@@ -51,12 +51,16 @@ function adapterFixture(){
    const inspection={...clone(sample.request.regionInspection),inspectionId:q.inspectionId,anchorKind:q.anchor.kind,targetFacts,targetFactsDigest:D('target-facts',targetFacts),evidence:{...clone(sample.request.regionInspection.evidence),worldRevision:q.expectedWorldRevision},placementSettings:clone(q.placementSettings)};
    return ok({outcome:'REGION_INSPECTED',inspection});
   }
-  if(op==='InspectWorld')return ok({...clone(sample.request.targetFacts),source:'INSPECTED',worldRevision:q.expectedWorldRevision,objectRef:null,objectRevision:null});
+  if(op==='InspectWorld'){
+   assert.ok(f.targetObject,'Host object facts must come from actual Canvas public ListObjects');
+   const positions=[[0,0,3],[0,1,3]],current=records(positions);
+   return ok({...clone(sample.request.targetFacts),source:'INSPECTED',worldRevision:q.expectedWorldRevision,objectRef:f.targetObject.objectRef,objectRevision:f.targetObject.objectRevision,occupiedCells:current.filter(r=>r.nodeName!=='air').map(({position,nodeName,param2})=>({position,nodeName,param2})),knownEmptyCells:current.filter(r=>r.nodeName==='air').map(r=>r.position)});
+  }
   if(op==='Readback')return ok({projection:projection(q,q.coveredPositions),readbackDigest:D('readback',projection(q,q.coveredPositions)),adapterExecutionRevision:'fixture-execution-1'});
   if(op==='PrepareRecoverableTransaction'){
    const before={...projection(q,q.scope.checkedPositions),worldRevision:f.worldRevision};
    const beforeImageDigest=D('before-image',before),payload={contractVersion:'world-adapter/v6',transactionId:q.transactionId,worldRef:q.worldRef,operationDigest:q.operationDigest,scopeDigest:q.scopeDigest,beforeImageDigest,localContext:clone(q.localContext)};
-   const p={payload,transactionPayloadDigest:D('scoped-tx',payload),beforeImageDigest,scopeDigest:q.scopeDigest,guarantee:q.guarantee,stateProfile:clone(stateProfile),adapterExecutionRevision:'fixture-execution-1',beforeStateReadbackDigest:D('readback',projection(q,q.scope.checkedPositions))};
+   const p={payload,transactionPayloadDigest:D('scoped-transaction-payload',payload),beforeImageDigest,scopeDigest:q.scopeDigest,guarantee:q.guarantee,stateProfile:clone(stateProfile),adapterExecutionRevision:'fixture-execution-1',beforeStateReadbackDigest:D('readback',projection(q,q.scope.checkedPositions))};
    f.prepared.set(q.transactionId,p);f.original.set(q.transactionId,{records:clone(before.records),positions:clone(before.coveredPositions)});return ok(p);
   }
   if(op==='ApplyCompiledTransaction'){
@@ -81,8 +85,12 @@ async function withRuntime(f,fn){
   await ctx.plugin(Jsonl,{root:join(root,'core'),compression:'none'}).await();await ctx.plugin(Storage).await();await ctx.plugin(StorageJson,{root:join(root,'projection')}).await();await ctx.plugin(StorageDomain,{backend:'json'}).await();
   await ctx.plugin(Attachments,{dshHome:join(root,'media')}).await();await ctx.plugin(SystemPrompt).await();await ctx.plugin(Tools).await();
   // Public constructor/store API: real Canvas fsynced fresh profile and operations.
+  const publicNative=await createFixtureNativeFactsPort(C);
+  f.native={async readScopedState(connectionRef,positions){const raw=validateNativeFactsScopedState(await publicNative.readScopedState(connectionRef,positions),C);f.calls.push({native:'readScopedState',connectionRef,positions:clone(positions),rawReturn:clone(raw),source:'Canvas0.5.3 public fixed fixture'});return raw;}};
   const store=await V.CanvasStore.open(join(root,'canvas'));
   f.canvas=new V.CanvasV5({store,adapter:f.adapter,nativeFacts:f.native,adapterId:'fixture-adapter'});await f.canvas.ready;assert.equal(f.canvas.status().storage,'READY');
+  const realCanvasCall=f.canvas.call.bind(f.canvas);f.canvasCalls=[];
+  f.canvas.call=async(op,q)=>{const out=await realCanvasCall(op,q);f.canvasCalls.push({operation:op,request:clone(q),response:clone(out)});return out;};
   const unbound=await f.canvas.call('ReadWorldSelectionContext',{contractVersion:'canvas/v5',sessionRef:'s1',requestId:'unbound',worldRef:f.local.worldRef});assert.equal(unbound.error,null,JSON.stringify(unbound));
   const selected=await f.canvas.call('SelectWorldConnection',{contractVersion:'canvas/v5',sessionRef:'s1',requestId:'select',worldRef:f.local.worldRef,connectionRef:f.local.connectionRef,connectionIncarnationRef:f.local.connectionIncarnationRef,expectedRevision:unbound.result.selection.sessionRevision,expectedContext:null});assert.equal(selected.error,null,JSON.stringify(selected));f.local=clone(selected.result.localContext);
   ctx.provide('hanaworldsPainterLocalFacts',{async read(q,operation){assert.equal(operation,'ValidateBuildProposal');const facts=await ws.readBuildProposalProviderFacts(q);f.painterFacts??=[];f.painterFacts.push(clone(facts));return facts;}});
@@ -93,7 +101,7 @@ async function withRuntime(f,fn){
   const append=async(id,event)=>{const w=await ctx.sessionPersistence.open(id,'write');try{const log=await w.read();await w.append([{...event,seq:log.events.length}]);}finally{await w.close();}};
   await fn({ctx,ws,append,url:`http://127.0.0.1:${server.address().port}/picture`},root);
  }finally{
-  if(process.env.HW_EVIDENCE_DIR){await mkdir(process.env.HW_EVIDENCE_DIR,{recursive:true});await import('node:fs/promises').then(fs=>fs.writeFile(join(process.env.HW_EVIDENCE_DIR,'last-adapter-trace.json'),JSON.stringify(f.calls,null,2)+'\n'));}
+  if(process.env.HW_EVIDENCE_DIR){const fs=await import('node:fs/promises');await mkdir(process.env.HW_EVIDENCE_DIR,{recursive:true});await fs.writeFile(join(process.env.HW_EVIDENCE_DIR,'last-adapter-trace.json'),JSON.stringify(f.calls,null,2)+'\n');await fs.writeFile(join(process.env.HW_EVIDENCE_DIR,'public-canvas-trace.json'),JSON.stringify(f.canvasCalls,null,2)+'\n');await fs.cp(root,join(process.env.HW_EVIDENCE_DIR,'durable-runtime'),{recursive:true});}
   if(ws)await ws.projectionStore.close();await ctx.fiber.dispose();server.closeAllConnections();await new Promise(r=>server.close(r));await rm(root,{recursive:true,force:true});
  }
 }
@@ -130,7 +138,7 @@ test('ACTUAL three public peers: image proposal → real compile → durable Can
   assert.ok(f.painterFacts.length>=2);assert.deepEqual(f.painterFacts[0].sourceContext.referenceBrief.media,[media]);
   const built=await call(r,'AdvanceCurrentBuild',advance);assert.equal(built.outcome,'VERIFIED');assert.equal(f.writes,1);assert.equal(f.records([[0,1,3]])[0].nodeName,'fixture:stone');
   const inventory=await f.canvas.call('ListObjects',{contractVersion:'canvas/v5',sessionRef:'s1',requestId:'objects',worldRef:f.local.worldRef,expectedRevision:null,localContext:f.local});assert.equal(inventory.error,null);assert.equal(inventory.result.objects.length,1);
-  const object=inventory.result.objects[0];const history=await f.canvas.call('HistoryQuery',{contractVersion:'canvas/v5',sessionRef:'s1',requestId:'history',worldRef:f.local.worldRef,objectRef:object.objectRef,expectedHistoryRevision:null,localContext:f.local});assert.equal(history.error,null);assert.equal(history.result.headTransactionId,built.receipt.transactionId);
+  const object=inventory.result.objects[0];f.targetObject=clone(object);const history=await f.canvas.call('HistoryQuery',{contractVersion:'canvas/v5',sessionRef:'s1',requestId:'history',worldRef:f.local.worldRef,objectRef:object.objectRef,expectedHistoryRevision:null,localContext:f.local});assert.equal(history.error,null);assert.equal(history.result.headTransactionId,built.receipt.transactionId);
   const undo=await call(r,'UndoCurrentBuild',{requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:history.result.historyRevision});assert.equal(undo.status,'VERIFIED');assert.equal(f.undoWrites,1);assert.equal(f.records([[0,1,3]])[0].nodeName,'air');assert.equal(f.modelCalls,0);
   if(process.env.HW_EVIDENCE_DIR){const fs=await import('node:fs/promises');await fs.cp(join(root,'canvas'),join(process.env.HW_EVIDENCE_DIR,'canvas-durable-after-undo'),{recursive:true});await fs.cp(join(root,'projection'),join(process.env.HW_EVIDENCE_DIR,'workshop-durable-after-undo'),{recursive:true});}
   console.log(JSON.stringify({evidence:'ACTUAL_THREE_PEER_NORMAL',contracts:C.contractHandshake,handshakes:Object.fromEntries(Object.entries(peers).map(([k,p])=>[k,W.peerProtocolHandshake(p)])),described,media,proposal:proposal.response,built,history:history.result,undo,adapterWrites:f.writes,adapterUndoWrites:f.undoWrites,worldAfterUndo:f.records([[0,1,3]]),modelCalls:f.modelCalls,boundary:'actual Workshop/Painter/Brush/Canvas; Adapter/world/native/Host facts FIXTURE'}));
