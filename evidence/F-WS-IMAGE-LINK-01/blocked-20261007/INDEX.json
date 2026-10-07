@@ -1,0 +1,42 @@
+[
+  {
+    "file": "added-dependencies.json",
+    "bytes": 1007,
+    "sha256": "2389111f37d1b1a2a405ea087d7020d3c9dc5e6fb2f2ca75aa344289938b9a75"
+  },
+  {
+    "file": "build-panel-01.log",
+    "bytes": 662,
+    "sha256": "05aab33d585ea129249547a9789fea661cfebe7db069b01d8483cf772d81ba8d"
+  },
+  {
+    "file": "build-panel-02.log",
+    "bytes": 662,
+    "sha256": "05aab33d585ea129249547a9789fea661cfebe7db069b01d8483cf772d81ba8d"
+  },
+  {
+    "file": "native-build-events.json",
+    "bytes": 15449,
+    "sha256": "99b9181eacfb47de2286d006b348b03629ed54ea8c6f6942c8b73480412640a1"
+  },
+  {
+    "file": "panel-green-02.log",
+    "bytes": 2584,
+    "sha256": "8c15c911b95041a4ba4eda7a2d4e146a2e4cc117d10cba8f55889a418d018297"
+  },
+  {
+    "file": "panel-green.log",
+    "bytes": 1959,
+    "sha256": "7e24a603cf3d75dc9e0eaef7234dfd8485b98b7d06fa702c05533fb0533d8482"
+  },
+  {
+    "file": "panel-red-node24.log",
+    "bytes": 2105,
+    "sha256": "dac4df9b892f20354206e29ddcb074a20eee30b63300d6bc4bc2975a14d76421"
+  },
+  {
+    "file": "panel-red.log",
+    "bytes": 1223,
+    "sha256": "1b29b6b2f740c292533e6c3d4cd553c2b3c5e359f57d423ac5d1d1700b3d443d"
+  }
+]

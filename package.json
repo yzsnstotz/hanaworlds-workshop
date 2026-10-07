@@ -1,6 +1,6 @@
 {
   "name": "hanaworlds-workshop",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -14,7 +14,19 @@
   },
   "exports": {
     ".": "./src/index.mjs",
-    "./client": "./client.cjs"
+    "./client": "./client.cjs",
+    "./panel-host": {
+      "types": "./panel/src/index.ts",
+      "default": "./lib/panel-host.mjs"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    }
   },
   "files": [
     "src/index.mjs",
@@ -25,17 +37,24 @@
     "cordis.patch.yml",
     "GADGET.md",
     "NOTICE",
-    "LICENSE"
+    "LICENSE",
+    "lib/panel-host.mjs",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts",
+    "panel/src/index.ts",
+    "panel/package.json"
   ],
   "dsh": {
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-ui-layout",
-        "@deepseek-ai/dsh-client-ui-sidebar"
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-session"
       ],
-      "external": [
-        "dsh-tauri/client"
-      ],
+      "external": [],
       "platform": "web"
     },
     "bundle": {
@@ -43,12 +62,13 @@
     }
   },
   "scripts": {
-    "build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/write-tools.mjs",
+    "build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/write-tools.mjs && node scripts/build-panel.mjs",
     "test": "node --test test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/write-tools.test.mjs",
     "test:image": "node --test test/image-attachment.test.mjs",
     "test:text-normal": "node --test --test-name-pattern='local text proposal' test/local-world-runtime.test.mjs",
     "test:contracts-042": "node --test test/contracts-042-consumption.test.mjs",
-    "test:write-tools": "node --test test/write-tools.test.mjs"
+    "test:write-tools": "node --test test/write-tools.test.mjs",
+    "build:panel": "node scripts/build-panel.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -57,6 +77,7 @@
     "@deepseek-ai/dsh-session": "0.2.0-rc.2",
     "@deepseek-ai/dsh-storage-domain": "0.2.0-rc.2",
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.2",
     "canonicalize": "5.1.0",
     "hanaworlds-contracts": "https://codeload.github.com/yzsnstotz/hanaworlds-contracts/tar.gz/6185622e977ef5136e9ef12219e0ba89dbba29db",
     "zod": "4.6.5"
@@ -65,6 +86,7 @@
     "@deepseek-ai/dsh-attachment-local": "0.2.0-rc.2",
     "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.0-rc.2",
     "@deepseek-ai/dsh-storage-json": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2"
+    "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-typert-generator": "0.2.0-rc.2"
   }
 }

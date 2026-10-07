@@ -26,3 +26,9 @@ The native tool registers through @deepseek-ai/dsh-tools@0.2.0-rc.2 (MIT).
 The image gate uses separately installed public @deepseek-ai/dsh-attachment-local
 and @deepseek-ai/dsh-system-prompt@0.2.0-rc.2 (MIT) as development dependencies;
 no Host source, attachment decoder or image store is copied or bundled.
+
+F-WS-IMAGE-LINK-01 partial build additions (2026-10-07):
+@deepseek-ai/dsh-typert-protocol 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · Official Remote binding/generator and compiler dependencies; generator only at build time.
+@deepseek-ai/dsh-typert-generator 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · Official Remote binding/generator and compiler dependencies; generator only at build time.
+typescript 6.0.3 · Apache-2.0 · https://registry.npmjs.org/ · Official Remote binding/generator and compiler dependencies; generator only at build time.
+@jridgewell/gen-mapping 0.3.13 · MIT · https://registry.npmjs.org/ · Official Remote binding/generator and compiler dependencies; generator only at build time.

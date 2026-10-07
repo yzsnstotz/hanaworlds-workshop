@@ -119,6 +119,38 @@ export class WorkshopV3 {
    return {sessionRef:id,sourceMessageId:source.data.id,downloadSha256:imageDigest(input.data),downloadBytes:input.data.byteLength,media,image:imageRef(media)};
   });
  }
+ /** Public operator panel path. Session is resolved by the Host's registered
+  * Session lookup; the UI supplies user text, never ToolExecution or headers. */
+ async downloadImageForPanel(session,rawURL,signal) {
+  signal.throwIfAborted();
+  const id=session?.header?.id;
+  if(!id||this.sessions?.get(id)!==session)throw Error('SESSION_MISMATCH');
+  const url=imageURL(rawURL);
+  session.append('user/message',{id:`workshop-link-${randomUUID()}`,role:'user',source:{kind:'user'},content:[{type:'text',text:url}]},{surfaceOp:'append'});
+  await this.sessions.flush(session);signal.throwIfAborted();
+  const result=await this.downloadImage(url,{agent:{session},signal});
+  if(this.sessions.get(id)!==session)throw Error('SESSION_MISMATCH');
+  signal.throwIfAborted();
+  session.append('user/message',{id:`workshop-image-${randomUUID()}`,role:'user',source:{kind:'user'},content:[{type:'image',attachment:result.image}]},{surfaceOp:'append'});
+  await this.sessions.flush(session);signal.throwIfAborted();
+  return this.readPanelImage(session,result.image.attachmentId,signal);
+ }
+ async readPanelImage(session,attachmentId,signal) {
+  signal.throwIfAborted();
+  const id=session?.header?.id;
+  if(!id||this.sessions?.get(id)!==session)throw Error('SESSION_MISMATCH');
+  const {core,state}=await this.#load(id);
+  if(!same(core.identity,coreIdentity(session.header,id)))throw Error('SESSION_MISMATCH');
+  const record=state.images?.[attachmentId];
+  if(!record)throw Error('ATTACHMENT_REJECTED');
+  const ref=imageRef(record.media);
+  const linked=core.events.some(e=>e.type==='user/message'&&e.surfaceOp==='append'&&e.data?.role==='user'&&e.data?.source?.kind==='user'&&e.data.content?.some(p=>p.type==='image'&&same(p.attachment,ref)));
+  if(!linked)throw Error('ATTACHMENT_NOT_IN_SESSION');
+  const stored=await this.attachments.readImage(ref,signal);signal.throwIfAborted();
+  if(!same(mediaBinding(stored.ref,stored.data),record.media))throw Error('MEDIA_DIGEST_MISMATCH');
+  if(this.sessions.get(id)!==session)throw Error('SESSION_MISMATCH');
+  return {sessionRef:id,status:'ATTACHED',sourceMessageId:record.sourceMessageId,media:copy(record.media),image:ref,data:Buffer.from(stored.data).toString('base64')};
+ }
  async #media(items,core,state) {
   if(!items.length)return [];
   if(!this.attachments?.readImage)fail('CAPABILITY_UNAVAILABLE');
@@ -439,7 +471,7 @@ export function apply(ctx) {
  const projectionStore=new WorkshopProjectionStore(()=>ctx.get('storageDomain'));
  ctx.effect?.(()=>()=>projectionStore.close(),'hanaworlds-workshop.projection-close');
  const service=new WorkshopV3({projectionStore});
- for(const [field,port] of Object.entries({attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities',painterRegion:'hanaworldsPainterRegionV1',brushRegion:'hanaworldsBrushRegionV1',canvasRegion:'hanaworldsCanvasRegionV1'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
+ for(const [field,port] of Object.entries({sessions:'sessions',attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities',painterRegion:'hanaworldsPainterRegionV1',brushRegion:'hanaworldsBrushRegionV1',canvasRegion:'hanaworldsCanvasRegionV1'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
  registerImageTool(ctx,service);
  ctx.provide('hanaworldsWorkshop',service);ctx.provide('hanaworldsWorkshopV3',service);
 }

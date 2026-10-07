@@ -1,0 +1,52 @@
+✖ panel link is downloaded as real bytes and read back as an image in the same real Session without model/world calls (254.937667ms)
+✖ panel rejects a borrowed foreign Session and undecodable bytes, and cannot read an unassociated image (51.799042ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 414.017875
+
+✖ failing tests:
+
+test at test/image-attachment.test.mjs:107:1
+✖ panel link is downloaded as real bytes and read back as an image in the same real Session without model/world calls (254.937667ms)
+  AssertionError [ERR_ASSERTION]: panel download public method is present
+  + actual - expected
+  
+  + 'undefined'
+  - 'function'
+  
+      at file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/test/image-attachment.test.mjs:109:9
+      at async setup (file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/test/image-attachment.test.mjs:41:2)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/image-attachment.test.mjs:121:1
+✖ panel rejects a borrowed foreign Session and undecodable bytes, and cannot read an unassociated image (51.799042ms)
+  AssertionError [ERR_ASSERTION]: panel download public method is present
+  + actual - expected
+  
+  + 'undefined'
+  - 'function'
+  
+      at file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/test/image-attachment.test.mjs:123:9
+      at async setup (file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/test/image-attachment.test.mjs:41:2)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:785:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

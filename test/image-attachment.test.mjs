@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Context } from '@deepseek-ai/cordis';
-import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
+import { Session, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
 import Jsonl from '@deepseek-ai/dsh-session-persistence-jsonl';
 import Storage from '@deepseek-ai/dsh-storage';
 import * as StorageJson from '@deepseek-ai/dsh-storage-json';
@@ -90,4 +90,43 @@ test('existing uploaded Core image can bind a brief; unreferenced attachment can
  await r.append('s1',user('upload','this house',[{type:'image',attachment:ref}]));snapshot=await call(r,'StartOrResumeSession',{});
  const accepted=await r.ws.call('AppendMultimodalTurn',{...input,requestId:'uploaded',expectedRevision:snapshot.context.sessionRevision});assert.equal(accepted.error,null,JSON.stringify(accepted));
  const result=await call(r,'StartOrResumeSession',{});assert.deepEqual(structuredClone(result.turns[0].media),[media]);assert.equal(r.requests(),0);
+}));
+
+// New panel path: real Session and Core/attachments/HTTP. The writer bridge is
+// an explicit fixture standing in for the Host-owned Agent persistence lifecycle.
+async function panelSession(r,id='s1') {
+ const handle=await r.ctx.sessionPersistence.open(id,'read');
+ const log=await handle.read(); const hdr=handle.header; await handle.close();
+ const session=Session.create(id,log.events,hdr); let offset=log.events.length;
+ const sessions={get:key=>key===id?session:undefined,async flush(current){
+  assert.equal(current,session);const writer=await r.ctx.sessionPersistence.open(id,'write');
+  try {const events=session.snapshotEvents(offset);await writer.append(events);offset=session.seq;}finally{await writer.close();}
+ }};
+ r.ws=new WorkshopV3({sessions,sessionPersistence:r.ctx.sessionPersistence,projectionStore:r.ws.projectionStore,attachments:r.ctx.attachments});
+ return session;
+}
+test('panel link is downloaded as real bytes and read back as an image in the same real Session without model/world calls',async()=>setup(async r=>{
+ const session=await panelSession(r);
+ assert.equal(typeof r.ws.downloadImageForPanel,'function','panel download public method is present');
+ const out=await r.ws.downloadImageForPanel(session,r.url,new AbortController().signal);
+ assert.equal(out.sessionRef,'s1');assert.equal(out.status,'ATTACHED');
+ const readback=await r.ws.readPanelImage(session,out.image.attachmentId,new AbortController().signal);
+ assert.deepEqual(readback.image,out.image);assert.equal(readback.media.storedBytesDigest,out.media.storedBytesDigest);
+ assert.equal(sha(Buffer.from(readback.data,'base64')),out.media.storedBytesDigest);
+ assert.equal(readback.image.width,2);assert.equal(readback.image.height,2);assert.equal(readback.image.mediaType,'image/png');
+ const h=await r.ctx.sessionPersistence.open('s1','read');const log=await h.read();await h.close();
+ assert.ok(log.events.some(e=>e.type==='user/message'&&e.data.content.some(c=>c.type==='image'&&c.attachment.attachmentId===out.image.attachmentId)));
+ assert.equal(r.requests(),1);
+ console.log(JSON.stringify({evidence:'PANEL_REAL_SESSION_HTTP_CORE_ATTACHMENTS',session:'s1',image:out.image,digest:out.media.storedBytesDigest,worldWrites:0,modelCalls:0,hostPersistenceLifecycle:'FIXTURE'}));
+}));
+test('panel rejects a borrowed foreign Session and undecodable bytes, and cannot read an unassociated image',async()=>setup(async r=>{
+ const session=await panelSession(r);
+ assert.equal(typeof r.ws.downloadImageForPanel,'function','panel download public method is present');
+ const foreign=Session.create('s2',[],header('s2'));
+ await assert.rejects(r.ws.downloadImageForPanel(foreign,r.url,new AbortController().signal),/SESSION_MISMATCH/);
+ assert.equal(r.requests(),0);
+ await assert.rejects(r.ws.readPanelImage(session,'unassociated',new AbortController().signal),/SESSION_NOT_FOUND|ATTACHMENT_REJECTED/);
+ await assert.rejects(r.ws.downloadImageForPanel(session,r.url.replace('/picture','/not-image'),new AbortController().signal));
+ const h=await r.ctx.sessionPersistence.open('s1','read');const log=await h.read();await h.close();
+ assert.equal(log.events.some(e=>e.type==='user/message'&&e.data.content.some(c=>c.type==='image')),false);
 }));
