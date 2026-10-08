@@ -21,7 +21,10 @@ import CredentialsLocal from '@deepseek-ai/dsh-credentials-local';
 import Authorization, { AuthorizationDeclinedError } from '@deepseek-ai/dsh-authorization';
 import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai';
 import { credentialKey } from '@deepseek-ai/dsh-credentials';
-import Workshop, { IMAGE_ASK_SECTION } from '../src/index.mjs';
+import Skills from '@deepseek-ai/dsh-skill';
+import * as ToolSkill from '@deepseek-ai/dsh-tool-skill';
+import Workshop from '../src/index.mjs';
+import BuildingSkill from '../src/building-skill.mjs';
 
 // Standalone developer Host for Workshop's image-ask step. Real: Cordis, Session
 // store/JSONL, AgentRegistry, the official AgentLoop, system-prompt assembly, tool
@@ -61,13 +64,12 @@ export class FixtureVisionModel extends LlmAdapter {
    const ref=p.attachment??p;const stored=await this.attachments().readImage(ref);
    images.push({role:m.role,attachmentId:ref.attachmentId,mediaType:stored.ref.mediaType,width:stored.ref.width,height:stored.ref.height,bytes:stored.data.byteLength,sha256:sha(stored.data)});
   }
-  const system=options.messages.filter(m=>m.role==='system').flatMap(m=>m.content).filter(p=>p.type==='text').map(p=>p.text).join('\n');
+  const messages=options.messages.flatMap(m=>m.content).filter(p=>p.type==='text').map(p=>p.text).join('\n');
   const tools=(options.tools??[]).map(t=>t.name);
-  const record={images,skillSection:system.includes('HanaWorlds building skill — image step.'),tools};this.requests.push(record);
+  const record={images,skillCatalog:messages.includes('<available_skills>')&&messages.includes('hanaworlds-building'),tools};this.requests.push(record);
   const text=['【FIXTURE 模型 · 不是真实模型，不会看图】',
    images.length?`本回合模型请求里收到 ${images.length} 张图片的真实字节：`:'本回合模型请求里没有图片。',
    ...images.map(i=>`- ${i.mediaType} ${i.width}×${i.height} px，${i.bytes} B，sha256 ${i.sha256.slice(0,16)}…`),
-   `系统提示含 ${IMAGE_ASK_SECTION} 图片步骤：${record.skillSection?'是':'否'}；模型可见工具：${tools.join('、')||'无'}。`,
    '真实模型未授权（UNKNOWN），这里不描述图中结构，也不判断比例/用途是否需要追问。'].join('\n');
   yield {type:'block-start',index:0,blockType:'text'};
   yield {type:'text-delta',index:0,text};
@@ -93,6 +95,10 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   await ctx.plugin(LlmPiAi,{providers:{[REAL_PROVIDER]:{}}}).await();
   await setup?.(ctx);
   await ctx.plugin(Workshop).await();
+  // setup has awaited the peer plugins; registration captures this composition once.
+  await ctx.plugin(Skills).await();
+  await ctx.plugin(BuildingSkill).await();
+  await ctx.plugin(ToolSkill).await();
   const ws=ctx.get('hanaworldsWorkshop');
   const conversations=new Map();
   const signedIn=async()=>!!(await ctx.credentials.readRecord(REAL_AUTH_KEY));

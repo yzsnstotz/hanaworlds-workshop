@@ -11,7 +11,7 @@ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAA
 const sha=b=>createHash('sha256').update(b).digest('hex');
 
 test('ask page: fixture labelled, localhost only, new and started conversations, upload and link reach the model turn, failures named and recoverable',async()=>{
- const runRoot=new URL('../../runtime/ask-web-test/',import.meta.url).pathname;await mkdir(runRoot,{recursive:true});
+ const runRoot=process.env.HW_RUNTIME_ROOT??new URL('../../runtime/ask-web-test/',import.meta.url).pathname;await mkdir(runRoot,{recursive:true});
  const web=await startAskWeb({port:0,runRoot,hosts:['127.0.0.1']});
  try{
   const port=web.servers[0].address().port,origin=`http://127.0.0.1:${port}`;
@@ -30,7 +30,7 @@ test('ask page: fixture labelled, localhost only, new and started conversations,
   assert.equal(up.status,200);assert.equal(up.body.result.status,'QUEUED_FOR_NEXT_TURN');assert.equal(up.body.fixture.kind,'FIXTURE');
   let t=(await post('/api/ask/transcript',{conversationId})).body.result;assert.equal(t.queued.length,1);assert.equal(t.queued[0].images[0].data,png.toString('base64'));
   const turn=(await post('/api/ask/turn',{conversationId,text:'描述这张图片里的建筑结构'})).body.result;
-  assert.equal(turn.request.images.length,1);assert.equal(turn.request.images[0].sha256,sha(png));assert.equal(turn.request.skillSection,true);
+  assert.equal(turn.request.images.length,1);assert.equal(turn.request.images[0].sha256,sha(png));assert.equal(turn.request.skillCatalog,true);
   assert.equal(turn.transcript.started,true);assert.equal(turn.transcript.queued.length,0);
   const reply=turn.transcript.items.at(-1);assert.equal(reply.role,'assistant');assert.match(reply.text,/FIXTURE/);
   // Same conversation, now started: a link attaches directly and the next turn carries it.

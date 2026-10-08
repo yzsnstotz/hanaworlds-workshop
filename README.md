@@ -56,7 +56,7 @@ PASS, product readiness or acceptance. No actual package declaration is forged.
 
 Workshop 为一个对话的 Agent 提供建造 skill 的「看图」步骤：
 
-- `workshop.prepareImageAsk(agent)`：通过官方 `agent.ctx` 作用域加一段系统提示 `hanaworlds-building:image-ask`（看实际图片描述结构；不按文件名/链接描述；只描述不建造；比例或用途不清先问一个问题），并用 `ctx.tools.restrict({allow:['hanaworlds_download_image']})` 只留下只读图片工具，写世界的工具在这一步不可见。返回解除两者的 disposer。只影响这一个 Agent。Host 缺 `systemPrompt`/`tools` 时具名拒绝。
+- `workshop.prepareImageAsk(agent)`：用官方 `ctx.tools.restrict({allow:['hanaworlds_download_image','skill']})` 限制当前 Agent 的工具，返回解除限制的 disposer。完整 building skill 由本包 `hanaworlds-workshop/building-skill` 插件供给；宿主先逐个 await 实际 peer 装配，再 await 此插件注册一次，最后 await 官方 `dsh-tool-skill` 消费插件。注册时使用本 Workshop 的 `describeWriteTools(null)`，保留原 await/catch→null 与 config??null 分支；不刷新、不冻结其他 Host 的正文。缺 `tools` 时具名拒绝。
 - `workshop.attachImageForPanel(session,{data,mediaType},signal)`：本机图片（用户选的字节），与链接同一套 Session 核对、存储、绑定和新/已开始对话语义（新对话 `QUEUED_FOR_NEXT_TURN` 经公开 Agent inbox，已开始对话 `ATTACHED`）。类型、空图、大小上限具名拒绝；附件存储仍完整解码校验。
 
 开发入口：`web/ask-server.mjs` 起 **http://127.0.0.1:47608/ask**（也接受 `localhost`，带参数可开）。它扮演 Host：真实 Cordis / Session / JSONL / AgentRegistry / 官方 AgentLoop / system-prompt / tools / 本地附件 / HTTP 下载 + Workshop；**模型是醒目标注的 FIXTURE**——它读取请求里每张图片的实际存储字节并报告 sha256，不会看图、不描述结构。真实模型、鉴权、费用未授权（UNKNOWN）。会话是本页独立会话，不是 App 当前对话；不写世界。
@@ -84,3 +84,5 @@ DSH Core v4 规定：对话的系统提示必须是表面第 0 个节点，并�
 唯一开发接入路线是官方 Gateway 的新 SRC/source-mode JSON 端点 `hanaworldsWorkshopImageLinks/downloadLink`、`readLink`；它们从未注册strict定义。标准 `@Remote` 装饰器由TypeScript编译，不生成/手造Typert描述符、不撤已存在的strict定义、不做运行时降级。Client使用公开 `ctx.connection.rpc.call`。本开发端点不提供生成Client类型投影。
 
 旧strict生成路线的两次exit1与根因未明事实保留在 `evidence/F-WS-IMAGE-LINK-01/blocked-20261007/`，不当成已修复。组件材料不能代正式Host/UI/产品安装/owner验收；其Host Agent持久writer bridge在组件检查中明确标为fixture，正式面板不创建fixture对话。
+
+`npm run test:skill`：官方 Cordis/skills/tool-skill 的隔离 SOURCE/FIXTURE，核对原 Desktop bd964cdf 完整正文、五种输入分支及装配后单次注册。不代表真实模型、Desktop 或产品 UI 验收。

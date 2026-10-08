@@ -4,7 +4,7 @@ import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import * as C from 'hanaworlds-contracts';
 import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, uploadedImageBytes, mediaBinding, imageRef, imageDigest } from './image-attachment.mjs';
 import { prepareImageAsk } from './image-ask.mjs';
-export { prepareImageAsk, imageAskGuidance, IMAGE_ASK_SECTION, IMAGE_ASK_ALLOWED_TOOLS } from './image-ask.mjs';
+export { prepareImageAsk, IMAGE_ASK_ALLOWED_TOOLS } from './image-ask.mjs';
 import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
 export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
 const VERSION = 'session/v3', CANVAS = 'canvas/v5';

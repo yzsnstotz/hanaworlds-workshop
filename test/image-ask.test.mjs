@@ -19,10 +19,13 @@ import Storage from '@deepseek-ai/dsh-storage';
 import * as StorageJson from '@deepseek-ai/dsh-storage-json';
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain';
 import Attachments from '@deepseek-ai/dsh-attachment-local';
-import Tools from '@deepseek-ai/dsh-tools';
+import Tools, { defineTool } from '@deepseek-ai/dsh-tools';
+import Skills from '@deepseek-ai/dsh-skill';
+import * as ToolSkill from '@deepseek-ai/dsh-tool-skill';
+import BuildingSkill from '../src/building-skill.mjs';
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import { FixtureVisionModel, PROVIDER, MODEL } from '../web/ask-server.mjs';
-const {default:plugin,IMAGE_ASK_SECTION,IMAGE_ASK_ALLOWED_TOOLS}=await import(process.env.HW_WORKSHOP_PACKAGE_ENTRY??'../src/index.mjs');
+const {default:plugin,IMAGE_ASK_ALLOWED_TOOLS}=await import(process.env.HW_WORKSHOP_PACKAGE_ENTRY??'../src/index.mjs');
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEklEQVQImWOo2HKnYssdBggFADdeCCGxfcWRAAAAAElFTkSuQmCC','base64');
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const signal=()=>new AbortController().signal;
@@ -40,6 +43,10 @@ async function setup(fn){
   await ctx.plugin(Llm).await();await ctx.plugin(SystemPrompt).await();await ctx.plugin(Tools).await();await ctx.plugin(AgentLoop).await();
   const model=new FixtureVisionModel(()=>ctx.attachments);ctx.llm.registerAdapter([PROVIDER],model);
   await ctx.plugin(plugin).await();
+  await ctx.plugin(Skills).await();
+  await ctx.plugin(BuildingSkill).await();
+  await ctx.plugin(ToolSkill).await();
+  ctx.tools.register(defineTool({name:'fixture_world_write',description:'FIXTURE forbidden write tool',parameters:{},output:{schema:{type:'object',additionalProperties:false,properties:{}}},async execute(){throw Error('FIXTURE_WRITE_MUST_NOT_RUN');}}));
   const base=`http://127.0.0.1:${server.address().port}`;
   await fn({ctx,model,ws:ctx.get('hanaworldsWorkshop'),url:`${base}/picture`,base});
  }finally{await ctx.fiber.dispose();server.closeAllConnections();await new Promise(r=>server.close(r));await rm(root,{recursive:true,force:true});}
@@ -54,7 +61,7 @@ async function ask(r,c,text){
 }
 async function durable(r,id){const h=await r.ctx.sessionPersistence.open(id,'read');try{return (await h.read()).events;}finally{await h.close();}}
 
-test('new conversation: local upload is queued, the first real Loop turn hands its actual bytes to the model with the building image step and no write tools',async()=>setup(async r=>{
+test('new conversation: local upload is queued, the first real Loop turn hands its actual bytes to the model with the official building skill catalog and no write tools',async()=>setup(async r=>{
  const c=await conversation(r);
  const out=await r.ws.attachImageForPanel(c.session,{data:png,mediaType:'image/png'},signal());
  assert.equal(out.status,'QUEUED_FOR_NEXT_TURN');assert.equal(out.sessionRef,c.id);assert.equal(out.image.width,2);
@@ -63,8 +70,8 @@ test('new conversation: local upload is queued, the first real Loop turn hands i
  const sent=await ask(r,c,'描述这张图片里的建筑结构');
  assert.equal(r.model.requests.length,1);
  assert.deepEqual(sent.images.map(i=>[i.attachmentId,i.sha256,i.bytes]),[[out.image.attachmentId,sha(png),png.length]],'the model turn received the actual image bytes');
- assert.equal(sent.skillSection,true,`system prompt carries ${IMAGE_ASK_SECTION}`);
- assert.deepEqual(sent.tools,[...IMAGE_ASK_ALLOWED_TOOLS],'only the read-only image tool is visible while describing');
+ assert.equal(sent.skillCatalog,true,'official tool-skill catalog reaches the model');
+ assert.deepEqual([...sent.tools].sort(),[...IMAGE_ASK_ALLOWED_TOOLS].sort(),'only the read-only image tool is visible while describing');
  const events=await durable(r,c.id);
  assert.equal(events.find(e=>e.surfaceOp!==undefined)?.type,'system/message','system head stays surface node 0');
  assert.ok(events.some(e=>e.type==='assistant/message'));
@@ -99,7 +106,8 @@ test('the image step is scoped to one agent and lifts cleanly',async()=>setup(as
  const a=await conversation(r);
  const {agent:plain}=await r.ctx.agents.create({sessionId:`plain-${randomUUID()}`,agentOptions:{provider:PROVIDER,model:MODEL}});
  plain.followup({id:'p',role:'user',source:{kind:'user'},content:[{type:'text',text:'hi'}]});await plain.whenIdle();
- assert.equal(r.model.requests.at(-1).skillSection,false,'another agent is unaffected');
- a.lift();await ask(r,a,'hi');assert.equal(r.model.requests.at(-1).skillSection,false,'disposer removes the section');
+ assert.ok(r.model.requests.at(-1).tools.includes('fixture_world_write'),'another agent keeps its ordinary tools');
+ await ask(r,a,'hi');assert.ok(!r.model.requests.at(-1).tools.includes('fixture_world_write'),'image agent cannot see write tools');
+ a.lift();await ask(r,a,'hi');assert.ok(r.model.requests.at(-1).tools.includes('fixture_world_write'),'disposer restores ordinary tool visibility');
  assert.throws(()=>r.ws.prepareImageAsk(undefined),/CONVERSATION_AGENT_REQUIRED/);
 }));
