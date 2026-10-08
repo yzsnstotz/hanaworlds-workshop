@@ -27,3 +27,4 @@ footer{margin-top:24px;color:var(--muted);font-size:12.5px}
 .tag.model{background:#fff4d6;color:#8a5a00}.tag.model.real{background:#e3f5e8;color:#1f7a3a}.tag.ok{background:#e3f5e8;color:#1f7a3a}
 #auth-error{color:var(--err);font-weight:600}.bar select#model{min-width:220px}
 .msg.assistant.real{background:#eef9f1;border-left-color:#1f7a3a}
+[hidden]{display:none!important}
