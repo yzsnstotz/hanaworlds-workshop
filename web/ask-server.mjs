@@ -81,7 +81,7 @@ export class FixtureVisionModel extends LlmAdapter {
 const imageParts=content=>(content??[]).filter(p=>p.type==='image').map(p=>p.attachment);
 const textOf=content=>(content??[]).filter(p=>p.type==='text').map(p=>p.text).join('\n');
 
-export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0.1','::1'],authKey=REAL_AUTH_KEY,setup,callbackPort=authKey===REAL_AUTH_KEY?OFFICIAL_CALLBACK_PORT:null}={}) {
+export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0.1','::1'],authKey=REAL_AUTH_KEY,setup,preparationOnly=false,callbackPort=authKey===REAL_AUTH_KEY?OFFICIAL_CALLBACK_PORT:null}={}) {
  await mkdir(runRoot,{recursive:true});const runtime=await mkdtemp(join(runRoot,'session-'));
  const ctx=new Context();const servers=[];
  try {
@@ -91,8 +91,10 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   await ctx.plugin(Sessions).await();await ctx.plugin(Projections).await();await ctx.plugin(Agents).await();
   await ctx.plugin(Llm).await();await ctx.plugin(SystemPrompt).await();await ctx.plugin(Tools).await();await ctx.plugin(AgentLoop).await();
   const model=new FixtureVisionModel(()=>ctx.attachments);ctx.llm.registerAdapter([PROVIDER],model);
-  await ctx.plugin(CredentialsLocal,{dshHome:join(runtime,'dsh-home')}).await();await ctx.plugin(Authorization).await();
-  await ctx.plugin(LlmPiAi,{providers:{[REAL_PROVIDER]:{}}}).await();
+  if(!preparationOnly){
+   await ctx.plugin(CredentialsLocal,{dshHome:join(runtime,'dsh-home')}).await();await ctx.plugin(Authorization).await();
+   await ctx.plugin(LlmPiAi,{providers:{[REAL_PROVIDER]:{}}}).await();
+  }
   await setup?.(ctx);
   await ctx.plugin(Workshop).await();
   // setup has awaited the peer plugins; registration captures this composition once.
@@ -101,9 +103,9 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   await ctx.plugin(ToolSkill).await();
   const ws=ctx.get('hanaworldsWorkshop');
   const conversations=new Map();
-  const signedIn=async()=>!!(await ctx.credentials.readRecord(REAL_AUTH_KEY));
+  const signedIn=async()=>preparationOnly?false:!!(await ctx.credentials.readRecord(REAL_AUTH_KEY));
   async function models(){
-   const listed=await ctx.llm.listModels(REAL_PROVIDER);const real=(listed.models??listed).filter(m=>(m.inputModalities??m.input??[]).includes('image'));
+   const listed=preparationOnly?[]:await ctx.llm.listModels(REAL_PROVIDER);const real=(listed.models??listed).filter(m=>(m.inputModalities??m.input??[]).includes('image'));
    return [{id:`${PROVIDER}/${MODEL}`,provider:PROVIDER,model:MODEL,kind:'FIXTURE',label:'FIXTURE 模型（不看图）'},
     ...real.map(m=>({id:`${REAL_PROVIDER}/${m.id}`,provider:REAL_PROVIDER,model:m.id,kind:'REAL',label:`${m.name??m.id}（真实模型 · 支持看图）`}))];
   }
@@ -116,7 +118,8 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   }
   /** One sign-in attempt at a time, driven by the person on the page through the official flow. */
   const auth={status:'idle',notices:[],prompt:null,error:null,method:null,waitingFor:null};let pendingPrompt=null;
-  const authView=async()=>({key:authKey,flow:ctx.authorization.describe(authKey)??null,signedIn:!!(await ctx.credentials.readRecord(authKey)),
+  const authView=async()=>preparationOnly?({key:authKey,flow:null,signedIn:false,status:'idle',notices:[],prompt:null,error:null,method:null,waitingFor:null,callbackPort:null,
+   route:{provider:REAL_PROVIDER,label:'准备页：真实模型待授权',cost:'仅运行 FIXTURE；真实模型请求关闭，不消耗真实模型额度。',storage:'本准备页未挂登录存储，不读取既有登录记录。'}}):({key:authKey,flow:ctx.authorization.describe(authKey)??null,signedIn:!!(await ctx.credentials.readRecord(authKey)),
    status:auth.status,notices:auth.notices,prompt:auth.prompt,error:auth.error,method:auth.method,waitingFor:auth.waitingFor,callbackPort,route:realRoute});
   async function beginAuth(){
    const flow=ctx.authorization.describe(authKey);if(!flow)throw Error('SIGN_IN_FLOW_UNAVAILABLE');
@@ -192,7 +195,7 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
     if(req.method==='GET'){
      if(path==='/'){res.writeHead(302,{location:'/ask'});return res.end();}
      if(path==='/api/ask/auth')return send(res,200,await authView());
-     if(path==='/api/ask/state')return send(res,200,{fixture,initial,models:await models(),auth:await authView(),conversations:[...conversations.values()].map(c=>({id:c.id,started:c.session.surface.nodes.length>0,createdAt:c.createdAt,model:c.model})),limits:{maxImageBytes:uploadCap,mediaTypes:limits.mediaTypes.filter(t=>['image/png','image/jpeg','image/webp','image/gif'].includes(t))}});
+     if(path==='/api/ask/state')return send(res,200,{fixture,preparationOnly,initial,models:await models(),auth:await authView(),conversations:[...conversations.values()].map(c=>({id:c.id,started:c.session.surface.nodes.length>0,createdAt:c.createdAt,model:c.model})),limits:{maxImageBytes:uploadCap,mediaTypes:limits.mediaTypes.filter(t=>['image/png','image/jpeg','image/webp','image/gif'].includes(t))}});
      if(path==='/sample.png')return send(res,200,samplePNG,'image/png');
      if(path==='/sample-not-image')return send(res,200,'<html>not an image</html>','text/html; charset=utf-8');
      if(assets.has(path))return send(res,200,assets.get(path),path.endsWith('.css')?'text/css; charset=utf-8':path.endsWith('.mjs')?'text/javascript; charset=utf-8':'text/html; charset=utf-8');
@@ -207,6 +210,7 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
     if(!args||typeof args!=='object')return send(res,400,{error:'INVALID_JSON'});
     const controller=new AbortController();res.once('close',()=>{if(!res.writableEnded)controller.abort();});const signal=controller.signal;
     const result=await serial(async()=>{
+     if(preparationOnly&&path.startsWith('/api/ask/auth/'))throw Error('REAL_MODEL_AUTH_PENDING');
      if(path==='/api/ask/auth/begin'){await beginAuth();return authView();}
      if(path==='/api/ask/auth/answer'){answerAuth(args.promptId,args.text);return authView();}
      if(path==='/api/ask/auth/cancel'){cancelAuth();return authView();}

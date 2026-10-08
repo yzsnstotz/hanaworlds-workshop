@@ -30,6 +30,12 @@
 
 **FIXTURE**：模型（`hanaworlds-fixture/fixture-vision-1`，不看图，只报告收到的真实字节）；会话是本页独立会话。**真实**：官方 AgentLoop、官方 skill registry / tool-skill catalog（页内 FIXTURE 模型不调用 skill；完整正文消费另由隔离 tool-skill 测试验证）、图片 Agent 仅见 skill + hanaworlds_download_image，Session/JSONL、附件存储/解码、HTTP 下载。真实模型/鉴权/费用 UNKNOWN，未授权。不写世界。
 
-### 真实模型登录（准备，0.4.8）
+### 未认证准备模式（0.4.11）
+
+规划登记的新入口使用 `startAskWeb({port:47611,runRoot:<本卡全新绝对路径>,preparationOnly:true})`。此模式只加载 FIXTURE 模型和官方 AgentLoop，不加载 CredentialsLocal/Authorization/真实模型 adapter；公开模型列表只含 FIXTURE，所有登录端点明确拒绝 `REAL_MODEL_AUTH_PENDING`，选择真实模型拒绝 `MODEL_NOT_AVAILABLE`。本页无需登录，不读取既有登录 store。运行目录、Session、媒体、投影全部新建；真实模型看图/先追问仍未测试。
+
+只有正常模式会使用下方既有登录流程。本轮准备模式不申请 SDK 读取/刷新既有凭据，也不启用真实请求；这两项须独立授权。正常模式配置没有可证明禁止账户消耗付费 credits 的开关，不能把订阅登录写成“保证零新增费用”。
+
+### 正常模式的既有登录流程（历史 0.4.8 准备）
 
 页面顶部「真实模型登录」卡对应官方 openai-codex（ChatGPT Plus/Pro 订阅）登录流程；登录记录只存本次运行目录 `dsh-home/`。人点击「登录 ChatGPT」才开始，页面显示登录页链接和流程提问；「退出登录」删除本页记录。新对话可在「新对话模型」里选真实模型；未登录时提问被拒绝 `REAL_MODEL_SIGN_IN_REQUIRED`。费用：计入所登录账号的订阅额度，订阅外是否另计费 UNKNOWN。

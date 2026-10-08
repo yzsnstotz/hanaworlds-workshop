@@ -26,7 +26,8 @@ async function refresh(){renderTranscript(await call('/api/ask/transcript'));}
 async function loadState(select){
  const r=await fetch('/api/ask/state');if(!r.ok)throw Error(`HTTP ${r.status}`);const s=await r.json();
  if(s.fixture?.kind!=='FIXTURE')throw Error('FIXTURE_LABEL_REQUIRED');
- $('fixture-model').textContent=`默认模型 ${s.fixture.model}（FIXTURE）· 真实模型需先登录`;state.limits=s.limits;state.conversations=s.conversations;
+ if(s.preparationOnly)$('fixture').querySelector('p').textContent='本准备页仅运行 FIXTURE 模型，不会真正看图；真实图片字节走同一官方 AgentLoop。会话是本页独立 FIXTURE 会话，不是 HanaWorlds App 的当前对话。本页不挂登录服务、不写世界；真实模型待授权，无需登录。';
+ $('fixture-model').textContent=s.preparationOnly?`准备页 · ${s.fixture.model}（FIXTURE）· 真实模型未启用，无需登录`:`默认模型 ${s.fixture.model}（FIXTURE）· 真实模型需先登录`;state.limits=s.limits;state.conversations=s.conversations;
  const ms=$('model'),keep=ms.value;ms.replaceChildren();for(const m of s.models){const o=document.createElement('option');o.value=m.id;o.textContent=m.label;ms.append(o);}if([...ms.options].some(o=>o.value===keep))ms.value=keep;
  renderAuth(s.auth);
  $('limits').textContent=`上限 ${Math.floor(s.limits.maxImageBytes/1024/1024)} MiB · 类型 ${s.limits.mediaTypes.join(' / ')}`;
