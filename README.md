@@ -31,6 +31,17 @@ Canvas package identity. Fixture success does not grant final public-consumption
 PASS, product readiness or acceptance. No actual package declaration is forged.
 
 
+## 浏览器登录直线化（0.4.9）
+
+按官方 pi-ai 0.87.1 `openai-codex` 浏览器登录的公开实现（方法 id `browser` 为默认；本机 `127.0.0.1:1455/auth/callback` 回调自动接回授权码；同时有一个「手动粘贴授权码」的后备提问），47608/47609 开发页现在：
+
+- 自动用官方默认的「浏览器登录」回答方法选择，不再让人选；
+- 不显示手动粘贴框，只提示「在 OpenAI 页面登录并确认后，本页会通过本机 1455 自动接回」，回调到达后后备提问被官方流程自行撤回；
+- 开始登录前先检查本机 1455 是否空闲，被占用时具名拒绝 `SIGN_IN_CALLBACK_PORT_BUSY`，不再静默落到「请粘贴代码」；
+- 页头显示实际端口。
+
+测试只用形状与官方一致的 FIXTURE 流程（`test/ask-web.test.mjs`），没有启动真实 OAuth。
+
 ## 真实模型登录准备（0.4.8，F-WS-IMAGE-ASK-01 路线 A）
 
 47608 开发页（Host 角色）新增可选的真实模型路线，**只做准备，不会自己登录或调用真实模型**：

@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id);
-const explain={IMAGE_TYPE_UNSUPPORTED:'这不是支持的图片（只收 PNG / JPEG / WebP / GIF）。',IMAGE_HTTP_FAILED:'图片下载失败（对方返回错误或要求跳转；请贴直达图片的链接）。',IMAGE_URL_REQUIRED:'请填写 HTTP/HTTPS 图片链接。',IMAGE_TOO_LARGE:'图片超过大小上限。',IMAGE_EMPTY:'图片是空的。',IMAGE_BYTES_REQUIRED:'没有读到图片字节。',QUESTION_REQUIRED:'请先写下问题。',AGENT_BUSY:'模型还在回答上一个问题。',MODEL_TURN_NO_REPLY:'模型回合结束了，但没有回答。',CONVERSATION_NOT_FOUND:'找不到这个对话。',REAL_MODEL_SIGN_IN_REQUIRED:'这个对话用的是真实模型，请先在上方「真实模型登录」登录。',MODEL_NOT_AVAILABLE:'这个模型现在不可用。',SIGN_IN_ALREADY_RUNNING:'已有一次登录在进行中。',SIGN_IN_FLOW_UNAVAILABLE:'登录流程不可用。',SIGN_IN_PROMPT_MISMATCH:'登录页的问题已变化，请看最新提示。','fetch failed':'图片下载失败（连不上该地址）。'};
+const explain={IMAGE_TYPE_UNSUPPORTED:'这不是支持的图片（只收 PNG / JPEG / WebP / GIF）。',IMAGE_HTTP_FAILED:'图片下载失败（对方返回错误或要求跳转；请贴直达图片的链接）。',IMAGE_URL_REQUIRED:'请填写 HTTP/HTTPS 图片链接。',IMAGE_TOO_LARGE:'图片超过大小上限。',IMAGE_EMPTY:'图片是空的。',IMAGE_BYTES_REQUIRED:'没有读到图片字节。',QUESTION_REQUIRED:'请先写下问题。',AGENT_BUSY:'模型还在回答上一个问题。',MODEL_TURN_NO_REPLY:'模型回合结束了，但没有回答。',CONVERSATION_NOT_FOUND:'找不到这个对话。',REAL_MODEL_SIGN_IN_REQUIRED:'这个对话用的是真实模型，请先在上方「真实模型登录」登录。',MODEL_NOT_AVAILABLE:'这个模型现在不可用。',SIGN_IN_ALREADY_RUNNING:'已有一次登录在进行中。',SIGN_IN_FLOW_UNAVAILABLE:'登录流程不可用。',SIGN_IN_PROMPT_MISMATCH:'登录页的问题已变化，请看最新提示。',SIGN_IN_CALLBACK_PORT_BUSY:'本机 1455 端口被占用，官方浏览器登录无法自动接回；请关掉正在进行的其他 OpenAI/Codex 登录后再点登录。','fetch failed':'图片下载失败（连不上该地址）。'};
 let state={conversation:null,busy:false,limits:null,conversations:[],auth:null};let authTimer=null;
 const show=e=>{const code=e.message;$('error').textContent=`未完成：${code}${explain[code]?` — ${explain[code]}`:''}${e.details?` ${JSON.stringify(e.details)}`:''}　页面可继续使用。`;$('error').hidden=false;};
 const status=t=>{$('status').textContent=t;};
@@ -53,8 +53,9 @@ function renderAuth(a){
  const running=a.status==='running';
  $('auth-begin').disabled=!a.flow||running||a.signedIn;$('auth-begin').textContent=a.flow?`登录 ${a.flow.methods?.[0]?.label??a.flow.label}`:'登录不可用';
  $('auth-cancel').disabled=!running;$('auth-signout').disabled=running||!a.signedIn;
- const ul=$('auth-notices');ul.replaceChildren();for(const n of a.notices){const li=document.createElement('li');li.append(n.message);if(n.url){const link=document.createElement('a');link.href=n.url;link.target='_blank';link.rel='noopener';link.textContent=' 打开登录页';li.append(link);}if(n.code){const c=document.createElement('code');c.textContent=` ${n.code}`;li.append(c);}ul.append(li);}
+ const ul=$('auth-notices');ul.replaceChildren();for(const n of a.notices){const li=document.createElement('li');li.append(n.url?'官方登录页已就绪：':n.message);if(n.url){const link=document.createElement('a');link.href=n.url;link.target='_blank';link.rel='noopener';link.textContent='打开 OpenAI 登录页';li.append(link);}if(n.code){const c=document.createElement('code');c.textContent=` ${n.code}`;li.append(c);}ul.append(li);}
  const f=$('auth-prompt-form');f.hidden=!a.prompt;if(a.prompt){f.dataset.id=a.prompt.id;$('auth-prompt-label').textContent=a.prompt.message;const sel=a.prompt.kind==='select';$('auth-select').hidden=!sel;$('auth-answer').hidden=sel;$('auth-answer').type=a.prompt.kind==='secret'?'password':'text';$('auth-answer').placeholder=a.prompt.placeholder??'';if(sel&&$('auth-select').dataset.id!==a.prompt.id){$('auth-select').dataset.id=a.prompt.id;$('auth-select').replaceChildren(...a.prompt.options.map(o=>{const x=document.createElement('option');x.value=o.id;x.textContent=o.label;return x;}));}}
+ const w=$('auth-waiting');w.hidden=a.waitingFor!=='BROWSER_CALLBACK';w.textContent=`在打开的 OpenAI 页面登录并确认后，本页会通过本机 ${a.callbackPort} 端口自动接回，不需要粘贴任何代码。`;
  $('auth-error').hidden=!a.error;$('auth-error').textContent=a.error?`登录未完成：${a.error}`:'';
  clearTimeout(authTimer);if(running)authTimer=setTimeout(()=>fetch('/api/ask/auth').then(r=>r.json()).then(renderAuth,()=>{}),1500);
 }
@@ -63,3 +64,4 @@ $('auth-begin').addEventListener('click',()=>authCall('/api/ask/auth/begin'));
 $('auth-cancel').addEventListener('click',()=>authCall('/api/ask/auth/cancel'));
 $('auth-signout').addEventListener('click',()=>authCall('/api/ask/auth/signout'));
 $('auth-prompt-form').addEventListener('submit',e=>{e.preventDefault();const sel=!$('auth-select').hidden;authCall('/api/ask/auth/answer',{promptId:$('auth-prompt-form').dataset.id,text:sel?$('auth-select').value:$('auth-answer').value});$('auth-answer').value='';});
+$('local-port').textContent=`本机开发网页 · ${location.port}`;

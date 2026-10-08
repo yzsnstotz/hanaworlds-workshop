@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { createServer as createProbe } from 'node:net';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -37,6 +38,12 @@ const sha=b=>createHash('sha256').update(b).digest('hex');
 // ~/.dsh or the HanaWorlds App profile. Nothing here starts a sign-in or calls
 // the real model by itself: both happen only when a person clicks.
 export const REAL_PROVIDER='openai-codex',REAL_AUTH_KEY=credentialKey('llm-pi-ai',REAL_PROVIDER);
+// Official pi-ai 0.87.1 openai-codex browser login: method id `browser` (its default), a local
+// callback server on 127.0.0.1:1455 that receives the code by itself, and a parallel manual-code
+// text prompt as fallback. This Host answers the method with the official default and never asks a
+// person to paste a code: the fallback prompt stays internal and is withdrawn when the callback lands.
+export const BROWSER_METHOD='browser',OFFICIAL_CALLBACK_PORT=1455;
+const portFree=port=>new Promise(resolve=>{const probe=createProbe();probe.once('error',()=>resolve(false));probe.listen(port,'127.0.0.1',()=>probe.close(()=>resolve(true)));});
 export const realRoute={provider:REAL_PROVIDER,label:'ChatGPT（OpenAI Codex 订阅登录）',
  cost:'计入登录账号的 ChatGPT Plus/Pro 订阅额度；本页不绑卡、不新建 API key。订阅之外是否另计费：UNKNOWN，请按自己的套餐判断。',
  storage:'登录记录只存在本页运行目录，不读、不写 HanaWorlds App 或 ~/.dsh 的登录。可随时「退出登录」删除。'};
@@ -72,7 +79,7 @@ export class FixtureVisionModel extends LlmAdapter {
 const imageParts=content=>(content??[]).filter(p=>p.type==='image').map(p=>p.attachment);
 const textOf=content=>(content??[]).filter(p=>p.type==='text').map(p=>p.text).join('\n');
 
-export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0.1','::1'],authKey=REAL_AUTH_KEY,setup}={}) {
+export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0.1','::1'],authKey=REAL_AUTH_KEY,setup,callbackPort=authKey===REAL_AUTH_KEY?OFFICIAL_CALLBACK_PORT:null}={}) {
  await mkdir(runRoot,{recursive:true});const runtime=await mkdtemp(join(runRoot,'session-'));
  const ctx=new Context();const servers=[];
  try {
@@ -102,22 +109,31 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
    conversations.set(id,{id,agent:handle.agent,session:ctx.sessions.get(id),lift,createdAt:Date.now(),model:picked});return id;
   }
   /** One sign-in attempt at a time, driven by the person on the page through the official flow. */
-  const auth={status:'idle',notices:[],prompt:null,error:null};let pendingPrompt=null;
+  const auth={status:'idle',notices:[],prompt:null,error:null,method:null,waitingFor:null};let pendingPrompt=null;
   const authView=async()=>({key:authKey,flow:ctx.authorization.describe(authKey)??null,signedIn:!!(await ctx.credentials.readRecord(authKey)),
-   status:auth.status,notices:auth.notices,prompt:auth.prompt,error:auth.error,route:realRoute});
-  function beginAuth(){
+   status:auth.status,notices:auth.notices,prompt:auth.prompt,error:auth.error,method:auth.method,waitingFor:auth.waitingFor,callbackPort,route:realRoute});
+  async function beginAuth(){
    const flow=ctx.authorization.describe(authKey);if(!flow)throw Error('SIGN_IN_FLOW_UNAVAILABLE');
    if(auth.status==='running')throw Error('SIGN_IN_ALREADY_RUNNING');
-   Object.assign(auth,{status:'running',notices:[],prompt:null,error:null});
+   // The official browser login silently degrades to a paste prompt when it cannot bind its callback port; refuse by name instead.
+   if(callbackPort!==null&&!(await portFree(callbackPort))){const e=Error('SIGN_IN_CALLBACK_PORT_BUSY');e.details={port:callbackPort};throw e;}
+   Object.assign(auth,{status:'running',notices:[],prompt:null,error:null,method:null,waitingFor:null});
    const interaction={notify:n=>{auth.notices.push({message:n.message,url:n.url??null,code:n.code??null});},
     prompt:q=>new Promise((resolve,reject)=>{
+     if(q.kind==='select'&&q.options?.some(o=>o.id===BROWSER_METHOD)){auth.method=BROWSER_METHOD;return resolve(BROWSER_METHOD);}
+     if(q.kind==='text'&&auth.method===BROWSER_METHOD){
+      // Manual-code fallback of the browser login: not shown; the local callback completes the flow.
+      auth.waitingFor='BROWSER_CALLBACK';
+      q.signal?.addEventListener('abort',()=>{if(auth.waitingFor==='BROWSER_CALLBACK')auth.waitingFor=null;},{once:true});
+      return;
+     }
      const id=randomUUID();auth.prompt={id,kind:q.kind,message:q.message,placeholder:q.placeholder??null,options:q.options??null};
      pendingPrompt={id,resolve,reject};
      q.signal?.addEventListener('abort',()=>{if(pendingPrompt?.id===id){pendingPrompt=null;auth.prompt=null;}},{once:true});
     })};
    ctx.authorization.begin({key:authKey,method:flow.methods[0]?.id,interaction}).then(
-    out=>{auth.status=out.status;auth.prompt=null;pendingPrompt=null;},
-    error=>{auth.status='failed';auth.error=error?.code??error?.message??String(error);auth.prompt=null;pendingPrompt=null;});
+    out=>{auth.status=out.status;auth.prompt=null;auth.waitingFor=null;pendingPrompt=null;},
+    error=>{auth.status='failed';auth.error=error?.code??error?.message??String(error);auth.prompt=null;auth.waitingFor=null;pendingPrompt=null;});
   }
   function answerAuth(id,text){
    if(!pendingPrompt||pendingPrompt.id!==id||typeof text!=='string')throw Error('SIGN_IN_PROMPT_MISMATCH');
@@ -185,7 +201,7 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
     if(!args||typeof args!=='object')return send(res,400,{error:'INVALID_JSON'});
     const controller=new AbortController();res.once('close',()=>{if(!res.writableEnded)controller.abort();});const signal=controller.signal;
     const result=await serial(async()=>{
-     if(path==='/api/ask/auth/begin'){beginAuth();return authView();}
+     if(path==='/api/ask/auth/begin'){await beginAuth();return authView();}
      if(path==='/api/ask/auth/answer'){answerAuth(args.promptId,args.text);return authView();}
      if(path==='/api/ask/auth/cancel'){cancelAuth();return authView();}
      if(path==='/api/ask/auth/signout'){if(auth.status==='running')throw Error('SIGN_IN_ALREADY_RUNNING');await ctx.credentials.deleteRecord(authKey);Object.assign(auth,{status:'idle',notices:[],prompt:null,error:null});return authView();}

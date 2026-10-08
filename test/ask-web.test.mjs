@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdir, rm } from 'node:fs/promises';
-import { request } from 'node:http';
+import { request, createServer } from 'node:http';
 import { startAskWeb, REAL_AUTH_KEY } from '../web/ask-server.mjs';
 import { credentialKey } from '@deepseek-ai/dsh-credentials';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEklEQVQImWOo2HKnYssdBggFADdeCCGxfcWRAAAAAElFTkSuQmCC','base64');
@@ -96,4 +96,41 @@ test('sign-in surface drives an official dsh-authorization flow end to end (FIXT
   await post('/api/ask/auth/cancel');const cancelled=await until(v=>v.status!=='running');
   assert.equal(cancelled.status,'cancelled');assert.equal(cancelled.signedIn,false);
  }finally{await web.close();await rm(web.runtime,{recursive:true,force:true});}
+});
+
+// Same harness-level sequence as dsh-llm-pi-ai 0.2.0-rc.2 + pi-ai 0.87.1 openai-codex browser login
+// (method select with `browser` default, auth_url notice, manual-code text prompt racing the local
+// callback). FIXTURE flow on its own key; no real OAuth.
+test('official browser-login shape: method auto-chosen, paste prompt never exposed, callback completes sign-in; busy callback port refused by name',async()=>{
+ const runRoot=new URL('../../runtime/ask-web-test/',import.meta.url).pathname;await mkdir(runRoot,{recursive:true});
+ const key=credentialKey('hanaworlds-ask-test','codex-shape');let land;const callback=new Promise(r=>{land=r;});const seen={};
+ const setup=ctx=>{ctx.authorization.registerFlow({key,label:'OpenAI Codex (FIXTURE shape)',methods:[{id:'oauth',label:'OpenAI (ChatGPT Plus/Pro)'}],async run(session){
+  seen.method=await session.prompt({kind:'select',message:'Select OpenAI Codex login method:',options:[{id:'browser',label:'Browser login (default)'},{id:'device_code',label:'Device code login (headless)'}]});
+  session.notify({message:'A browser window should open. Complete login to finish.',url:'http://127.0.0.1/fixture-authorize'});
+  const manualAbort=new AbortController();let manual;
+  const manualP=session.prompt({kind:'text',message:'Complete login in your browser, or paste the authorization code / redirect URL here:',placeholder:'http://localhost:1455/auth/callback',signal:manualAbort.signal}).then(v=>{manual=v;},()=>{});
+  const code=await Promise.race([callback,manualP.then(()=>manual)]);manualAbort.abort();seen.via=manual?'manual':'callback';
+  if(!code)throw Error('Missing authorization code');
+  await ctx.credentials.modifyRecord(key,()=>Promise.resolve({kind:'grant',payload:{token:'fixture'}}));}});};
+ const web=await startAskWeb({port:0,runRoot,hosts:['127.0.0.1'],authKey:key,setup});
+ try{
+  const origin=`http://127.0.0.1:${web.servers[0].address().port}`;
+  const post=async(path,body={})=>(await fetch(origin+path,{method:'POST',headers:{'content-type':'application/json',origin},body:JSON.stringify(body)})).json();
+  const view=async()=>(await fetch(`${origin}/api/ask/auth`)).json();
+  const until=async f=>{for(let i=0;i<100;i++){const v=await view();if(f(v))return v;await new Promise(r=>setTimeout(r,20));}throw Error('AUTH_STATE_TIMEOUT');};
+  await post('/api/ask/auth/begin');
+  const waiting=await until(v=>v.waitingFor==='BROWSER_CALLBACK');
+  assert.equal(seen.method,'browser');assert.equal(waiting.method,'browser');assert.equal(waiting.prompt,null,'no prompt is exposed to the person');
+  assert.equal(waiting.notices[0].url,'http://127.0.0.1/fixture-authorize');
+  land('fixture-code');
+  const done=await until(v=>v.status!=='running');assert.equal(done.status,'authorized');assert.equal(done.signedIn,true);assert.equal(seen.via,'callback');assert.equal(done.waitingFor,null);
+ }finally{await web.close();await rm(web.runtime,{recursive:true,force:true});}
+ const busy=createServer();await new Promise(r=>busy.listen(0,'127.0.0.1',r));const busyPort=busy.address().port;
+ const web2=await startAskWeb({port:0,runRoot,hosts:['127.0.0.1'],authKey:key,setup,callbackPort:busyPort});
+ try{
+  const origin=`http://127.0.0.1:${web2.servers[0].address().port}`;
+  const r=await (await fetch(origin+'/api/ask/auth/begin',{method:'POST',headers:{'content-type':'application/json',origin},body:'{}'})).json();
+  assert.equal(r.error,'SIGN_IN_CALLBACK_PORT_BUSY');assert.deepEqual(r.details,{port:busyPort});
+  assert.equal((await (await fetch(`${origin}/api/ask/auth`)).json()).status,'idle');
+ }finally{await web2.close();await rm(web2.runtime,{recursive:true,force:true});busy.close();}
 });
