@@ -1,6 +1,6 @@
-// Current Workshop public exports, compiled against exact candidate 0.5.4-rc.1.
+// Current Workshop public exports, compiled against exact formal 0.5.4.
 import * as C from 'hanaworlds-contracts';
-const exact: '0.5.4-rc.1' = C.version;
+const exact: '0.5.4' = C.version;
 const used = [
   C.ContractError,
   C.admitRequest,

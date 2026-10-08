@@ -1,6 +1,6 @@
 # hanaworlds-workshop
 
-HanaWorlds Stage 1 Workshop 0.4.12 component candidate. See [GADGET.md](GADGET.md)
+HanaWorlds Stage 1 Workshop 0.4.13 component. See [GADGET.md](GADGET.md)
 for its host ports, Session flow, installation and recovery boundary. Product
 composition and human acceptance remain unproven.
 
@@ -87,15 +87,15 @@ DSH Core v4 规定：对话的系统提示必须是表面第 0 个节点，并�
 
 `npm run test:skill`：官方 Cordis/skills/tool-skill 的隔离 SOURCE/FIXTURE，核对原 Desktop bd964cdf 完整正文、五种输入分支及装配后单次注册。不代表真实模型、Desktop 或产品 UI 验收。
 
-## Session/world candidate v0.5.4-rc.1 (0.4.12)
+## Session/world formal v0.5.4 (0.4.13)
 
-The root dependency pins public tag `v0.5.4-rc.1`, commit
-`0beeff5774db476c0128683ca6107a28bdcdcbee`. `CONTRACTS-PROVENANCE.json`
-records the supplied 157755-byte candidate tar SHA256
-`51902797a167a222d812c344871bb1c0774ae775fb0026d70381edd4c08f17ed`
+The root dependency pins public tag `v0.5.4`, commit
+`85687fc3811e4c8ee6e69410d46d8026e19d2c75`. `CONTRACTS-PROVENANCE.json`
+records the supplied 157837-byte formal tar SHA256
+`b920097dee8bf57ef44cc9ca964829e568b14c9e1b15a77bf4599f69391062ec`
 and all 26 published file digests. `npm run verify:contracts` verifies the
-installed bytes and exact Git lock before build. This is a candidate, not formal
-v0.5.4; the protected v0.5.3 evidence remains historical.
+installed bytes and exact Git lock before build. This is the published formal v0.5.4; the protected rc.1 and v0.5.3
+evidence remains historical.
 
 `call('ReadSessionIdentity', request)` and `call('ListSessions', request)` expose
 trusted official Session metadata without selecting a world or creating a

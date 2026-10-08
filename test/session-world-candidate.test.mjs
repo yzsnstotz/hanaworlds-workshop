@@ -36,7 +36,7 @@ async function tree(root, prefix = '') {
 async function runtime(fn) {
   const base = process.env.HW_RUNTIME_ROOT;
   assert.ok(base, 'own runtime root required'); await mkdir(base, { recursive: true });
-  const root = await mkdtemp(join(base, 'candidate-'));
+  const root = await mkdtemp(join(base, 'formal-'));
   const ctx = new Context(); const canvasCalls = [];
   try {
     await ctx.plugin(Jsonl, { root: join(root, 'core'), compression: 'none' }).await();
@@ -78,8 +78,8 @@ function success(operation, body, response) {
   C.validateBoundResponse('session/v3', operation, body, response);
   assert.equal(response.error, null, JSON.stringify(response)); return response.result;
 }
-test('candidate exact identity and public fixture validate under the same rc.1 package', () => {
-  assert.equal(C.contractHandshake.contracts, 'hanaworlds-contracts@0.5.4-rc.1');
+test('formal exact identity and public fixture validate under the same formal package', () => {
+  assert.equal(C.contractHandshake.contracts, 'hanaworlds-contracts@0.5.4');
   assert.throws(() => C.checkContractHandshake({ contracts: 'hanaworlds-contracts@0.5.3' }));
   const f = seam.sessionDirectory.read;
   success('ReadSessionIdentity', f.request, f.response);

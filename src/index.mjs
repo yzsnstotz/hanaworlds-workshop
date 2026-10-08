@@ -30,7 +30,7 @@ export class WorkshopV3 {
  constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;
   this.protocolHandshake=C.validateType('ProtocolHandshake',{profileVersion:'protocol-handshake/v1',component:'hanaworlds-workshop',
    protocols:[{protocol:'session',major:3,minor:1}],capabilities:[],
-   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.4.12',sourceRevision:null,artifactDigest:null}});
+   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.4.13',sourceRevision:null,artifactDigest:null}});
   this.locks=new Map(); }
  /** Trusted composition-only metadata preparation for G-S. Returns the official
   * SessionPersistence snapshot verbatim; this is not a session/v3 wire operation.
