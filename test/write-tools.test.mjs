@@ -282,7 +282,7 @@ test('G2: actual Brush 0.5.0 package BrushV3 drives the PER_CELL path (real comp
  assert.equal(B.version,'0.5.0');assert.equal(Object.hasOwn(f.brush,'contractHandshake'),false);
  await perCellFlow(f,`ACTUAL hanaworlds-brush@${B.version}`);
  assert.deepEqual(W.peerContractHandshake(f.brush),B.contractHandshake);
- assert.equal(W.peerContractHandshake(f.brush).contracts,'hanaworlds-contracts@0.5.0');
+ assert.equal(W.peerContractHandshake(f.brush).contracts,'hanaworlds-contracts@0.5.3');
  assert.equal(C.contractHandshake.contracts,'hanaworlds-contracts@0.5.3');
  const advertised=W.peerProtocolHandshake(f.brush);assert.equal(advertised.profileVersion,'protocol-handshake/v1');
  const compatible=C.checkProtocolCompatibility(advertised,[C.protocolRequirement('BUILD/V3',['BUILD/V3:per-cell-compile'])]);
