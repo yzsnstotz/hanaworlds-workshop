@@ -1,6 +1,21 @@
-# Workshop 0.4.3 — local-world skill business component
+# Workshop 0.4.12 — local-world skill business component
 
-Fresh profile only. Contracts v0.5.3 / tag source 3457493da209178f815d6950e323e1dc462e8d6c (formal pack SHA256 7f2b088b300426ea2536e08904780dc5df94eaf5e341e83cbff0cc3a42362241); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
+Fresh profile only. Contracts candidate v0.5.4-rc.1 / tag source 0beeff5774db476c0128683ca6107a28bdcdcbee (candidate pack SHA256 51902797a167a222d812c344871bb1c0774ae775fb0026d70381edd4c08f17ed); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
+
+## Session identity and deletion
+
+Workshop advertises session 3.1. Host-bound `call('ReadSessionIdentity', request)`
+and `call('ListSessions', request)` use official SessionPersistence stat/list,
+including unbound Sessions; they never create a Session/projection or select a
+World. The identity revision is the Workshop CurrentContext revision, including
+a stable initial revision before StartOrResumeSession. Canvas may reenter these
+readonly routes while Workshop holds a mutation lock.
+
+Fixed official DSH 0.2.0-rc.2 has no persistent deletion API. Snapshots always
+advertise sessionDeleteSupported:false. DeleteSession rejects with
+SESSION_DELETE_UNSUPPORTED / DELETE_SEAM_ABSENT before Canvas retirement or any
+Core/projection mutation. A live handle dispose/close is not persistent deletion.
+The successful G-L deletion route remains unavailable pending official supply.
 
 ## Host assembly
 
@@ -116,7 +131,7 @@ Workshop 为一个对话的 Agent 提供建造 skill 的「看图」步骤：
 
 `npm run test:ask`：`test/image-ask.test.mjs`（真实 Loop + FIXTURE 模型）与 `test/ask-web.test.mjs`（47608 路由与信任边界）。
 
-## Two write methods (S1-WS-WRITE-TOOLS-01; current contracts v0.5.3)
+## Two write methods (S1-WS-WRITE-TOOLS-01; current contracts candidate v0.5.4-rc.1)
 
 The one building skill has two write methods, each published as a contracts
 `WriteMethodDescriptor` (`method`, `toolName`, `purpose`, `inputType`,
@@ -213,4 +228,4 @@ PASS, product readiness or acceptance. No actual package declaration is forged.
 
 `npm run test:skill`：官方 Cordis/skills/tool-skill 的隔离 SOURCE/FIXTURE，核对原 Desktop bd964cdf 完整正文、五种输入分支及装配后单次注册。不代表真实模型、Desktop 或产品 UI 验收。
 
-Current formal v0.5.3 check: actual Brush compilation is SKIP because HW_BRUSH_PACKAGE_ENTRY is not supplied; the current passing peer paths are FIXTURE, and historical actual-peer evidence is not a current formal result.
+Retained formal v0.5.3 check: actual Brush compilation is SKIP because HW_BRUSH_PACKAGE_ENTRY is not supplied; the current passing peer paths are FIXTURE, and historical actual-peer evidence is not a current formal result.

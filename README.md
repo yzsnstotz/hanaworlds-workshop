@@ -1,6 +1,6 @@
 # hanaworlds-workshop
 
-HanaWorlds Stage 1 Workshop 0.4.11 component candidate. See [GADGET.md](GADGET.md)
+HanaWorlds Stage 1 Workshop 0.4.12 component candidate. See [GADGET.md](GADGET.md)
 for its host ports, Session flow, installation and recovery boundary. Product
 composition and human acceptance remain unproven.
 
@@ -87,16 +87,28 @@ DSH Core v4 规定：对话的系统提示必须是表面第 0 个节点，并�
 
 `npm run test:skill`：官方 Cordis/skills/tool-skill 的隔离 SOURCE/FIXTURE，核对原 Desktop bd964cdf 完整正文、五种输入分支及装配后单次注册。不代表真实模型、Desktop 或产品 UI 验收。
 
-## Formal contracts v0.5.3 (0.4.11)
+## Session/world candidate v0.5.4-rc.1 (0.4.12)
 
-The root dependency uses the public Git tag `v0.5.3`, locked to
-`3457493da209178f815d6950e323e1dc462e8d6c`. `CONTRACTS-PROVENANCE.json`
-records the official 146045-byte npm-pack artifact SHA256
-`7f2b088b300426ea2536e08904780dc5df94eaf5e341e83cbff0cc3a42362241`
-and its 25 file digests. `npm run verify:contracts` checks tag/commit and installed
-files before build. This distinguishes the published artifact from the older
-unpublished candidate with the same version string. No vendor copy ships or
-remains in the current source tree. `HW_RUNTIME_ROOT=/absolute/card-run/new-runtime npm run test:contracts` and
-`npm run typecheck:contracts` cover the current Workshop consumer; the old
-0.4.2 differential gate is historical. SOURCE/FIXTURE checks do not prove
-real image understanding, native world behavior, UI readiness or owner acceptance.
+The root dependency pins public tag `v0.5.4-rc.1`, commit
+`0beeff5774db476c0128683ca6107a28bdcdcbee`. `CONTRACTS-PROVENANCE.json`
+records the supplied 157755-byte candidate tar SHA256
+`51902797a167a222d812c344871bb1c0774ae775fb0026d70381edd4c08f17ed`
+and all 26 published file digests. `npm run verify:contracts` verifies the
+installed bytes and exact Git lock before build. This is a candidate, not formal
+v0.5.4; the protected v0.5.3 evidence remains historical.
+
+`call('ReadSessionIdentity', request)` and `call('ListSessions', request)` expose
+trusted official Session metadata without selecting a world or creating a
+Workshop projection. Their revisions match Workshop CurrentContext; the service
+advertises session 3.1. Core storage revisions are not substituted for Workshop
+revisions. Fixed DSH 0.2.0-rc.2 has no persistent Session deletion capability:
+DeleteSession reports `SESSION_DELETE_UNSUPPORTED / DELETE_SEAM_ABSENT` before
+Canvas retirement or any Session/projection mutation, and snapshots advertise
+`sessionDeleteSupported:false`.
+
+`HW_RUNTIME_ROOT=/absolute/card-run/new-runtime npm run test:session-world`
+covers the affected SOURCE/FIXTURE routes with real official JSONL and domain
+persistence, an explicit Canvas fixture and no auth/model/world writer.
+`npm run typecheck:contracts` checks the exact public consumer types. These
+checks do not establish real image understanding, native world behavior,
+product UI readiness or owner acceptance.

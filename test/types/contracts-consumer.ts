@@ -1,6 +1,6 @@
-// Current Workshop public exports, compiled against exact formal 0.5.3.
+// Current Workshop public exports, compiled against exact candidate 0.5.4-rc.1.
 import * as C from 'hanaworlds-contracts';
-const exact: '0.5.3' = C.version;
+const exact: '0.5.4-rc.1' = C.version;
 const used = [
   C.ContractError,
   C.admitRequest,
@@ -30,3 +30,15 @@ const used = [
   C.validateType
 ];
 export { exact, used };
+
+// New Session routes consume the generated public types directly.
+import type { ReadSessionIdentityRequest, ListSessionsRequest, SessionIdentity, SessionDirectory } from 'hanaworlds-contracts';
+const identityRequest: ReadSessionIdentityRequest = { contractVersion: 'session/v3', requestId: 'read', sessionRef: 's1' };
+const listRequest: ListSessionsRequest = { contractVersion: 'session/v3', requestId: 'list' };
+const identity: SessionIdentity = { sessionRef: 's1', sessionRevision: 'rev-core-initial' };
+const directory: SessionDirectory = { directoryRevision: 'dir-1', sessions: [identity] };
+C.validateBoundRequest('session/v3', 'ReadSessionIdentity', identityRequest);
+C.validateBoundRequest('session/v3', 'ListSessions', listRequest);
+C.validateType('SessionDirectory', directory);
+const deletionGuard: typeof C.requireSessionDeleteSupported = C.requireSessionDeleteSupported;
+export { identityRequest, listRequest, directory, deletionGuard };

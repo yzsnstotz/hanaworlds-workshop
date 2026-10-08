@@ -1,5 +1,6 @@
 import { WorkshopImageLinkPanelService } from '../lib/panel-host.mjs';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { symbols } from '@deepseek-ai/cordis';
 import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import * as C from 'hanaworlds-contracts';
 import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, uploadedImageBytes, mediaBinding, imageRef, imageDigest } from './image-attachment.mjs';
@@ -10,18 +11,27 @@ export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWrit
 const VERSION = 'session/v3', CANVAS = 'canvas/v5';
 const copy = structuredClone, revision = () => `rev-${randomUUID()}`;
 const same = (a,b) => C.canonicalJSON(a) === C.canonicalJSON(b);
+// Cordis supplies a new caller-context proxy per get; compare its public origin.
+const sameProvider = (a,b) => (a?.[symbols.original]??a)===(b?.[symbols.original]??b);
 const digest = (kind,value) => C.digestValue(kind,value).sha256;
 const fail = (code,details) => { throw new C.ContractError(code,'validate','REQUIRED_FACT_UNKNOWN',details); };
 const packet = (wire,id,result,error=null) => ({contractVersion:wire,requestId:id,result,error});
 const pub = error => error?.publicError ?? C.publicError(error);
 const peerFail = response => {const error=new Error(response.error.code);error.publicError=response.error;throw error;};
 const withoutRequest = ({requestId:_r,proposal:_p,...rest}) => rest;
-const initial = id => ({context:{currentSession:id,activeWorldRef:null,orderedSelectedObjectRefs:[],sessionRevision:revision(),selectionRevision:'0',localContext:null},turns:[],details:{},confirmed:{},pending:null,requests:{},contexts:{},builds:{},undos:{}});
+// Workshop owns this initial revision, including before a projection is created.
+// It is derived from the trusted lifecycle identity, never Core's storage revision.
+const initialRevision = identity => `rev-core-${createHash('sha256').update(C.canonicalJSON(identity)).digest('hex')}`;
+const initial = (id,identity) => ({context:{currentSession:id,activeWorldRef:null,orderedSelectedObjectRefs:[],sessionRevision:initialRevision(identity),selectionRevision:'0',localContext:null},turns:[],details:{},confirmed:{},pending:null,requests:{},contexts:{},builds:{},undos:{}});
 
 /** Current fresh-install runtime. Peer ports are Host-owned in-process services;
  * no model JSON can select a peer or call Canvas/Adapter mutators directly. */
 export class WorkshopV3 {
- constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;this.locks=new Map(); }
+ constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;
+  this.protocolHandshake=C.validateType('ProtocolHandshake',{profileVersion:'protocol-handshake/v1',component:'hanaworlds-workshop',
+   protocols:[{protocol:'session',major:3,minor:1}],capabilities:[],
+   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.4.12',sourceRevision:null,artifactDigest:null}});
+  this.locks=new Map(); }
  /** Trusted composition-only metadata preparation for G-S. Returns the official
   * SessionPersistence snapshot verbatim; this is not a session/v3 wire operation.
   * No World selection, Workshop projection, full log read or Session creation. */
@@ -31,7 +41,7 @@ export class WorkshopV3 {
   const snapshot=await port.stat(sessionRef);
   if(!snapshot)fail('SESSION_NOT_FOUND');
   coreIdentity(snapshot.header,sessionRef);
-  if(port!==this.sessionPersistence)fail('SESSION_NOT_FOUND');
+  if(!sameProvider(port,this.sessionPersistence))fail('SESSION_NOT_FOUND');
   return copy(snapshot);
  }
  /** Enumerate authoritative official stored metadata without manufacturing
@@ -41,8 +51,17 @@ export class WorkshopV3 {
   if(typeof port?.list!=='function')fail('CAPABILITY_UNAVAILABLE');
   const snapshots=await port.list();
   for(const snapshot of snapshots)coreIdentity(snapshot.header,snapshot.header?.id);
-  if(port!==this.sessionPersistence)fail('SESSION_NOT_FOUND');
+  if(!sameProvider(port,this.sessionPersistence))fail('SESSION_NOT_FOUND');
   return copy(snapshots);
+ }
+ async #sessionIdentity(snapshot) {
+  const identity=coreIdentity(snapshot.header,snapshot.header.id);
+  const state=await this.projectionStore.get(identity.id,identity);
+  return C.validateType('SessionIdentity',{sessionRef:identity.id,
+   sessionRevision:state?.context.sessionRevision??initialRevision(identity)});
+ }
+ #publicCapabilities() {
+  return this.capabilities==null?null:{...copy(this.capabilities),sessionDeleteSupported:false};
  }
  async #lock(id,run) {
   const previous=this.locks.get(id)??Promise.resolve();let release;
@@ -56,7 +75,7 @@ export class WorkshopV3 {
  }
  async #load(id,create=false) {
   const core=await this.#core(id);let state=await this.projectionStore.get(id,core.identity);
-  if(!state&&create){state=initial(id);await this.projectionStore.create(id,core.identity,state);}
+  if(!state&&create){state=initial(id,core.identity);await this.projectionStore.create(id,core.identity,state);}
   if(!state)fail('SESSION_NOT_FOUND');return {core,state};
  }
  async #save(id,core,state,nextRevision=revision()) {
@@ -100,9 +119,32 @@ export class WorkshopV3 {
   let body;
   try {
    body=copy(typeof raw==='string'||raw instanceof Uint8Array?C.admitRequest(VERSION,operation,raw):C.validateBoundRequest(VERSION,operation,raw));
+   // Canvas may query this port while a Workshop mutation holds the Session lock.
+   // Domain reads return a committed snapshot and must not enter that mutation lock.
+   if(operation==='ReadSessionIdentity'){
+    const port=this.sessionPersistence,result=await this.#sessionIdentity(await this.readSessionMetadata(body.sessionRef));
+    if(!sameProvider(port,this.sessionPersistence))fail('SESSION_NOT_FOUND');
+    return packet(VERSION,body.requestId,result);
+   }
+   if(operation==='ListSessions'){
+    const port=this.sessionPersistence;
+    const sessions=await Promise.all((await this.listSessionMetadata()).map(s=>this.#sessionIdentity(s)));
+    if(!sameProvider(port,this.sessionPersistence))fail('SESSION_NOT_FOUND');
+    sessions.sort((a,b)=>a.sessionRef<b.sessionRef?-1:a.sessionRef>b.sessionRef?1:0);
+    const directoryRevision=`dir-${createHash('sha256').update(C.canonicalJSON(sessions)).digest('hex')}`;
+    return packet(VERSION,body.requestId,C.validateType('SessionDirectory',{directoryRevision,sessions}));
+   }
+   // Fixed DSH 0.2.0-rc.2 cannot delete persisted Sessions. No request journal,
+   // projection initialization or Canvas retirement may happen on this branch.
+   if(operation==='DeleteSession'){
+    await this.readSessionMetadata(body.sessionRef);
+    const capabilities=this.#publicCapabilities();
+    if(capabilities)C.requireSessionDeleteSupported(capabilities);
+    throw new C.ContractError('SESSION_DELETE_UNSUPPORTED','validate','DELETE_SEAM_ABSENT');
+   }
    return await this.#lock(body.sessionRef,async()=>{
     const {core,state}=await this.#load(body.sessionRef,operation==='StartOrResumeSession');
-    if(operation==='StartOrResumeSession')return packet(VERSION,body.requestId,C.validateType('SessionSnapshot',{context:state.context,turns:state.turns,capabilities:this.capabilities,sessionDeleteSupported:false}));
+    if(operation==='StartOrResumeSession')return packet(VERSION,body.requestId,C.validateType('SessionSnapshot',{context:state.context,turns:state.turns,capabilities:this.#publicCapabilities(),sessionDeleteSupported:false}));
     const key=`${operation}:${body.requestId}`,record=state.requests[key];
     const facts=await this.#facts(body,state,record,{switching:operation==='SwitchWorldContext'});
     const admitted=C.validateCurrentRequest(VERSION,operation,body,facts);
@@ -249,7 +291,7 @@ export class WorkshopV3 {
    if(Object.values(state.builds).some(b=>b.dispatched&&!b.outcome&&!b.terminal))fail('RECOVERY_PENDING');
    const context=await this.#selection(body);if(body.selectionRevision!==context.selectionRevision)fail('CURRENT_WORLD_MISMATCH');
    state.context={...copy(context),sessionRevision:state.context.sessionRevision};state.pending=null;
-   return {context:copy(state.context),turns:state.turns,capabilities:this.capabilities,sessionDeleteSupported:false};
+   return {context:copy(state.context),turns:state.turns,capabilities:this.#publicCapabilities(),sessionDeleteSupported:false};
   }
   if(operation==='AppendMultimodalTurn'){
    const media=await this.#media(body.media,core,state);
@@ -283,7 +325,6 @@ export class WorkshopV3 {
   if(operation==='AdvanceCurrentBuild')return this.#advance(body,core,state);
   if(operation==='ReadCurrentUndoStatus')return (await this.#undoStatus(body,state)).status;
   if(operation==='UndoCurrentBuild')return this.#undo(body,core,state);
-  if(operation==='DeleteSession')fail('SESSION_DELETE_UNSUPPORTED');
   fail('CAPABILITY_UNAVAILABLE');
  }
  #clarification(p){return {sessionRef:p.sessionRef,turnRevision:p.turnRevision,invocationId:p.invocationId,clarificationId:p.clarificationId,code:'AMBIGUOUS_INTENT',question:p.question};}
