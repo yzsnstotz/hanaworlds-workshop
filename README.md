@@ -31,6 +31,16 @@ Canvas package identity. Fixture success does not grant final public-consumption
 PASS, product readiness or acceptance. No actual package declaration is forged.
 
 
+## 真实模型登录准备（0.4.8，F-WS-IMAGE-ASK-01 路线 A）
+
+47608 开发页（Host 角色）新增可选的真实模型路线，**只做准备，不会自己登录或调用真实模型**：
+
+- 官方 `@deepseek-ai/dsh-llm-pi-ai` 只配置 `openai-codex` 路由（目录内支持看图的 `gpt-5.6-luna` / `gpt-6-luna`），官方 `dsh-authorization` 登录流程 `llm-pi-ai/openai-codex`（「OpenAI (ChatGPT Plus/Pro)」OAuth）。
+- 登录记录存于本页自己的 `dsh-credentials-local`，路径是本次服务运行目录下的 `dsh-home/`；不读不写 `~/.dsh` 或 HanaWorlds App profile。
+- 页面「真实模型登录」卡：显示路线、费用边界、存储位置；「登录 ChatGPT」由人点击才开始官方流程（页面显示流程给出的登录页链接/代码，回答流程的提问）；「取消登录」「退出登录」（删除本页记录）。
+- 新对话可选模型：默认 FIXTURE；选真实模型的对话在未登录时提问会被具名拒绝 `REAL_MODEL_SIGN_IN_REQUIRED`，不发出任何模型请求。
+- 测试（`test/ask-web.test.mjs`）只描述真实流程、不启动它；登录界面的完整往返用一条 FIXTURE 流程验证。真实登录、真实看图、费用均未发生。
+
 ## 附图提问（0.4.7，F-WS-IMAGE-ASK-01）
 
 Workshop 为一个对话的 Agent 提供建造 skill 的「看图」步骤：

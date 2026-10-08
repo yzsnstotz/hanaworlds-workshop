@@ -29,3 +29,7 @@
 页面：选对话 / 新对话；附本机图片或贴链接（缩略图、类型、尺寸、状态可见）；提交问题给当前对话的模型，回答与本回合模型实际收到的图片字节 sha256 一同显示。错误显示具名代码与说明，页面可继续使用。
 
 **FIXTURE**：模型（`hanaworlds-fixture/fixture-vision-1`，不看图，只报告收到的真实字节）；会话是本页独立会话。**真实**：官方 AgentLoop、系统提示组装（含 `hanaworlds-building:image-ask`）、工具限制、Session/JSONL、附件存储/解码、HTTP 下载。真实模型/鉴权/费用 UNKNOWN，未授权。不写世界。
+
+### 真实模型登录（准备，0.4.8）
+
+页面顶部「真实模型登录」卡对应官方 openai-codex（ChatGPT Plus/Pro 订阅）登录流程；登录记录只存本次运行目录 `dsh-home/`。人点击「登录 ChatGPT」才开始，页面显示登录页链接和流程提问；「退出登录」删除本页记录。新对话可在「新对话模型」里选真实模型；未登录时提问被拒绝 `REAL_MODEL_SIGN_IN_REQUIRED`。费用：计入所登录账号的订阅额度，订阅外是否另计费 UNKNOWN。

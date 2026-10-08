@@ -16,6 +16,10 @@ import * as StorageDomain from '@deepseek-ai/dsh-storage-domain';
 import Attachments from '@deepseek-ai/dsh-attachment-local';
 import Tools from '@deepseek-ai/dsh-tools';
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
+import CredentialsLocal from '@deepseek-ai/dsh-credentials-local';
+import Authorization, { AuthorizationDeclinedError } from '@deepseek-ai/dsh-authorization';
+import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai';
+import { credentialKey } from '@deepseek-ai/dsh-credentials';
 import Workshop, { IMAGE_ASK_SECTION } from '../src/index.mjs';
 
 // Standalone developer Host for Workshop's image-ask step. Real: Cordis, Session
@@ -27,6 +31,15 @@ export const PROVIDER='hanaworlds-fixture',MODEL='fixture-vision-1';
 export const fixture={kind:'FIXTURE',model:`${PROVIDER}/${MODEL}`,label:'FIXTURE 模型（不是真实模型，不会真正看图）',
  conversations:'本页独立会话，不是 HanaWorlds App 的当前对话',realModel:'UNKNOWN：未授权真实模型/鉴权/费用',worldWrites:0};
 const sha=b=>createHash('sha256').update(b).digest('hex');
+// Recommended real route (owner packet A): official dsh-llm-pi-ai openai-codex,
+// signed in through the official dsh-authorization flow. The credential record
+// lives only in this page's own store under its runtime directory — never
+// ~/.dsh or the HanaWorlds App profile. Nothing here starts a sign-in or calls
+// the real model by itself: both happen only when a person clicks.
+export const REAL_PROVIDER='openai-codex',REAL_AUTH_KEY=credentialKey('llm-pi-ai',REAL_PROVIDER);
+export const realRoute={provider:REAL_PROVIDER,label:'ChatGPT（OpenAI Codex 订阅登录）',
+ cost:'计入登录账号的 ChatGPT Plus/Pro 订阅额度；本页不绑卡、不新建 API key。订阅之外是否另计费：UNKNOWN，请按自己的套餐判断。',
+ storage:'登录记录只存在本页运行目录，不读、不写 HanaWorlds App 或 ~/.dsh 的登录。可随时「退出登录」删除。'};
 
 /** FIXTURE model. It cannot see: it reads the actual stored bytes of every
  * image in the request it was handed, reports their digests, and says so. */
@@ -59,7 +72,7 @@ export class FixtureVisionModel extends LlmAdapter {
 const imageParts=content=>(content??[]).filter(p=>p.type==='image').map(p=>p.attachment);
 const textOf=content=>(content??[]).filter(p=>p.type==='text').map(p=>p.text).join('\n');
 
-export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0.1','::1']}={}) {
+export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0.1','::1'],authKey=REAL_AUTH_KEY,setup}={}) {
  await mkdir(runRoot,{recursive:true});const runtime=await mkdtemp(join(runRoot,'session-'));
  const ctx=new Context();const servers=[];
  try {
@@ -69,14 +82,50 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   await ctx.plugin(Sessions).await();await ctx.plugin(Projections).await();await ctx.plugin(Agents).await();
   await ctx.plugin(Llm).await();await ctx.plugin(SystemPrompt).await();await ctx.plugin(Tools).await();await ctx.plugin(AgentLoop).await();
   const model=new FixtureVisionModel(()=>ctx.attachments);ctx.llm.registerAdapter([PROVIDER],model);
+  await ctx.plugin(CredentialsLocal,{dshHome:join(runtime,'dsh-home')}).await();await ctx.plugin(Authorization).await();
+  await ctx.plugin(LlmPiAi,{providers:{[REAL_PROVIDER]:{}}}).await();
+  await setup?.(ctx);
   await ctx.plugin(Workshop).await();
   const ws=ctx.get('hanaworldsWorkshop');
   const conversations=new Map();
-  async function newConversation(){
+  const signedIn=async()=>!!(await ctx.credentials.readRecord(REAL_AUTH_KEY));
+  async function models(){
+   const listed=await ctx.llm.listModels(REAL_PROVIDER);const real=(listed.models??listed).filter(m=>(m.inputModalities??m.input??[]).includes('image'));
+   return [{id:`${PROVIDER}/${MODEL}`,provider:PROVIDER,model:MODEL,kind:'FIXTURE',label:'FIXTURE 模型（不看图）'},
+    ...real.map(m=>({id:`${REAL_PROVIDER}/${m.id}`,provider:REAL_PROVIDER,model:m.id,kind:'REAL',label:`${m.name??m.id}（真实模型 · 支持看图）`}))];
+  }
+  async function newConversation(choice=`${PROVIDER}/${MODEL}`){
+   const picked=(await models()).find(m=>m.id===choice);if(!picked)throw Error('MODEL_NOT_AVAILABLE');
    const id=`ask-${randomUUID()}`;
-   const handle=await ctx.agents.create({sessionId:id,agentOptions:{provider:PROVIDER,model:MODEL}});
+   const handle=await ctx.agents.create({sessionId:id,agentOptions:{provider:picked.provider,model:picked.model}});
    const lift=ws.prepareImageAsk(handle.agent);
-   conversations.set(id,{id,agent:handle.agent,session:ctx.sessions.get(id),lift,createdAt:Date.now()});return id;
+   conversations.set(id,{id,agent:handle.agent,session:ctx.sessions.get(id),lift,createdAt:Date.now(),model:picked});return id;
+  }
+  /** One sign-in attempt at a time, driven by the person on the page through the official flow. */
+  const auth={status:'idle',notices:[],prompt:null,error:null};let pendingPrompt=null;
+  const authView=async()=>({key:authKey,flow:ctx.authorization.describe(authKey)??null,signedIn:!!(await ctx.credentials.readRecord(authKey)),
+   status:auth.status,notices:auth.notices,prompt:auth.prompt,error:auth.error,route:realRoute});
+  function beginAuth(){
+   const flow=ctx.authorization.describe(authKey);if(!flow)throw Error('SIGN_IN_FLOW_UNAVAILABLE');
+   if(auth.status==='running')throw Error('SIGN_IN_ALREADY_RUNNING');
+   Object.assign(auth,{status:'running',notices:[],prompt:null,error:null});
+   const interaction={notify:n=>{auth.notices.push({message:n.message,url:n.url??null,code:n.code??null});},
+    prompt:q=>new Promise((resolve,reject)=>{
+     const id=randomUUID();auth.prompt={id,kind:q.kind,message:q.message,placeholder:q.placeholder??null,options:q.options??null};
+     pendingPrompt={id,resolve,reject};
+     q.signal?.addEventListener('abort',()=>{if(pendingPrompt?.id===id){pendingPrompt=null;auth.prompt=null;}},{once:true});
+    })};
+   ctx.authorization.begin({key:authKey,method:flow.methods[0]?.id,interaction}).then(
+    out=>{auth.status=out.status;auth.prompt=null;pendingPrompt=null;},
+    error=>{auth.status='failed';auth.error=error?.code??error?.message??String(error);auth.prompt=null;pendingPrompt=null;});
+  }
+  function answerAuth(id,text){
+   if(!pendingPrompt||pendingPrompt.id!==id||typeof text!=='string')throw Error('SIGN_IN_PROMPT_MISMATCH');
+   const p=pendingPrompt;pendingPrompt=null;auth.prompt=null;p.resolve(text);
+  }
+  function cancelAuth(){
+   if(pendingPrompt){const p=pendingPrompt;pendingPrompt=null;auth.prompt=null;p.reject(new AuthorizationDeclinedError('declined on the page'));}
+   ctx.authorization.cancel(authKey);
   }
   const conv=id=>{const c=conversations.get(id);if(!c)throw Error('CONVERSATION_NOT_FOUND');if(ctx.sessions.get(id)!==c.session)throw Error('SESSION_MISMATCH');return c;};
   async function durable(id){const h=await ctx.sessionPersistence.open(id,'read');try{return (await h.read()).events;}finally{await h.close();}}
@@ -91,11 +140,12 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
    }
    const inbox=c.agent.inbox;const queued=[];
    for(const m of [...inbox.nextStep,...inbox.nextTurn])if(m.role==='user')queued.push({role:'user',id:m.id,queued:true,text:textOf(m.content),images:await Promise.all(imageParts(m.content).map(image))});
-   return {conversationId:id,started:c.session.surface.nodes.length>0,status:c.agent.status,items,queued};
+   return {conversationId:id,model:c.model,started:c.session.surface.nodes.length>0,status:c.agent.status,items,queued};
   }
   async function turn(id,text,signal){
    const c=conv(id);if(typeof text!=='string'||!text.trim())throw Error('QUESTION_REQUIRED');
    if(c.agent.status!=='idle')throw Error('AGENT_BUSY');
+   if(c.model.kind==='REAL'&&!(await signedIn()))throw Error('REAL_MODEL_SIGN_IN_REQUIRED');
    const before=(await durable(id)).length,asked=model.requests.length;
    c.agent.followup({id:`ask-prompt-${randomUUID()}`,role:'user',source:{kind:'user'},content:[{type:'text',text:text.trim()}]});
    await c.agent.whenIdle();await ctx.sessions.flush(c.session);signal.throwIfAborted();
@@ -103,7 +153,7 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
    if(!added.some(e=>e.type==='assistant/message'&&e.surfaceOp==='append')){
     const error=Error('MODEL_TURN_NO_REPLY');error.details={events:added.map(e=>e.type),modelRequests:model.requests.length-asked};throw error;
    }
-   return {request:model.requests.at(-1)??null,transcript:await transcript(id,signal)};
+   return {model:c.model,request:c.model.kind==='FIXTURE'?model.requests.at(-1)??null:null,transcript:await transcript(id,signal)};
   }
   const initial=await newConversation();
   const assets=new Map(await Promise.all([['/ask','ask.html'],['/ask.mjs','ask.mjs'],['/ask.css','ask.css']].map(async([k,f])=>[k,await readFile(new URL(f,import.meta.url))])));
@@ -119,13 +169,14 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
     const origin=`http://${host}`,path=new URL(req.url,origin).pathname.replace(/\/+$/u,'')||'/';
     if(req.method==='GET'){
      if(path==='/'){res.writeHead(302,{location:'/ask'});return res.end();}
-     if(path==='/api/ask/state')return send(res,200,{fixture,initial,conversations:[...conversations.values()].map(c=>({id:c.id,started:c.session.surface.nodes.length>0,createdAt:c.createdAt})),limits:{maxImageBytes:uploadCap,mediaTypes:limits.mediaTypes.filter(t=>['image/png','image/jpeg','image/webp','image/gif'].includes(t))}});
+     if(path==='/api/ask/auth')return send(res,200,await authView());
+     if(path==='/api/ask/state')return send(res,200,{fixture,initial,models:await models(),auth:await authView(),conversations:[...conversations.values()].map(c=>({id:c.id,started:c.session.surface.nodes.length>0,createdAt:c.createdAt,model:c.model})),limits:{maxImageBytes:uploadCap,mediaTypes:limits.mediaTypes.filter(t=>['image/png','image/jpeg','image/webp','image/gif'].includes(t))}});
      if(path==='/sample.png')return send(res,200,samplePNG,'image/png');
      if(path==='/sample-not-image')return send(res,200,'<html>not an image</html>','text/html; charset=utf-8');
      if(assets.has(path))return send(res,200,assets.get(path),path.endsWith('.css')?'text/css; charset=utf-8':path.endsWith('.mjs')?'text/javascript; charset=utf-8':'text/html; charset=utf-8');
      return send(res,404,{error:'NOT_FOUND'});
     }
-    const routes=['/api/ask/new','/api/ask/link','/api/ask/upload','/api/ask/read','/api/ask/turn','/api/ask/transcript'];
+    const routes=['/api/ask/new','/api/ask/link','/api/ask/upload','/api/ask/read','/api/ask/turn','/api/ask/transcript','/api/ask/auth/begin','/api/ask/auth/answer','/api/ask/auth/cancel','/api/ask/auth/signout'];
     if(req.method!=='POST'||!routes.includes(path))return send(res,404,{error:'NOT_FOUND'});
     if(req.headers.origin!==origin)return send(res,403,{error:'SAME_ORIGIN_REQUIRED'});
     if(req.headers['content-type']?.split(';')[0]!=='application/json')return send(res,415,{error:'JSON_REQUIRED'});
@@ -134,7 +185,11 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
     if(!args||typeof args!=='object')return send(res,400,{error:'INVALID_JSON'});
     const controller=new AbortController();res.once('close',()=>{if(!res.writableEnded)controller.abort();});const signal=controller.signal;
     const result=await serial(async()=>{
-     if(path==='/api/ask/new'){const id=await newConversation();return transcript(id,signal);}
+     if(path==='/api/ask/auth/begin'){beginAuth();return authView();}
+     if(path==='/api/ask/auth/answer'){answerAuth(args.promptId,args.text);return authView();}
+     if(path==='/api/ask/auth/cancel'){cancelAuth();return authView();}
+     if(path==='/api/ask/auth/signout'){if(auth.status==='running')throw Error('SIGN_IN_ALREADY_RUNNING');await ctx.credentials.deleteRecord(authKey);Object.assign(auth,{status:'idle',notices:[],prompt:null,error:null});return authView();}
+     if(path==='/api/ask/new'){const id=await newConversation(args.model);return transcript(id,signal);}
      const c=conv(args.conversationId);
      if(path==='/api/ask/link')return ws.downloadImageForPanel(c.session,args.url,signal);
      if(path==='/api/ask/upload'){

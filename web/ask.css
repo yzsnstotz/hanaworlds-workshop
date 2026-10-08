@@ -22,3 +22,8 @@ button.secondary{background:#fff;color:var(--accent);border:1px solid var(--acce
 .msg.user{background:#eef3ff}.msg.assistant{background:var(--warn-bg);border-left:3px solid #f0b429}.msg.queued{border:1px dashed var(--accent)}
 .empty{color:var(--muted)}#status{color:var(--muted)}#error{color:var(--err);font-weight:600}
 footer{margin-top:24px;color:var(--muted);font-size:12.5px}
+
+.auth{margin-bottom:14px}.auth .route{margin:0 0 6px}.auth ul{margin:8px 0;padding-left:18px;font-size:13.5px}.auth ul a{word-break:break-all}
+.tag.model{background:#fff4d6;color:#8a5a00}.tag.model.real{background:#e3f5e8;color:#1f7a3a}.tag.ok{background:#e3f5e8;color:#1f7a3a}
+#auth-error{color:var(--err);font-weight:600}.bar select#model{min-width:220px}
+.msg.assistant.real{background:#eef9f1;border-left-color:#1f7a3a}
