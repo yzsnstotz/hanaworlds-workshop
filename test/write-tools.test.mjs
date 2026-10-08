@@ -16,7 +16,7 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import * as C from 'hanaworlds-contracts';
 import { gzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
-// S1-WS-WRITE-TOOLS-01 on actual contracts 0.5.2: two WriteMethodDescriptors, PER_CELL and REGION chains.
+// S1-WS-WRITE-TOOLS-01 on the current formal contracts: two WriteMethodDescriptors, PER_CELL and REGION chains.
 // Painter/Brush/Canvas (cells and region) and the world are FIXTURE; Workshop, Cordis, Core JSONL, domain storage, attachments, Tools and HTTP are real.
 const entry=process.env.HW_WORKSHOP_PACKAGE_ENTRY??new URL('../src/index.mjs',import.meta.url).href;
 const {default:plugin}=await import(entry);
@@ -223,7 +223,7 @@ test('REGION unavailable on wrong Canvas major: explains needs, zero Painter cal
  });
 });
 
-test('PER_CELL chain on 0.5.2: image brief → Painter → Brush → Canvas → same build Undo',async()=>{
+test('PER_CELL chain on formal 0.5.3: image brief → Painter → Brush → Canvas → same build Undo',async()=>{
  const f=fixture();await withRuntime(f,async r=>{
   const before=await r.ws.describeWriteTools('s1');assert.deepEqual(codes(before.tools[0].availability),['SESSION_NOT_FOUND']);
   const {media,advance}=await imageBrief(r,f);const described=await r.ws.describeWriteTools('s1');
@@ -283,7 +283,7 @@ test('G2: actual Brush 0.5.0 package BrushV3 drives the PER_CELL path (real comp
  await perCellFlow(f,`ACTUAL hanaworlds-brush@${B.version}`);
  assert.deepEqual(W.peerContractHandshake(f.brush),B.contractHandshake);
  assert.equal(W.peerContractHandshake(f.brush).contracts,'hanaworlds-contracts@0.5.0');
- assert.equal(C.contractHandshake.contracts,'hanaworlds-contracts@0.5.2');
+ assert.equal(C.contractHandshake.contracts,'hanaworlds-contracts@0.5.3');
  const advertised=W.peerProtocolHandshake(f.brush);assert.equal(advertised.profileVersion,'protocol-handshake/v1');
  const compatible=C.checkProtocolCompatibility(advertised,[C.protocolRequirement('BUILD/V3',['BUILD/V3:per-cell-compile'])]);
  log('K3_ACTUAL_BRUSH_CROSS_PATCH',{brushContract:W.peerContractHandshake(f.brush),workshopContract:C.contractHandshake,advertised,compatible});

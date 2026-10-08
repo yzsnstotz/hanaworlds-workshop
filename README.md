@@ -1,11 +1,11 @@
 # hanaworlds-workshop
 
-HanaWorlds Stage 1 Workshop 0.4.4 component candidate. See [GADGET.md](GADGET.md)
+HanaWorlds Stage 1 Workshop 0.4.11 component candidate. See [GADGET.md](GADGET.md)
 for its host ports, Session flow, installation and recovery boundary. Product
 composition and human acceptance remain unproven.
 
 
-## Actual public-peer Undo consumption (0.4.4)
+## Historical public-peer Undo consumption (0.4.4)
 
 Undo consumes Canvas's appended verified transaction as the history head and
 links its origin to the original BUILD. Receipt, readback, operation, object
@@ -86,3 +86,17 @@ DSH Core v4 规定：对话的系统提示必须是表面第 0 个节点，并�
 旧strict生成路线的两次exit1与根因未明事实保留在 `evidence/F-WS-IMAGE-LINK-01/blocked-20261007/`，不当成已修复。组件材料不能代正式Host/UI/产品安装/owner验收；其Host Agent持久writer bridge在组件检查中明确标为fixture，正式面板不创建fixture对话。
 
 `npm run test:skill`：官方 Cordis/skills/tool-skill 的隔离 SOURCE/FIXTURE，核对原 Desktop bd964cdf 完整正文、五种输入分支及装配后单次注册。不代表真实模型、Desktop 或产品 UI 验收。
+
+## Formal contracts v0.5.3 (0.4.11)
+
+The root dependency uses the public Git tag `v0.5.3`, locked to
+`3457493da209178f815d6950e323e1dc462e8d6c`. `CONTRACTS-PROVENANCE.json`
+records the official 146045-byte npm-pack artifact SHA256
+`7f2b088b300426ea2536e08904780dc5df94eaf5e341e83cbff0cc3a42362241`
+and its 25 file digests. `npm run verify:contracts` checks tag/commit and installed
+files before build. This distinguishes the published artifact from the older
+unpublished candidate with the same version string. No vendor copy ships or
+remains in the current source tree. `HW_RUNTIME_ROOT=/absolute/card-run/new-runtime npm run test:contracts` and
+`npm run typecheck:contracts` cover the current Workshop consumer; the old
+0.4.2 differential gate is historical. SOURCE/FIXTURE checks do not prove
+real image understanding, native world behavior, UI readiness or owner acceptance.

@@ -22,7 +22,7 @@ import Attachments from '@deepseek-ai/dsh-attachment-local';
 import Tools, { defineTool } from '@deepseek-ai/dsh-tools';
 import Skills from '@deepseek-ai/dsh-skill';
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill';
-import BuildingSkill from '../src/building-skill.mjs';
+const {default:BuildingSkill}=await import(process.env.HW_WORKSHOP_BUILDING_SKILL_ENTRY??'../src/building-skill.mjs');
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import { FixtureVisionModel, PROVIDER, MODEL } from '../web/ask-server.mjs';
 const {default:plugin,IMAGE_ASK_ALLOWED_TOOLS}=await import(process.env.HW_WORKSHOP_PACKAGE_ENTRY??'../src/index.mjs');

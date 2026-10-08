@@ -1,6 +1,6 @@
 # Workshop 0.4.3 — local-world skill business component
 
-Fresh profile only. Contracts 0.5.2 / source 6185622e977ef5136e9ef12219e0ba89dbba29db (tar e6c50766…); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
+Fresh profile only. Contracts v0.5.3 / tag source 3457493da209178f815d6950e323e1dc462e8d6c (formal pack SHA256 7f2b088b300426ea2536e08904780dc5df94eaf5e341e83cbff0cc3a42362241); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
 ## Host assembly
 
@@ -116,7 +116,7 @@ Workshop 为一个对话的 Agent 提供建造 skill 的「看图」步骤：
 
 `npm run test:ask`：`test/image-ask.test.mjs`（真实 Loop + FIXTURE 模型）与 `test/ask-web.test.mjs`（47608 路由与信任边界）。
 
-## Two write methods (S1-WS-WRITE-TOOLS-01, contracts 0.5.2)
+## Two write methods (S1-WS-WRITE-TOOLS-01; current contracts v0.5.3)
 
 The one building skill has two write methods, each published as a contracts
 `WriteMethodDescriptor` (`method`, `toolName`, `purpose`, `inputType`,
@@ -194,11 +194,11 @@ tarball, uses the actual Brush 0.5.0 `BrushV3` as the external public seam, and
 requires the previous 0.4.1 package to reject the same cross-patch Brush fixture
 flow with UNSUPPORTED_VERSION. The baseline uses its own contracts 0.5.0 for
 Painter/Canvas to isolate the Brush exact-package defect. Actual Brush compile
-is exercised in both current source and packed runtimes; Painter/Canvas/world,
+is exercised in both historical source and packed runtimes (contracts 0.5.2); Painter/Canvas/world,
 model choice and product UI are FIXTURE or NOT_RUN here.
 
 
-## Current peer-protocol fixture delivery (0.4.3)
+## Historical peer-protocol fixture delivery (0.4.3)
 
 `scripts/gate-peer-protocol-fixture.sh <new-E> <contracts-0.5.2-tar> <workshop-0.4.2-tar>`
 checks both descriptions, affected per-cell business and named protocol rejection
@@ -212,3 +212,5 @@ Canvas package identity. Fixture success does not grant final public-consumption
 PASS, product readiness or acceptance. No actual package declaration is forged.
 
 `npm run test:skill`：官方 Cordis/skills/tool-skill 的隔离 SOURCE/FIXTURE，核对原 Desktop bd964cdf 完整正文、五种输入分支及装配后单次注册。不代表真实模型、Desktop 或产品 UI 验收。
+
+Current formal v0.5.3 check: actual Brush compilation is SKIP because HW_BRUSH_PACKAGE_ENTRY is not supplied; the current passing peer paths are FIXTURE, and historical actual-peer evidence is not a current formal result.

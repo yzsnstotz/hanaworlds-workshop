@@ -1,3 +1,4 @@
+// HISTORICAL: fixed 0.4.2 baseline; current formal consumer is test:contracts/typecheck:contracts.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';

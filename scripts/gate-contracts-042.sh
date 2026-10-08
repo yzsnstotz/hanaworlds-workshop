@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# HISTORICAL fixed 0.4.2 baseline; not a current formal contract gate.
 # Differential gate: exact contracts 0.4.2 consumption by Workshop 0.2.2 only.
 # Does not rerun the 0.2.1 HTTP/algorithm matrix (scripts/gate-image-attachment.sh stays as its fixed 0.4.0 record).
 set -euo pipefail

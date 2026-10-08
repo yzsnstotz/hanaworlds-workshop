@@ -1,7 +1,12 @@
 {
-  "sourceRevision": "6185622e977ef5136e9ef12219e0ba89dbba29db",
-  "admittedPackSha256": "e6c50766ffc821ca90e07c38f473456952ef650e8a321f676dc44ce7d7d72209",
-  "sourcePackageVersion": "0.5.2",
+  "packageName": "hanaworlds-contracts",
+  "packageVersion": "0.5.3",
+  "sourceRepository": "https://github.com/yzsnstotz/hanaworlds-contracts.git",
+  "sourceTag": "v0.5.3",
+  "tagObject": "b3983bc5cde7791266758842a017458386d14283",
+  "sourceRevision": "3457493da209178f815d6950e323e1dc462e8d6c",
+  "formalPackBytes": 146045,
+  "formalPackSha256": "7f2b088b300426ea2536e08904780dc5df94eaf5e341e83cbff0cc3a42362241",
   "files": [
     {
       "path": "LICENSE",
@@ -15,8 +20,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 28638,
-      "sha256": "65fdddb051b95bbc135888d05052c6e532552d5191b5410d942138e32ef5bb73"
+      "bytes": 30772,
+      "sha256": "8de2a9c177f4818659a5f96526fb4dda3a6a1b770cb8774bf53fef019a7d8c4d"
     },
     {
       "path": "dist/errors.mjs",
@@ -41,7 +46,7 @@
     {
       "path": "dist/local/generated/contracts.mjs",
       "bytes": 205734,
-      "sha256": "dec33cfc0567adebda9f6de6f1fc899d8a33292eaf8f68d08331b3c15493ef40"
+      "sha256": "619f66ddd20baf90c1d2ebe9f5f4fc71df024f2cac88c36ac78e11a7059ee6f8"
     },
     {
       "path": "dist/local/index.mjs",
@@ -56,7 +61,7 @@
     {
       "path": "dist/local/public.d.ts",
       "bytes": 14356,
-      "sha256": "3799e231db9bf184b322a5e551c6c0d2ce0a83088b014c2aa0bbef2daaee56fc"
+      "sha256": "71653b1064a46280493884528d9e152858001718ae21ff4f8f9e921cb7ec0f4d"
     },
     {
       "path": "dist/local/region-domain.mjs",
@@ -100,23 +105,23 @@
     },
     {
       "path": "fixtures/local/region.json",
-      "bytes": 72082,
-      "sha256": "dc7258d1efed89abce593e04c50e90038ffc90da1df2bdcfba6134413751fb57"
+      "bytes": 72135,
+      "sha256": "a8003d917cc6fd98e42139524fc257eae73beaa506cf6c0f9ddb9b0c058611b0"
     },
     {
       "path": "package.json",
-      "bytes": 1736,
-      "sha256": "60ea142df8b17be1cce6f3347dc8cebda948cc349fb16013a33d9ba6b3854ee1"
+      "bytes": 1925,
+      "sha256": "09d86170af0e7326c515e7b328fa9004d67f180c2992f9779076ffc2ab7cc62b"
     },
     {
       "path": "schemas/local/contracts.schema.json",
       "bytes": 284120,
-      "sha256": "572edb46ea2307af5d54cbb39a3dac48a0a14d8b85e7224931d6c3eed637f09d"
+      "sha256": "252c1094dfc4cfdabd87e217cb8a7676764197bc0b92bca84c966a352b022f3d"
     },
     {
       "path": "schemas/local/profile.json",
       "bytes": 320613,
-      "sha256": "2b4aa60e8715ab7cefac32ca2a41dc7a0e73905327dbcf5a5f005b468011960b"
+      "sha256": "c62917474344a9878b7436a3cb34c02abe4bc7184920dbf5ef15b36516a8560a"
     },
     {
       "path": "types/local/contracts.d.ts",
@@ -126,7 +131,7 @@
     {
       "path": "types/local/index.d.ts",
       "bytes": 14356,
-      "sha256": "3799e231db9bf184b322a5e551c6c0d2ce0a83088b014c2aa0bbef2daaee56fc"
+      "sha256": "71653b1064a46280493884528d9e152858001718ae21ff4f8f9e921cb7ec0f4d"
     }
   ]
 }
