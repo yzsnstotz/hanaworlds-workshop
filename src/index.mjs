@@ -2,7 +2,9 @@ import { WorkshopImageLinkPanelService } from '../lib/panel-host.mjs';
 import { randomUUID } from 'node:crypto';
 import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import * as C from 'hanaworlds-contracts';
-import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, mediaBinding, imageRef, imageDigest } from './image-attachment.mjs';
+import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, uploadedImageBytes, mediaBinding, imageRef, imageDigest } from './image-attachment.mjs';
+import { prepareImageAsk } from './image-ask.mjs';
+export { prepareImageAsk, imageAskGuidance, IMAGE_ASK_SECTION, IMAGE_ASK_ALLOWED_TOOLS } from './image-ask.mjs';
 import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
 export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
 const VERSION = 'session/v3', CANVAS = 'canvas/v5';
@@ -105,14 +107,13 @@ export class WorkshopV3 {
    if(!same(core.identity,coreIdentity(exec.agent.session.header,id)))throw Error('SESSION_MISMATCH');
    const source=core.events.findLast(e=>e.type==='user/message'&&e.surfaceOp==='append'&&userProvidedURL(e.data,url));
    if(!source?.data?.id)throw Error('USER_IMAGE_URL_REQUIRED');
-   return this.#attachDownload(id,core,state,url,source.data.id,signal,live=>live.events.some(e=>e.type==='user/message'&&e.data?.id===source.data.id&&userProvidedURL(e.data,url)));
+   return this.#bindImage(id,core,state,await downloadImageBytes(url,this.#media$(),signal),source.data.id,signal,live=>live.events.some(e=>e.type==='user/message'&&e.data?.id===source.data.id&&userProvidedURL(e.data,url)));
   });
  }
- /** Download, store and bind one image to the Session journal. `sourced(live)` re-checks the user provenance against the fresh Core log. */
- async #attachDownload(id,core,state,url,sourceMessageId,signal,sourced) {
-  const attachments=this.attachments;
-  if(!attachments?.saveImage||!attachments?.readImage)throw Error('MEDIA_UNAVAILABLE');
-  const input=await downloadImageBytes(url,attachments,signal);signal.throwIfAborted();
+ #media$() {const attachments=this.attachments;if(!attachments?.saveImage||!attachments?.readImage)throw Error('MEDIA_UNAVAILABLE');return attachments;}
+ /** Store and bind one image (downloaded or uploaded bytes) to the Session journal. `sourced(live)` re-checks the user provenance against the fresh Core log. */
+ async #bindImage(id,core,state,input,sourceMessageId,signal,sourced) {
+  const attachments=this.#media$();signal.throwIfAborted();
   // saveImage fully decodes and checks the MIME. Store and decoder are the existing Host capability.
   const ref=await attachments.saveImage(input);signal.throwIfAborted();
   const stored=await attachments.readImage(ref,signal);signal.throwIfAborted();
@@ -133,7 +134,7 @@ export class WorkshopV3 {
   const id=session?.header?.id;
   if(!id||this.sessions?.get(id)!==session)throw Error('SESSION_MISMATCH');
   const url=imageURL(rawURL);
-  if(!this.#started(session))return this.#queuePanelImage(session,id,url,signal);
+  if(!this.#started(session))return this.#queuePanelImage(session,id,signal,()=>downloadImageBytes(url,this.#media$(),signal),[{type:'text',text:url}]);
   session.append('user/message',{id:`workshop-link-${randomUUID()}`,role:'user',source:{kind:'user'},content:[{type:'text',text:url}]},{surfaceOp:'append'});
   await this.sessions.flush(session);signal.throwIfAborted();
   const result=await this.downloadImage(url,{agent:{session},signal});
@@ -146,21 +147,45 @@ export class WorkshopV3 {
  /** New conversation: user input before the first turn must enter through the
   * public Agent inbox, so the Loop commits its system head before it. Nothing
   * wakes the driver; the next turn (the user's own prompt) carries the image. */
- async #queuePanelImage(session,id,url,signal) {
+ async #queuePanelImage(session,id,signal,obtain,leading) {
   const agent=this.agents?.get(id);
   if(!agent||agent.session!==session)throw Error('CONVERSATION_AGENT_REQUIRED');
   const sourceMessageId=`workshop-link-${randomUUID()}`;
   const result=await this.#lock(id,async()=>{
    const {core,state}=await this.#load(id,true);
    if(!same(core.identity,coreIdentity(session.header,id)))throw Error('SESSION_MISMATCH');
-   return this.#attachDownload(id,core,state,url,sourceMessageId,signal,()=>true);
+   return this.#bindImage(id,core,state,await obtain(),sourceMessageId,signal,()=>true);
   });
   if(this.sessions.get(id)!==session||this.agents.get(id)!==agent)throw Error('SESSION_MISMATCH');
   signal.throwIfAborted();
-  agent.inject({id:sourceMessageId,role:'user',source:{kind:'user'},content:[{type:'text',text:url},{type:'image',attachment:result.image}]});
+  agent.inject({id:sourceMessageId,role:'user',source:{kind:'user'},content:[...leading,{type:'image',attachment:result.image}]});
   await this.sessions.flush(session);signal.throwIfAborted();
   return this.readPanelImage(session,result.image.attachmentId,signal);
  }
+ /** Public operator panel path for a local image the user picked. Same Session
+  * check, store, bind and new/started conversation semantics as a link; the
+  * bytes come from the user instead of HTTP. */
+ async attachImageForPanel(session,upload,signal) {
+  signal.throwIfAborted();
+  const id=session?.header?.id;
+  if(!id||this.sessions?.get(id)!==session)throw Error('SESSION_MISMATCH');
+  const input=uploadedImageBytes(upload,this.#media$());
+  if(!this.#started(session))return this.#queuePanelImage(session,id,signal,()=>input,[]);
+  const sourceMessageId=`workshop-image-${randomUUID()}`;
+  const result=await this.#lock(id,async()=>{
+   const {core,state}=await this.#load(id,true);
+   if(!same(core.identity,coreIdentity(session.header,id)))throw Error('SESSION_MISMATCH');
+   return this.#bindImage(id,core,state,input,sourceMessageId,signal,()=>true);
+  });
+  if(this.sessions.get(id)!==session)throw Error('SESSION_MISMATCH');
+  signal.throwIfAborted();
+  session.append('user/message',{id:sourceMessageId,role:'user',source:{kind:'user'},content:[{type:'image',attachment:result.image}]},{surfaceOp:'append'});
+  await this.sessions.flush(session);signal.throwIfAborted();
+  return this.readPanelImage(session,result.image.attachmentId,signal);
+ }
+ /** Building skill image step for one conversation's agent (prompt section +
+  * read-only tool set). Returns the disposer; see image-ask.mjs. */
+ prepareImageAsk(agent) {return prepareImageAsk(agent);}
  async readPanelImage(session,attachmentId,signal) {
   signal.throwIfAborted();
   const id=session?.header?.id;

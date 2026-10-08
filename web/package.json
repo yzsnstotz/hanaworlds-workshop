@@ -4,7 +4,12 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "Local Workshop developer webpage with an explicitly fixture Session",
-  "engines": { "node": ">=24.13.1 <25" },
-  "scripts": { "start": "node server.mjs" }
+  "description": "Local Workshop developer webpages: image link (47605) and image ask (47608); FIXTURE session/model, clearly labelled",
+  "engines": {
+    "node": ">=24.13.1 <25"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "start:ask": "node ask-server.mjs"
+  }
 }

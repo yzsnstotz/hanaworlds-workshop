@@ -1,6 +1,6 @@
 {
   "name": "hanaworlds-workshop",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -23,6 +23,7 @@
   "files": [
     "src/index.mjs",
     "src/image-attachment.mjs",
+    "src/image-ask.mjs",
     "src/write-tools.mjs",
     "src/projection-store.mjs",
     "client.cjs",
@@ -50,10 +51,11 @@
     }
   },
   "scripts": {
-    "build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/write-tools.mjs && node scripts/build-image-panel.mjs",
-    "test": "node --test test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/image-panel-new-session.test.mjs test/write-tools.test.mjs",
+    "build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/image-ask.mjs && node --check src/write-tools.mjs && node scripts/build-image-panel.mjs",
+    "test": "node --test test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/image-panel-new-session.test.mjs test/image-ask.test.mjs test/write-tools.test.mjs",
     "test:image": "node --test test/image-attachment.test.mjs test/image-panel-new-session.test.mjs",
     "test:new-session": "node --test test/image-panel-new-session.test.mjs",
+    "test:ask": "node --test test/image-ask.test.mjs test/ask-web.test.mjs",
     "test:text-normal": "node --test --test-name-pattern='local text proposal' test/local-world-runtime.test.mjs",
     "test:contracts-042": "node --test test/contracts-042-consumption.test.mjs",
     "test:write-tools": "node --test test/write-tools.test.mjs",

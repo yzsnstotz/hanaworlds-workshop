@@ -30,6 +30,19 @@ export async function downloadImageBytes(url,attachments,signal) {
  try{for await(const chunk of response.body){signal.throwIfAborted();length+=chunk.length;if(length>cap)refuse('IMAGE_TOO_LARGE');chunks.push(chunk);}}finally{if(signal.aborted)await response.body.cancel().catch(()=>{});}
  signal.throwIfAborted();if(!length)refuse('IMAGE_EMPTY');return {data:Buffer.concat(chunks,length),mediaType};
 }
+/** Bytes the user picked locally. Same type list and Host limits as a link;
+ * the Host attachment store still fully decodes and checks them on save. */
+export function uploadedImageBytes(upload,attachments) {
+ const data=upload?.data;
+ if(!(data instanceof Uint8Array))refuse('IMAGE_BYTES_REQUIRED');
+ const cap=Math.min(attachments.imageLimits?.maxImageBytes,attachments.imageLimits?.maxMessageImageBytes);
+ if(!Number.isSafeInteger(cap)||cap<=0)refuse('IMAGE_LIMITS_UNAVAILABLE');
+ const mediaType=typeof upload.mediaType==='string'?upload.mediaType.split(';')[0].trim().toLowerCase():'';
+ if(!['image/png','image/jpeg','image/webp','image/gif'].includes(mediaType)||!attachments.imageLimits.mediaTypes.includes(mediaType))refuse('IMAGE_TYPE_UNSUPPORTED');
+ if(!data.byteLength)refuse('IMAGE_EMPTY');
+ if(data.byteLength>cap)refuse('IMAGE_TOO_LARGE');
+ return {data:Buffer.from(data.buffer,data.byteOffset,data.byteLength),mediaType};
+}
 const string={type:'string',required:true},number={type:'number',required:true};
 const imageSchema={type:'object',required:true,additionalProperties:false,properties:{attachmentId:string,mediaType:string,bytes:number,width:number,height:number}};
 const nullableString={oneOf:[{type:'string'},{type:'null'}],required:true};

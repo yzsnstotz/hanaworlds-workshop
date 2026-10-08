@@ -105,6 +105,17 @@ first turn then commits the system head before it. No live Agent →
 direct `ATTACHED` path. Additional Host port: `agents`. `npm run test:new-session`
 uses the real AgentLoop/JSONL with a FIXTURE model adapter.
 
+## 附图提问（0.4.7，F-WS-IMAGE-ASK-01）
+
+Workshop 为一个对话的 Agent 提供建造 skill 的「看图」步骤：
+
+- `workshop.prepareImageAsk(agent)`：通过官方 `agent.ctx` 作用域加一段系统提示 `hanaworlds-building:image-ask`（看实际图片描述结构；不按文件名/链接描述；只描述不建造；比例或用途不清先问一个问题），并用 `ctx.tools.restrict({allow:['hanaworlds_download_image']})` 只留下只读图片工具，写世界的工具在这一步不可见。返回解除两者的 disposer。只影响这一个 Agent。Host 缺 `systemPrompt`/`tools` 时具名拒绝。
+- `workshop.attachImageForPanel(session,{data,mediaType},signal)`：本机图片（用户选的字节），与链接同一套 Session 核对、存储、绑定和新/已开始对话语义（新对话 `QUEUED_FOR_NEXT_TURN` 经公开 Agent inbox，已开始对话 `ATTACHED`）。类型、空图、大小上限具名拒绝；附件存储仍完整解码校验。
+
+开发入口：`web/ask-server.mjs` 起 **http://127.0.0.1:47608/ask**（也接受 `localhost`，带参数可开）。它扮演 Host：真实 Cordis / Session / JSONL / AgentRegistry / 官方 AgentLoop / system-prompt / tools / 本地附件 / HTTP 下载 + Workshop；**模型是醒目标注的 FIXTURE**——它读取请求里每张图片的实际存储字节并报告 sha256，不会看图、不描述结构。真实模型、鉴权、费用未授权（UNKNOWN）。会话是本页独立会话，不是 App 当前对话；不写世界。
+
+`npm run test:ask`：`test/image-ask.test.mjs`（真实 Loop + FIXTURE 模型）与 `test/ask-web.test.mjs`（47608 路由与信任边界）。
+
 ## Two write methods (S1-WS-WRITE-TOOLS-01, contracts 0.5.2)
 
 The one building skill has two write methods, each published as a contracts

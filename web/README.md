@@ -21,3 +21,11 @@
 `node --test test/web-entry.test.mjs` 只验证新网页路由及其信任边界/初始化，不重复已有组件门。首版漏初始Core事件导致准确422/Session not found；新增请求复现红灯，按已有公开示例追加首个turn/start后绿灯，原失败保留E。
 
 新增代码MIT；复用公开依赖名称/准确版本/许可/来源/用途仍由根NOTICE及已交current-dependencies.json列明。本轮无新第三方依赖。并发、超大图/超时/恢复、完整非法输入矩阵、正式App整合归后续验证。
+
+## 附图提问页 · http://127.0.0.1:47608/ask（F-WS-IMAGE-ASK-01）
+
+启动：source 根 `npm ci` 后 `npm --prefix web run start:ask`（或 `node web/ask-server.mjs`）。监听 127.0.0.1 与 ::1 的 47608；Host 头只收 `127.0.0.1` / `localhost` / `[::1]`，POST 需同源 JSON。端口被占即准确失败，不换端口、不重试。每次启动在 `../runtime/ask-web/session-*` 建全新运行目录，不读任何 App profile。
+
+页面：选对话 / 新对话；附本机图片或贴链接（缩略图、类型、尺寸、状态可见）；提交问题给当前对话的模型，回答与本回合模型实际收到的图片字节 sha256 一同显示。错误显示具名代码与说明，页面可继续使用。
+
+**FIXTURE**：模型（`hanaworlds-fixture/fixture-vision-1`，不看图，只报告收到的真实字节）；会话是本页独立会话。**真实**：官方 AgentLoop、系统提示组装（含 `hanaworlds-building:image-ask`）、工具限制、Session/JSONL、附件存储/解码、HTTP 下载。真实模型/鉴权/费用 UNKNOWN，未授权。不写世界。

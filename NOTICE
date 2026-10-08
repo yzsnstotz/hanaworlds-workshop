@@ -46,3 +46,5 @@ F-DESKTOP-IMAGE-INPUT-01 Workshop preparation (0.4.6, test-only additions):
 @deepseek-ai/dsh-agent 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · AgentRegistry (`agents` port, public Agent.inject) in that test; already an installed peer; not bundled.
 @deepseek-ai/dsh-llm 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · LlmRuntime and public LlmAdapter base for the FIXTURE model adapter; already an installed peer; not bundled.
 @deepseek-ai/dsh-session-projection 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · projection registry required by AgentLoop; already an installed peer; not bundled.
+
+F-WS-IMAGE-ASK-01 (0.4.7): no new third-party dependency. The 47608 ask developer page reuses the packages listed above (dsh-agent, dsh-agent-loop, dsh-llm, dsh-session-projection, dsh-system-prompt, dsh-tools, dsh-attachment-local, dsh-session-persistence-jsonl, dsh-storage*) from the root lock.
