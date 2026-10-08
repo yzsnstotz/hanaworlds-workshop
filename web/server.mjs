@@ -49,17 +49,20 @@ export async function startWorkshopWeb({port=47605,runRoot=defaultRun}={}) {
   server=createServer(async(req,res)=>{
    try{
     const origin=`http://127.0.0.1:${server.address().port}`;
-    if(req.headers.host!==new URL(origin).host)return send(res,403,{error:'LOCALHOST_HOST_REQUIRED'});
+    // 127.0.0.1 and localhost both name this machine; anything else is refused (DNS rebinding).
+    const okHosts=[new URL(origin).host,`localhost:${server.address().port}`];
+    if(!okHosts.includes(req.headers.host))return send(res,403,{error:'LOCALHOST_HOST_REQUIRED'});
     const path=new URL(req.url,origin).pathname;
     if(req.method==='GET'){
      if(path==='/api/session')return send(res,200,{sessionRef,...fixture});
      if(path==='/sample.png')return send(res,200,samplePNG,'image/png');
-     const key=path==='/'?'/index.html':path;
+     // A copied link with trailing text still opens the page.
+     const key=path==='/'||(!assets.has(path)&&!path.startsWith('/api/'))?'/index.html':path;
      if(assets.has(key))return send(res,200,assets.get(key),key.endsWith('.html')?'text/html; charset=utf-8':key.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8');
      return send(res,404,{error:'NOT_FOUND'});
     }
     if(req.method!=='POST'||!['/api/download','/api/read'].includes(path))return send(res,404,{error:'NOT_FOUND'});
-    if(req.headers.origin!==origin)return send(res,403,{error:'SAME_ORIGIN_REQUIRED'});
+    if(!okHosts.map(h=>`http://${h}`).includes(req.headers.origin))return send(res,403,{error:'SAME_ORIGIN_REQUIRED'});
     if(req.headers['content-type']?.split(';')[0]!=='application/json')return send(res,415,{error:'JSON_REQUIRED'});
     let text='';for await(const chunk of req){text+=chunk;if(Buffer.byteLength(text)>1048576)return send(res,413,{error:'REQUEST_TOO_LARGE'});}
     let args;try{args=JSON.parse(text);}catch{return send(res,400,{error:'INVALID_JSON'});}
