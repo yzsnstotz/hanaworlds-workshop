@@ -22,6 +22,28 @@ const initial = id => ({context:{currentSession:id,activeWorldRef:null,orderedSe
  * no model JSON can select a peer or call Canvas/Adapter mutators directly. */
 export class WorkshopV3 {
  constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;this.locks=new Map(); }
+ /** Trusted composition-only metadata preparation for G-S. Returns the official
+  * SessionPersistence snapshot verbatim; this is not a session/v3 wire operation.
+  * No World selection, Workshop projection, full log read or Session creation. */
+ async readSessionMetadata(sessionRef) {
+  const port=this.sessionPersistence;
+  if(typeof port?.stat!=='function')fail('CAPABILITY_UNAVAILABLE');
+  const snapshot=await port.stat(sessionRef);
+  if(!snapshot)fail('SESSION_NOT_FOUND');
+  coreIdentity(snapshot.header,sessionRef);
+  if(port!==this.sessionPersistence)fail('SESSION_NOT_FOUND');
+  return copy(snapshot);
+ }
+ /** Enumerate authoritative official stored metadata without manufacturing
+  * Session existence from a reference, local projection or world binding. */
+ async listSessionMetadata() {
+  const port=this.sessionPersistence;
+  if(typeof port?.list!=='function')fail('CAPABILITY_UNAVAILABLE');
+  const snapshots=await port.list();
+  for(const snapshot of snapshots)coreIdentity(snapshot.header,snapshot.header?.id);
+  if(port!==this.sessionPersistence)fail('SESSION_NOT_FOUND');
+  return copy(snapshots);
+ }
  async #lock(id,run) {
   const previous=this.locks.get(id)??Promise.resolve();let release;
   const next=new Promise(r=>{release=r;});this.locks.set(id,next);
