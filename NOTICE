@@ -40,3 +40,9 @@ typescript 6.0.3 · Apache-2.0 · https://registry.npmjs.org/ · build-only stan
 @deepseek-ai/dsh-typert-registry 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · component check registry composition (no authored strict definition).
 @deepseek-ai/dsh-client-connection 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · public SDK declaration/transport component check.
 Historical strict-generator additions above remain evidence; generator is removed from the current build.
+
+F-DESKTOP-IMAGE-INPUT-01 Workshop preparation (0.4.6, test-only additions):
+@deepseek-ai/dsh-agent-loop 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · real native AgentLoop for the new-conversation panel-link test; not bundled.
+@deepseek-ai/dsh-agent 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · AgentRegistry (`agents` port, public Agent.inject) in that test; already an installed peer; not bundled.
+@deepseek-ai/dsh-llm 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · LlmRuntime and public LlmAdapter base for the FIXTURE model adapter; already an installed peer; not bundled.
+@deepseek-ai/dsh-session-projection 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · projection registry required by AgentLoop; already an installed peer; not bundled.

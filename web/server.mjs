@@ -29,7 +29,10 @@ export async function startWorkshopWeb({port=47605,runRoot=defaultRun}={}) {
   await ctx.plugin(Attachments,{dshHome:join(runtime,'media')}).await();
   const sessionRef=`workshop-example-${randomUUID()}`;
   const header={version:SESSION_FORMAT_VERSION,id:sessionRef,createdAt:Date.now(),cwd:runtime,isSeeded:false};
-  const initial=[{type:'turn/start',seq:0,time:header.createdAt,data:{turn:1}}];
+  // FIXTURE: an already-started conversation. Core v4 reserves surface node 0 for the
+  // native Loop's system prompt; this example stands in for that first Loop step.
+  const t=header.createdAt,initial=[{type:'turn/start',seq:0,time:t,data:{turn:1}},{type:'step/start',seq:1,time:t,data:{turn:1,step:1}},
+   {type:'system/message',seq:2,time:t,surfaceOp:'append',data:{turn:1,step:1,message:{id:`${sessionRef}-system`,role:'system',source:{kind:'system-prompt'},content:[{type:'text',text:'示例对话系统提示（FIXTURE）'}]}}}];
   const created=await ctx.sessionPersistence.create(header);await created.append(initial);await created.close();
   const session=Session.create(sessionRef,initial,header);let offset=initial.length;
   // Explicit fixture lifecycle bridge, using the public Core append/JSONL APIs.

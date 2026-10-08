@@ -95,6 +95,16 @@ AttachmentLocal (0.2.0-rc.2), with a declared agent/Host publication/Canvas fixt
 archive and independent installed package, plus the affected text normal flow.
 Actual Desktop/skill/model/image building/UI/world/Undo remains NOT_RUN.
 
+Panel link in a not-yet-started conversation (0.4.6): Core v4 reserves surface
+node 0 for the native Loop's system prompt. When the live Session has no such
+head, `downloadImageForPanel` stores and binds the image as before but delivers
+one user message (link text + image block) through the public Agent inbox
+(`ctx.agents.get(id).inject`, no wake) and returns `QUEUED_FOR_NEXT_TURN`; the
+first turn then commits the system head before it. No live Agent →
+`CONVERSATION_AGENT_REQUIRED` before download. Started conversations keep the
+direct `ATTACHED` path. Additional Host port: `agents`. `npm run test:new-session`
+uses the real AgentLoop/JSONL with a FIXTURE model adapter.
+
 ## Two write methods (S1-WS-WRITE-TOOLS-01, contracts 0.5.2)
 
 The one building skill has two write methods, each published as a contracts

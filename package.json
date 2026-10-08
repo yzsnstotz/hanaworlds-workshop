@@ -1,6 +1,6 @@
 {
   "name": "hanaworlds-workshop",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -51,8 +51,9 @@
   },
   "scripts": {
     "build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/write-tools.mjs && node scripts/build-image-panel.mjs",
-    "test": "node --test test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/write-tools.test.mjs",
-    "test:image": "node --test test/image-attachment.test.mjs",
+    "test": "node --test test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/image-panel-new-session.test.mjs test/write-tools.test.mjs",
+    "test:image": "node --test test/image-attachment.test.mjs test/image-panel-new-session.test.mjs",
+    "test:new-session": "node --test test/image-panel-new-session.test.mjs",
     "test:text-normal": "node --test --test-name-pattern='local text proposal' test/local-world-runtime.test.mjs",
     "test:contracts-042": "node --test test/contracts-042-consumption.test.mjs",
     "test:write-tools": "node --test test/write-tools.test.mjs",
@@ -74,6 +75,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-agent-loop": "0.2.0-rc.2",
     "@deepseek-ai/dsh-api-gateway": "0.2.0-rc.2",
     "@deepseek-ai/dsh-attachment-local": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",

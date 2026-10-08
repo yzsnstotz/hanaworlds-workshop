@@ -31,6 +31,18 @@ Canvas package identity. Fixture success does not grant final public-consumption
 PASS, product readiness or acceptance. No actual package declaration is forged.
 
 
+## 新对话里的图片链接顺序（0.4.6）
+
+DSH Core v4 规定：对话的系统提示必须是表面第 0 个节点，并且只能由原生 AgentLoop 在第一个回合内写入（`dsh-session` README「`system/message` … the first one is surface node 0」，`dsh-session-format-v3-to-v4`「protected first system head」）。0.4.5 的 `downloadImageForPanel` 在**还没开始的对话**里先直接写 user/message，之后第一个正常回合的系统提示就被持久化拒绝：`system/message requires a protected first surface head`。
+
+0.4.6 起，`downloadImageForPanel` 先看当前 live Session 是否已有这个系统头：
+
+- **已开始的对话**：原路径不变——写入链接与图片 user/message，返回 `status: 'ATTACHED'`。
+- **还没开始的对话**：下载、解码、存储与同 Session 绑定照旧，但用户输入改走官方 `ctx.agents.get(id).inject(message)`（公开 Agent inbox，不唤醒模型）。一条 user 消息同时带链接文本和真实 image block，返回 `status: 'QUEUED_FOR_NEXT_TURN'`；用户自己的下一次提问开启第一个回合时，Loop 先提交系统提示，再把这条消息与提问一起交给当前模型。回合之后 `readPanelImage` 返回 `ATTACHED`。
+- 该对话没有 live Agent 时，在下载和任何写入之前具名拒绝 `CONVERSATION_AGENT_REQUIRED`（需要 Host 先为这个对话创建 Agent）。
+
+新增 Host 端口：Cordis `agents`（官方 `@deepseek-ai/dsh-agent` 注册表）。`npm run test:new-session` 用真实 Cordis / SessionStore / AgentRegistry / AgentLoop / JSONL / 本地附件 / HTTP 复现并验证；只有模型适配器是 FIXTURE（固定文本回答并记录收到的请求）。它不代表真实模型看图、Desktop 产品路径或 owner 验收。
+
 ## Workshop 图片链接开发面板（0.4.5）
 
 正常产品安装本包后，侧栏 **Workshop 开发面板** 提供图片链接 → 当前对话附件。打开真实对话后切到面板，粘贴直达 PNG/JPEG/WebP/GIF 的 HTTP(S) 图片链接，点「下载到当前对话」。结果来自真实附件 bytes，显示缩略图、MIME、宽高；公开 Session 日志里的实际 image block 与附件读回通过后才显示已关联状态。重定向、下载、解码、当前对话或附件关联失败显示原因。

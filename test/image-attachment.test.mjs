@@ -20,6 +20,8 @@ const sha=b=>createHash('sha256').update(b).digest('hex');
 const sample=JSON.parse(await (await import('node:fs/promises')).readFile(new URL(import.meta.resolve('hanaworlds-contracts/fixtures/main'))));
 const local=sample.request.localContext;
 const header=id=>({version:SESSION_FORMAT_VERSION,id,createdAt:100,cwd:'/image-fixture',isSeeded:false});
+// A conversation the native Loop has started: system prompt is protected surface node 0 (Core v4).
+const started=()=>[{type:'turn/start',seq:0,time:99,data:{turn:1}},{type:'step/start',seq:1,time:99,data:{turn:1,step:1}},{type:'system/message',seq:2,time:99,surfaceOp:'append',data:{turn:1,step:1,message:{id:'fixture-system',role:'system',source:{kind:'system-prompt'},content:[{type:'text',text:'fixture system prompt'}]}}}];
 const user=(id,text,extra=[])=>({type:'user/message',time:100,surfaceOp:'append',data:{id,role:'user',source:{kind:'user'},content:[{type:'text',text},...extra]}});
 async function mount(root){
  const ctx=new Context();await ctx.plugin(Jsonl,{root:join(root,'core'),compression:'none'}).await();
@@ -36,7 +38,7 @@ async function setup(fn){
  const base=process.env.HW_RUNTIME_ROOT??new URL('../../runtime/',import.meta.url).pathname;await mkdir(base,{recursive:true});const root=await mkdtemp(join(base,'image-'));
  let requests=0,onSlow;const server=createServer((q,s)=>{requests++;if(q.url==='/slow'){s.writeHead(200,{'content-type':'image/png'});s.write(png.subarray(0,8));onSlow?.();return;}s.writeHead(200,{'content-type':'image/png'});s.end(q.url==='/not-image'?Buffer.from('not an image'):png);});await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const r=await mount(root),url=`http://127.0.0.1:${server.address().port}/picture`;
- try{for(const id of ['s1','s2']){const w=await r.ctx.sessionPersistence.create(header(id));await w.append([{type:'turn/start',seq:0,time:99,data:{turn:1}}]);await w.close();}await r.append('s1',user('user-image',`照这个建造 ${url} ${url.replace('/picture','/not-image')}`));await r.append('s2',user('other','不要图片'));
+ try{for(const id of ['s1','s2']){const w=await r.ctx.sessionPersistence.create(header(id));await w.append(started());await w.close();}await r.append('s1',user('user-image',`照这个建造 ${url} ${url.replace('/picture','/not-image')}`));await r.append('s2',user('other','不要图片'));
  const execute=(args={url},id='s1',signal=new AbortController().signal)=>r.ctx.tools.execute({name:'hanaworlds_download_image',callId:`download-${id}`,arguments:args,signal,agent:{ctx:r.ctx,session:{header:header(id)}}});
  await fn({...r,root,url,execute,requests:()=>requests,whenSlow:fn=>{onSlow=fn;}});
  }finally{await r.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(root,{recursive:true,force:true});}
@@ -48,7 +50,6 @@ test('real HTTP → actual attachment store → native image result → same bri
  const image=out.content.find(p=>p.type==='image');assert.ok(image,'native result carries actual image block');const read=await r.ctx.attachments.readImage(image.attachment);
  assert.equal(out.value.downloadSha256,sha(png));assert.equal(out.value.downloadBytes,png.length);assert.equal(read.ref.mediaType,'image/png');assert.equal(sha(read.data),out.value.media.storedBytesDigest);assert.equal(out.value.media.attachmentRef,image.attachment.attachmentId);
  // Host/agent-loop persistence boundary is explicit fixture; actual Core JSONL stores its public result.
- await r.append('s1',{type:'step/start',time:100,data:{turn:1,step:1}});
  await r.append('s1',{type:'assistant/message',time:100,surfaceOp:'append',data:{turn:1,step:1,stream:[],message:{id:'fixture-assistant',role:'assistant',source:{kind:'model',provider:'fixture',model:'fixture'},content:[{type:'tool-call',id:'download-s1',name:'hanaworlds_download_image',arguments:JSON.stringify({url:r.url})}]}}});
  await r.append('s1',{type:'tool/call',time:100,data:{turn:1,step:1,callId:'download-s1',name:'hanaworlds_download_image',arguments:JSON.stringify({url:r.url})}});
  await r.append('s1',{type:'tool/result',time:101,surfaceOp:'append',data:{turn:1,step:1,message:{id:'image-result',role:'tool',toolCallId:'download-s1',source:{kind:'tool',callId:'download-s1'},isError:false,content:out.content}}});

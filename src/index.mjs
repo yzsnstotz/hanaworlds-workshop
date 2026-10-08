@@ -105,21 +105,27 @@ export class WorkshopV3 {
    if(!same(core.identity,coreIdentity(exec.agent.session.header,id)))throw Error('SESSION_MISMATCH');
    const source=core.events.findLast(e=>e.type==='user/message'&&e.surfaceOp==='append'&&userProvidedURL(e.data,url));
    if(!source?.data?.id)throw Error('USER_IMAGE_URL_REQUIRED');
-   const attachments=this.attachments;
-   if(!attachments?.saveImage||!attachments?.readImage)throw Error('MEDIA_UNAVAILABLE');
-   const input=await downloadImageBytes(url,attachments,signal);signal.throwIfAborted();
-   // saveImage fully decodes and checks the MIME. Store and decoder are the existing Host capability.
-   const ref=await attachments.saveImage(input);signal.throwIfAborted();
-   const stored=await attachments.readImage(ref,signal);signal.throwIfAborted();
-   if(!same(stored.ref,ref))throw Error('MEDIA_DIGEST_MISMATCH');
-   const media=mediaBinding(ref,stored.data),live=await this.#core(id);signal.throwIfAborted();
-   const currentMedia=await this.attachments?.readImage(ref,signal);signal.throwIfAborted();
-   if(!currentMedia||!same(mediaBinding(currentMedia.ref,currentMedia.data),media)||!same(live.identity,core.identity)||!live.events.some(e=>e.type==='user/message'&&e.data?.id===source.data.id&&userProvidedURL(e.data,url)))throw Error('SESSION_MISMATCH');
-   state.images??={};state.images[ref.attachmentId]={media,sourceMessageId:source.data.id};
-   await this.#save(id,core,state);signal.throwIfAborted();
-   return {sessionRef:id,sourceMessageId:source.data.id,downloadSha256:imageDigest(input.data),downloadBytes:input.data.byteLength,media,image:imageRef(media)};
+   return this.#attachDownload(id,core,state,url,source.data.id,signal,live=>live.events.some(e=>e.type==='user/message'&&e.data?.id===source.data.id&&userProvidedURL(e.data,url)));
   });
  }
+ /** Download, store and bind one image to the Session journal. `sourced(live)` re-checks the user provenance against the fresh Core log. */
+ async #attachDownload(id,core,state,url,sourceMessageId,signal,sourced) {
+  const attachments=this.attachments;
+  if(!attachments?.saveImage||!attachments?.readImage)throw Error('MEDIA_UNAVAILABLE');
+  const input=await downloadImageBytes(url,attachments,signal);signal.throwIfAborted();
+  // saveImage fully decodes and checks the MIME. Store and decoder are the existing Host capability.
+  const ref=await attachments.saveImage(input);signal.throwIfAborted();
+  const stored=await attachments.readImage(ref,signal);signal.throwIfAborted();
+  if(!same(stored.ref,ref))throw Error('MEDIA_DIGEST_MISMATCH');
+  const media=mediaBinding(ref,stored.data),live=await this.#core(id);signal.throwIfAborted();
+  const currentMedia=await this.attachments?.readImage(ref,signal);signal.throwIfAborted();
+  if(!currentMedia||!same(mediaBinding(currentMedia.ref,currentMedia.data),media)||!same(live.identity,core.identity)||!sourced(live))throw Error('SESSION_MISMATCH');
+  state.images??={};state.images[ref.attachmentId]={media,sourceMessageId};
+  await this.#save(id,core,state);signal.throwIfAborted();
+  return {sessionRef:id,sourceMessageId,downloadSha256:imageDigest(input.data),downloadBytes:input.data.byteLength,media,image:imageRef(media)};
+ }
+ /** Core reserves surface node 0 for the native Loop's system prompt; until it exists the conversation has not started. */
+ #started(session) {const head=session.surface.nodes[0];return head!==undefined&&session.snapshotEvents(head,head+1)[0]?.type==='system/message';}
  /** Public operator panel path. Session is resolved by the Host's registered
   * Session lookup; the UI supplies user text, never ToolExecution or headers. */
  async downloadImageForPanel(session,rawURL,signal) {
@@ -127,12 +133,31 @@ export class WorkshopV3 {
   const id=session?.header?.id;
   if(!id||this.sessions?.get(id)!==session)throw Error('SESSION_MISMATCH');
   const url=imageURL(rawURL);
+  if(!this.#started(session))return this.#queuePanelImage(session,id,url,signal);
   session.append('user/message',{id:`workshop-link-${randomUUID()}`,role:'user',source:{kind:'user'},content:[{type:'text',text:url}]},{surfaceOp:'append'});
   await this.sessions.flush(session);signal.throwIfAborted();
   const result=await this.downloadImage(url,{agent:{session},signal});
   if(this.sessions.get(id)!==session)throw Error('SESSION_MISMATCH');
   signal.throwIfAborted();
   session.append('user/message',{id:`workshop-image-${randomUUID()}`,role:'user',source:{kind:'user'},content:[{type:'image',attachment:result.image}]},{surfaceOp:'append'});
+  await this.sessions.flush(session);signal.throwIfAborted();
+  return this.readPanelImage(session,result.image.attachmentId,signal);
+ }
+ /** New conversation: user input before the first turn must enter through the
+  * public Agent inbox, so the Loop commits its system head before it. Nothing
+  * wakes the driver; the next turn (the user's own prompt) carries the image. */
+ async #queuePanelImage(session,id,url,signal) {
+  const agent=this.agents?.get(id);
+  if(!agent||agent.session!==session)throw Error('CONVERSATION_AGENT_REQUIRED');
+  const sourceMessageId=`workshop-link-${randomUUID()}`;
+  const result=await this.#lock(id,async()=>{
+   const {core,state}=await this.#load(id,true);
+   if(!same(core.identity,coreIdentity(session.header,id)))throw Error('SESSION_MISMATCH');
+   return this.#attachDownload(id,core,state,url,sourceMessageId,signal,()=>true);
+  });
+  if(this.sessions.get(id)!==session||this.agents.get(id)!==agent)throw Error('SESSION_MISMATCH');
+  signal.throwIfAborted();
+  agent.inject({id:sourceMessageId,role:'user',source:{kind:'user'},content:[{type:'text',text:url},{type:'image',attachment:result.image}]});
   await this.sessions.flush(session);signal.throwIfAborted();
   return this.readPanelImage(session,result.image.attachmentId,signal);
  }
@@ -146,11 +171,13 @@ export class WorkshopV3 {
   if(!record)throw Error('ATTACHMENT_REJECTED');
   const ref=imageRef(record.media);
   const linked=core.events.some(e=>e.type==='user/message'&&e.surfaceOp==='append'&&e.data?.role==='user'&&e.data?.source?.kind==='user'&&e.data.content?.some(p=>p.type==='image'&&same(p.attachment,ref)));
-  if(!linked)throw Error('ATTACHMENT_NOT_IN_SESSION');
+  const inbox=!linked&&this.agents?.get(id)?.inbox;
+  const queued=!!inbox&&[...inbox.nextStep,...inbox.nextTurn].some(m=>m.id===record.sourceMessageId&&m.role==='user'&&m.source?.kind==='user'&&m.content?.some(p=>p.type==='image'&&same(p.attachment,ref)));
+  if(!linked&&!queued)throw Error('ATTACHMENT_NOT_IN_SESSION');
   const stored=await this.attachments.readImage(ref,signal);signal.throwIfAborted();
   if(!same(mediaBinding(stored.ref,stored.data),record.media))throw Error('MEDIA_DIGEST_MISMATCH');
   if(this.sessions.get(id)!==session)throw Error('SESSION_MISMATCH');
-  return {sessionRef:id,status:'ATTACHED',sourceMessageId:record.sourceMessageId,media:copy(record.media),image:ref,data:Buffer.from(stored.data).toString('base64')};
+  return {sessionRef:id,status:linked?'ATTACHED':'QUEUED_FOR_NEXT_TURN',sourceMessageId:record.sourceMessageId,media:copy(record.media),image:ref,data:Buffer.from(stored.data).toString('base64')};
  }
  async #media(items,core,state) {
   if(!items.length)return [];
@@ -472,7 +499,7 @@ export function apply(ctx) {
  const projectionStore=new WorkshopProjectionStore(()=>ctx.get('storageDomain'));
  ctx.effect?.(()=>()=>projectionStore.close(),'hanaworlds-workshop.projection-close');
  const service=new WorkshopV3({projectionStore});
- for(const [field,port] of Object.entries({sessions:'sessions',attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities',painterRegion:'hanaworldsPainterRegionV1',brushRegion:'hanaworldsBrushRegionV1',canvasRegion:'hanaworldsCanvasRegionV1'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
+ for(const [field,port] of Object.entries({sessions:'sessions',agents:'agents',attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities',painterRegion:'hanaworldsPainterRegionV1',brushRegion:'hanaworldsBrushRegionV1',canvasRegion:'hanaworldsCanvasRegionV1'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
  registerImageTool(ctx,service);
  ctx.provide('hanaworldsWorkshop',service);ctx.provide('hanaworldsWorkshopV3',service);
  new WorkshopImageLinkPanelService(ctx);
