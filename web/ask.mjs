@@ -55,7 +55,7 @@ function renderAuth(a){
  $('auth-cancel').disabled=!running;$('auth-signout').disabled=running||!a.signedIn;
  const ul=$('auth-notices');ul.replaceChildren();for(const n of a.notices){const li=document.createElement('li');li.append(n.url?'官方登录页已就绪：':n.message);if(n.url){const link=document.createElement('a');link.href=n.url;link.target='_blank';link.rel='noopener';link.textContent='打开 OpenAI 登录页';li.append(link);}if(n.code){const c=document.createElement('code');c.textContent=` ${n.code}`;li.append(c);}ul.append(li);}
  const f=$('auth-prompt-form');f.hidden=!a.prompt;if(a.prompt){f.dataset.id=a.prompt.id;$('auth-prompt-label').textContent=a.prompt.message;const sel=a.prompt.kind==='select';$('auth-select').hidden=!sel;$('auth-answer').hidden=sel;$('auth-answer').type=a.prompt.kind==='secret'?'password':'text';$('auth-answer').placeholder=a.prompt.placeholder??'';if(sel&&$('auth-select').dataset.id!==a.prompt.id){$('auth-select').dataset.id=a.prompt.id;$('auth-select').replaceChildren(...a.prompt.options.map(o=>{const x=document.createElement('option');x.value=o.id;x.textContent=o.label;return x;}));}}
- const w=$('auth-waiting');w.hidden=a.waitingFor!=='BROWSER_CALLBACK';w.textContent=`在打开的 OpenAI 页面登录并确认后，本页会通过本机 ${a.callbackPort} 端口自动接回，不需要粘贴任何代码。`;
+ const w=$('auth-waiting');w.hidden=a.waitingFor!=='BROWSER_CALLBACK';w.textContent=`在打开的 OpenAI 页面登录并确认后，本页会${a.callbackPort?`通过本机 ${a.callbackPort} 端口`:''}自动接回，不需要粘贴任何代码。`;
  $('auth-error').hidden=!a.error;$('auth-error').textContent=a.error?`登录未完成：${a.error}`:'';
  clearTimeout(authTimer);if(running)authTimer=setTimeout(()=>fetch('/api/ask/auth').then(r=>r.json()).then(renderAuth,()=>{}),1500);
 }

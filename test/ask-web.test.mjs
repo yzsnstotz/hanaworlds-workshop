@@ -59,7 +59,7 @@ test('real route prepared offline: official openai-codex flow and vision models 
   const post=async(path,body)=>(await fetch(origin+path,{method:'POST',headers:{'content-type':'application/json',origin},body:JSON.stringify(body)})).json();
   const state=await (await fetch(`${origin}/api/ask/state`)).json();
   assert.equal(state.auth.key,REAL_AUTH_KEY);assert.equal(state.auth.flow.label,'OpenAI Codex');assert.equal(state.auth.flow.methods[0].label,'OpenAI (ChatGPT Plus/Pro)');
-  assert.equal(state.auth.signedIn,false);assert.equal(state.auth.status,'idle');assert.match(state.auth.route.cost,/订阅/);
+  assert.equal(state.auth.signedIn,false);assert.equal(state.auth.status,'idle');assert.equal(state.auth.callbackPort,1455);assert.match(state.auth.route.cost,/订阅/);
   const luna=state.models.find(m=>m.id==='openai-codex/gpt-5.6-luna');assert.equal(luna?.kind,'REAL');
   assert.equal(state.models[0].kind,'FIXTURE');assert.ok(state.models.filter(m=>m.kind==='REAL').every(m=>m.provider==='openai-codex'));
   const real=(await post('/api/ask/new',{model:'openai-codex/gpt-5.6-luna'})).result;assert.equal(real.model.kind,'REAL');
