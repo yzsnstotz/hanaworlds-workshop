@@ -91,7 +91,7 @@ DSH Core v4 规定：对话的系统提示必须是表面第 0 个节点，并�
 ## Contracts dependency (range)
 
 The root dependency is the contracts source by Git semver range
-`git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.0.0-rc.2`; no
+`git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.0.0-rc.3`; no
 vendor copy, tag or commit pin. npm resolves the range and `package-lock.json`
 records the resolved commit. `npm run verify:contracts` (run before build)
 checks the range form, that the lock and the installed package agree, and that the

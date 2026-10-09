@@ -1,6 +1,6 @@
 # Workshop 0.5.0 — local-world skill business component
 
-Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.0.0-rc.2` (contracts v1.0.0 candidate; after the formal v1.0.0 only the range and lock change to `^1.0.0`) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
+Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.0.0-rc.3` (contracts v1.0.0 candidate; after the formal v1.0.0 only the range and lock change to `^1.0.0`) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
 ## Session identity and deletion
 
