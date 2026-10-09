@@ -7,7 +7,7 @@ import * as C from 'hanaworlds-contracts';
 import { verifyContracts } from '../scripts/verify-contracts.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const installed = dirname(fileURLToPath(import.meta.resolve('hanaworlds-contracts/package.json')));
-const spec = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.0.0-rc.4';
+const spec = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.0.0';
 
 async function scratch(t, name) {
   const base = process.env.HW_RUNTIME_ROOT;

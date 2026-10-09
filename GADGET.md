@@ -1,6 +1,6 @@
 # Workshop 0.5.0 — local-world skill business component
 
-Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.0.0-rc.4` (contracts v1.0.0 candidate; after the formal v1.0.0 only the range and lock change to `^1.0.0`) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
+Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.0.0` (formal contracts v1.0.0; same content as the rc.4 candidate it was adapted and tested on) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
 ## Session identity and deletion
 
@@ -180,7 +180,7 @@ Workshop 为一个对话的 Agent 提供建造 skill 的「看图」步骤：
 
 `npm run test:ask`：`test/image-ask.test.mjs`（真实 Loop + FIXTURE 模型）与 `test/ask-web.test.mjs`（47608 路由与信任边界）。
 
-## Two write methods (S1-WS-WRITE-TOOLS-01; contracts `^1.0.0-rc.1`)
+## Two write methods (S1-WS-WRITE-TOOLS-01; contracts `^1.0.0`)
 
 The one building skill has two write methods, each published as a contracts
 `WriteMethodDescriptor` (`method`, `toolName`, `purpose`, `inputType`,
