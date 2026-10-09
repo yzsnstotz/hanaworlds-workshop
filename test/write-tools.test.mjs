@@ -133,6 +133,7 @@ function regionPeers(f,{canvasMajor=2}={}){
     r.before=before;r.commit={transactionId:q.transactionId,worldRef:q.worldRef,status:r.rollback?'ROLLED_BACK':'VERIFIED',operationDigest:q.operationDigest,beforeSummary,expectedAfterSummary,actualSummary:r.rollback?beforeSummary:expectedAfterSummary,snapshot,historyRevision:'region-history-1',lighting:{status:'COMPLETE',box:lightBox(q.operations.chunks),method:'fixture:voxelmanip.calc_lighting+write_to_map'},affectedObjectRefs:[],localContext:structuredClone(q.localContext)};
     r.lightBox=r.commit.lighting.box;return ok(r.commit);}
    if(op==='UndoRegionCommit'){assert.equal(q.originTransactionId,r.commit.transactionId);assert.equal(q.expectedHistoryRevision,r.commit.historyRevision);
+    if(r.undoRefusal){r.calls.push('UndoRefused');return {contractVersion:'canvas-region/v2',requestId:q.requestId,result:null,error:C.guardRefusalError(r.undoRefusal),guardRefusal:r.undoRefusal,applyFailure:null};}
     const pre=C.summarizeRegionStates(q.worldRef,r.before.map(b=>({chunkPos:b.chunkPos,state:r.world[b.chunkPos]})));
     r.undoWrites++;for(const b of r.before)r.world[b.chunkPos]=b.state;
     return ok({originTransactionId:q.originTransactionId,undoTransactionId:q.undoTransactionId,worldRef:q.worldRef,status:'VERIFIED',originBeforeSummaryDigest:sha('region-summary',r.commit.beforeSummary),originAfterSummaryDigest:sha('region-summary',r.commit.actualSummary),preUndoSummary:pre,actualSummary:r.commit.beforeSummary,historyRevision:'region-history-2',lighting:{status:'COMPLETE',box:r.lightBox,method:'fixture:voxelmanip.calc_lighting+write_to_map'},localContext:structuredClone(q.localContext)});}
@@ -218,6 +219,22 @@ test('REGION engine guard refusal reaches the skill by name (guard, stage, findi
   const built=await r.ws.advanceRegionBuild({...advance,requestId:'a'});
   assert.equal(built.error?.code,'SAFETY_INVARIANT_FAILED');assert.deepEqual(built.guardRefusal,f.region.refusal);assert.equal(built.applyFailure,null);assert.equal(f.region.writes,0);
   log('REGION_GUARD_REFUSAL',{error:built.error,guardRefusal:built.guardRefusal,writes:0});
+ });
+});
+
+test('rc.3 REGION Undo refused by the engine guard (engine form: restore, no cause, nothing written) is accepted, named for the skill, not pending recovery',async()=>{
+ const f=fixture();f.region=regionPeers(f);const R=f.region;await withRuntime(f,async r=>{
+  const {advance}=await imageBrief(r,f);const context=await r.ws.readWriteProposalContext('REGION',{...advance,requestId:'region-context'});
+  assert.equal((await r.ws.submitWriteProposal('REGION',{...context,requestId:'p',proposal:{decision:'REGION',block:regionBlock()}})).response.error,null);
+  const built=await r.ws.advanceRegionBuild({...advance,requestId:'a'});assert.equal(built.outcome,'VERIFIED',JSON.stringify(built.error));
+  const filled=nodeAt(R.world,[18,1,2]);R.undoRefusal={guard:'CELL_PROTECTION',stage:'REGION_RESTORE',finding:'PROTECTED_CELL'};
+  const undoReq={contractVersion:'session/v4',sessionRef:'s1',requestId:'u1',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:built.result.historyRevision};
+  const refused=await r.ws.undoRegionBuild(undoReq);
+  assert.deepEqual(structuredClone(refused.error),{code:'SAFETY_INVARIANT_FAILED',phase:'restore',retryability:'AFTER_NEW_FACTS',mutationState:'NONE',transactionRef:null,causeCode:null,reason:'SCOPE_DENIED'});
+  assert.deepEqual(refused.guardRefusal,R.undoRefusal);assert.equal(refused.applyFailure,null);assert.equal(R.undoWrites,0);assert.equal(nodeAt(R.world,[18,1,2]),filled,'nothing written');
+  // Engine form is a zero-write refusal, not RESTORE_FAILED: no pending recovery, Undo can be asked again once facts change.
+  delete R.undoRefusal;const undone=await r.ws.undoRegionBuild({...undoReq,requestId:'u2'});assert.equal(undone.outcome,'VERIFIED',JSON.stringify(undone.error));assert.equal(R.undoWrites,1);
+  log('REGION_UNDO_ENGINE_FORM_REFUSAL',{error:refused.error,guardRefusal:refused.guardRefusal,undoWritesWhileRefused:0,retry:undone.outcome});
  });
 });
 
