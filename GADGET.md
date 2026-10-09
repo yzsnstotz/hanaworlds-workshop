@@ -1,4 +1,4 @@
-# Workshop 0.5.0 — local-world skill business component
+# Workshop 0.5.1 — local-world skill business component
 
 Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.0.0` (formal contracts v1.0.0; same content as the rc.4 candidate it was adapted and tested on) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
@@ -26,6 +26,11 @@ Host must keep these ports in its internal runtime. Keep the three existing busi
 The Host first selects the actual connection through Canvas `SelectWorldConnection` using the real transport incarnation and expectedContext. Then `call('SwitchWorldContext', session/v4 request)` reads that selection back and binds Workshop to it. It does not create an incarnation or assume selection from JSON. Session, world, connection and incarnation must agree. Unbound/current mismatch is an explicit rejection.
 
 The delivered Painter0.3.0 retains service name `hanaworldsPainterV2PictureBlocks` while accepting only new painter/v5. Desktop supplies `hanaworldsPainterLocalFacts.read(request, operation, {signal})`; for ValidateBuildProposal it can call Workshop's **read-only internal** `readBuildProposalProviderFacts(request)`. This returns public BuildProposalProviderFacts from the exact reserved request, durable source/current brief and fresh Canvas connection readback. No private state access or model-supplied facts. The read method is reentrant during Painter validation and never acquires the mutation lock. Host remains responsible for its real Session/connection dispatch and cancellation; this accessor is not a fourth agent tool. CreateBuildPlan's Host LocalRequestFacts port belongs to the deferred fixed/image route, not this text-only getter.
+
+For `ValidateRegionProposal`, use the same registered service's `readRegionProposalProviderFacts(exactRetainedRequest) → Promise<LocalRequestFacts>` after `submitWriteProposal('REGION', request)` has durably reserved that request and entered Painter. Contracts v1.0.0 already defines `painter-region/v2 / ValidateRegionProposal`, `ValidateRegionProposalRequest`, `LocalRequestFacts` and `validateCurrentRequest`; this is a composition-only method, not a new wire operation or agent tool. The Host forwards the exact request, checks its operation/provider identity/cancellation, and lets the service derive facts. It must not call lock-taking `StartOrResumeSession` or `ReadCurrentContext` in the Painter callback, or derive current facts from model input or an earlier context.
+
+Both provider-fact reads share the exact-retention and readonly stability boundary. Region checks the current confirmed intent/brief/catalogue against the retained context and reads fresh Canvas selection. It returns ACTIVE/NEW before the response, or COMPLETED/EXACT_REPLAY with the contracts request digest afterwards. Missing Sessions reject `SESSION_NOT_FOUND`; unmatched/unreserved requests reject `TRANSACTION_CONFLICT`; superseded contexts, changed confirmed turn/brief/catalogue or a projection replaced during an awaited read reject `TARGET_FACTS_STALE`; changed Canvas binding rejects `CURRENT_WORLD_MISMATCH`; an unconfirmed current turn rejects `INTENT_UNCONFIRMED`. Schema/domain failures keep the contracts error. Neither read saves state, takes the mutation lock, creates Sessions, unlocks dispatch, or supplies facts for unretained requests.
+
 
 ## Three business actions
 

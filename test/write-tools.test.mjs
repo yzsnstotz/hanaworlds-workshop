@@ -173,6 +173,91 @@ test('protocol major + capability: same major other minor/provenance accepted; w
  log('PROTOCOL_MAJOR_CAPABILITY',{sameMajorOtherMinorAndProvenance:same,wrongMajor:major,missingCapability:cap,exactOnlyPeer:exact,absent,perCellBrushWrongMajor:cellBrushMajor});
 });
 
+test('Region provider facts: retained callback is reentrant, readonly and bound to current Core/Canvas facts',async()=>{
+ const f=fixture();f.region=regionPeers(f);const R=f.region;
+ await withRuntime(f,async r=>{
+  const {advance}=await imageBrief(r,f);
+  const context=await r.ws.readWriteProposalContext('REGION',{...advance,requestId:'facts-context'});
+  const request={...context,requestId:'facts-proposal',proposal:{decision:'REGION',block:regionBlock()}};
+  await assert.rejects(r.ws.readRegionProposalProviderFacts(request),{code:'TRANSACTION_CONFLICT'});
+  const original=R.painter.call;let callbackFacts;
+  R.painter.call=async(op,q)=>{
+   assert.ok(r.ws.locks.has('s1'),'submit retains the mutation lock throughout the callback');
+   const identity=await r.ws.readSessionMetadata('s1');
+   const before=await r.ws.projectionStore.get('s1',identity.header);
+   callbackFacts=await r.ws.readRegionProposalProviderFacts(q);
+   assert.deepEqual(C.validateCurrentRequest('painter-region/v2',op,q,callbackFacts).disposition,'EXECUTE');
+   assert.deepEqual(callbackFacts,{currentContext:f.local,sessionRef:'s1',currentTurnRevision:context.turnRevision,currentBriefDigest:context.referenceBriefDigest,requestState:'ACTIVE',replay:'NEW',priorRequestDigest:null});
+   assert.deepEqual(await r.ws.projectionStore.get('s1',identity.header),before,'fact reads do not save a projection');
+   await assert.rejects(r.ws.readRegionProposalProviderFacts({...q,requestId:'wrong'}),{code:'TRANSACTION_CONFLICT'});
+   await assert.rejects(r.ws.readRegionProposalProviderFacts({...q,invocationId:'wrong'}),{code:'TRANSACTION_CONFLICT'});
+   const otherBrief={...q.referenceBrief,sessionRef:'missing'},otherIntent={...q.intent,referenceBriefDigest:D('reference-brief',otherBrief)};
+   const other={...q,sessionRef:'missing',referenceBrief:otherBrief,referenceBriefDigest:D('reference-brief',otherBrief),intent:otherIntent,intentDigest:D('intent',otherIntent)};
+   C.validateRegionProposalRequest(other);
+   await assert.rejects(r.ws.readRegionProposalProviderFacts(other),{code:'SESSION_NOT_FOUND'});
+   await assert.rejects(r.ws.readRegionProposalProviderFacts({...q,proposal:{decision:'REGION',block:{...q.proposal.block,origin:[30,0,0]}}}),{code:'TRANSACTION_CONFLICT'});
+   callbackFacts.currentContext.connectionRef='caller-mutated';
+   assert.equal((await r.ws.readRegionProposalProviderFacts(q)).currentContext.connectionRef,f.local.connectionRef);
+   return original(op,q);
+  };
+  const submitted=await r.ws.submitWriteProposal('REGION',request);
+  assert.equal(submitted.response.error,null,JSON.stringify(submitted.response));
+  const completed=await r.ws.readRegionProposalProviderFacts(request);
+  assert.equal(completed.replay,'EXACT_REPLAY');assert.equal(completed.requestState,'COMPLETED');
+  assert.equal(completed.priorRequestDigest,C.requestDigest('painter-region/v2','ValidateRegionProposal',request));
+  assert.equal(C.validateCurrentRequest('painter-region/v2','ValidateRegionProposal',request,completed).disposition,'RETURN_STORED');
+  const local=clone(f.local);f.local={...local,connectionRef:'changed-connection'};
+  await assert.rejects(r.ws.readRegionProposalProviderFacts(request),{code:'CURRENT_WORLD_MISMATCH'});f.local=local;
+  const catalogue=r.ctx.get('hanaworldsCatalogue');const read=catalogue.read;
+  catalogue.read=async world=>{const c=clone(await read(world));c.nodes['fixture:stone'].damagePerSecond=1;return c;};
+  await assert.rejects(r.ws.readRegionProposalProviderFacts(request),{code:'TARGET_FACTS_STALE'});catalogue.read=read;
+  await r.ws.readWriteProposalContext('REGION',{...advance,requestId:'new-context'});
+  await assert.rejects(r.ws.readRegionProposalProviderFacts(request),{code:'TARGET_FACTS_STALE'});
+  assert.equal(R.writes,0);assert.equal(f.writes,0);assert.equal(f.modelCalls,0);
+  log('REGION_PROVIDER_FACTS',{callbackUnderMutationLock:true,readonly:true,exactReplay:true,wrongRequestRejected:true,currentCanvasRejected:true,supersededRejected:true,peers:'FIXTURE',worldWrites:0,modelCalls:0});
+ });
+});
+
+test('Region provider facts rejects a projection changed during a concurrent readonly fetch',async()=>{
+ const f=fixture();f.region=regionPeers(f);
+ await withRuntime(f,async r=>{
+  const {advance}=await imageBrief(r,f);
+  const context=await r.ws.readWriteProposalContext('REGION',{...advance,requestId:'facts-context'});
+  const request={...context,requestId:'facts-proposal',proposal:{decision:'REGION',block:regionBlock()}};
+  assert.equal((await r.ws.submitWriteProposal('REGION',request)).response.error,null);
+  const catalogue=r.ctx.get('hanaworldsCatalogue'),read=catalogue.read;
+  let reached,release;const suspended=new Promise(resolve=>reached=resolve),resume=new Promise(resolve=>release=resolve);
+  let first=true;catalogue.read=async world=>{if(first){first=false;reached();await resume;}return read(world);};
+  const reading=r.ws.readRegionProposalProviderFacts(request);
+  const denied=assert.rejects(reading,{code:'TARGET_FACTS_STALE'});
+  await suspended;
+  await r.ws.readWriteProposalContext('REGION',{...advance,requestId:'replacement-context'});
+  release();await denied;catalogue.read=read;
+  assert.equal(f.region.writes,0);assert.equal(f.modelCalls,0);
+  log('REGION_FACTS_CONCURRENT_CHANGE',{supersededDuringAwaitRejected:true,peers:'FIXTURE',worldWrites:0,modelCalls:0});
+ });
+});
+
+test('Region provider facts refuses an old retained request after a new Core turn and confirmed brief',async()=>{
+ const f=fixture();f.region=regionPeers(f);
+ await withRuntime(f,async r=>{
+  const {advance}=await imageBrief(r,f);
+  const context=await r.ws.readWriteProposalContext('REGION',{...advance,requestId:'facts-context'});
+  const request={...context,requestId:'facts-proposal',proposal:{decision:'REGION',block:regionBlock()}};
+  assert.equal((await r.ws.submitWriteProposal('REGION',request)).response.error,null);
+  await r.append('s1',user('replacement','改成另一座小屋'));
+  let current=await call(r,'StartOrResumeSession',{requestId:'current',expectedRevision:null});
+  const next=await call(r,'AppendMultimodalTurn',{requestId:'replacement',expectedRevision:current.context.sessionRevision,turnRef:'replacement-turn',text:'另一座小屋',media:[],controls:clone(context.referenceBrief.controls),localContext:f.local});
+  await assert.rejects(r.ws.readRegionProposalProviderFacts(request),{code:'INTENT_UNCONFIRMED'});
+  await r.append('s1',user('replacement-confirm','确认'));
+  current=await call(r,'StartOrResumeSession',{requestId:'current',expectedRevision:null});
+  await call(r,'AnswerClarification',{requestId:'replacement-confirm',expectedRevision:current.context.sessionRevision,turnRef:'replacement-turn',clarificationId:next.clarification.clarificationId,answer:'确认',localContext:f.local});
+  await assert.rejects(r.ws.readRegionProposalProviderFacts(request),{code:'TARGET_FACTS_STALE'});
+  assert.equal(f.region.writes,0);assert.equal(f.modelCalls,0);
+  log('REGION_FACTS_NEW_TURN',{pendingTurnRejected:true,newConfirmedBriefRejected:true,peers:'FIXTURE',worldWrites:0,modelCalls:0});
+ });
+});
+
 test('REGION fill + explicit-air dig across mapblocks: image brief → Painter → Brush → Canvas one transaction → whole-region Undo',async()=>{
  const f=fixture();f.region=regionPeers(f);const R=f.region;await withRuntime(f,async r=>{
   const {media,advance}=await imageBrief(r,f);

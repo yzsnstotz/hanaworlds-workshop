@@ -45,7 +45,7 @@ export class WorkshopV3 {
  constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;
   this.protocolHandshake=C.validateType('ProtocolHandshake',{profileVersion:'protocol-handshake/v1',component:'hanaworlds-workshop',
    protocols:[{protocol:'session',major:4,minor:0}],capabilities:[],
-   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.5.0',sourceRevision:null,artifactDigest:null}});
+   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.5.1',sourceRevision:null,artifactDigest:null}});
   this.locks=new Map(); }
  /** Trusted composition-only metadata preparation for G-S. Returns the official
   * SessionPersistence snapshot verbatim; this is not a session/v4 wire operation.
@@ -448,11 +448,38 @@ export class WorkshopV3 {
   * Only already-reserved exact public requests can read these own facts. */
  async readBuildProposalProviderFacts(raw) {
   const request=copy(C.validateBuildProposalRequest(raw));
-  const {state}=await this.#load(request.sessionRef);
+  return this.#readProposalProviderFacts('PER_CELL',request,async(state,stored)=>{
+   const facts=await this.#proposalFacts(request,state,stored);
+   C.validateBuildProposalContext(request,facts);return facts;
+  });
+ }
+ /** Host-only Region counterpart: exact retained ValidateRegionProposalRequest
+  * in, public LocalRequestFacts out. Reentrant during the locked Painter call;
+  * facts come from the committed Workshop projection and fresh Canvas selection. */
+ async readRegionProposalProviderFacts(raw) {
+  const request=copy(C.validateRegionProposalRequest(raw));
+  return this.#readProposalProviderFacts('REGION',request,async(state,stored)=>{
+   if(state.contexts[state.currentContextId]!==stored)fail('TARGET_FACTS_STALE');
+   if(!same(await this.#regionContext(request,state,stored),stored.context))fail('TARGET_FACTS_STALE');
+   const record=stored.response?{response:stored.response,digest:C.requestDigest('painter-region/v2','ValidateRegionProposal',stored.request)}:null;
+   const facts=await this.#facts(request,state,record);
+   C.validateCurrentRequest('painter-region/v2','ValidateRegionProposal',request,facts);return facts;
+  });
+ }
+ // Shared exact-retention and read stability boundary. No reservation, write or
+ // mutation lock here. Reject a snapshot superseded while external reads await.
+ async #readProposalProviderFacts(method,request,readFacts) {
+  const persistence=this.sessionPersistence,projection=this.projectionStore,canvas=this.canvas,catalogue=this.catalogue;
+  await this.readSessionMetadata(request.sessionRef);
+  const {core,state}=await this.#load(request.sessionRef);
   const stored=Object.values(state.contexts).find(x=>x.invocationId===request.invocationId);
-  if(!stored?.request||!same(stored.request,request))fail('TRANSACTION_CONFLICT');
-  const facts=await this.#proposalFacts(request,state,stored);
-  C.validateBuildProposalContext(request,facts);
+  if(!stored?.request||(stored.method??'PER_CELL')!==method||!same(stored.request,request))fail('TRANSACTION_CONFLICT');
+  const facts=await readFacts(state,stored);
+  if(!sameProvider(persistence,this.sessionPersistence)||projection!==this.projectionStore)fail('SESSION_NOT_FOUND');
+  if(!sameProvider(canvas,this.canvas)||!sameProvider(catalogue,this.catalogue))fail('CURRENT_WORLD_MISMATCH');
+  const live=await this.#load(request.sessionRef);
+  if(!same(live.core.identity,core.identity))fail('SESSION_NOT_FOUND');
+  if(live.state.context.sessionRevision!==state.context.sessionRevision)fail('TARGET_FACTS_STALE');
   return copy(facts);
  }
  /** Existing proposal entry: the PER_CELL write method. */
