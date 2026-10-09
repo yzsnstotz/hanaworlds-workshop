@@ -84,7 +84,7 @@ export function memoryPorts() {
 
 export const capabilities = { providerRef: 'fixture-host', capabilityRevision: 'host-not-canvas',
   worldRef: null, engineBounds: null, limits: [], recoveryGuarantee: null, stateProfile: null,
-  regionProtectionWriters: [], sessionDeleteSupported: false, imageMediaTypes: [], model: null };
+  regionProtectionWriters: [], sessionDeleteSupported: false, imageMediaTypes: [], model: null,engineGuards:null };
 export const startRequest = { contractVersion: 'session/v2', actorRef: 'user', sessionRef: 's1',
   requestId: 'start', authorizationRef: 'grant', expectedRevision: null };
 export const switchRequest = (revision, overrides = {}) => ({ contractVersion: 'session/v2',

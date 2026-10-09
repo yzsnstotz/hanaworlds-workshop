@@ -18,7 +18,12 @@ const digest = (kind,value) => C.digestValue(kind,value).sha256;
 const fail = (code,details) => { throw new C.ContractError(code,'validate','REQUIRED_FACT_UNKNOWN',details); };
 const packet = (wire,id,result,error=null) => ({contractVersion:wire,requestId:id,result,error});
 const pub = error => error?.publicError ?? C.publicError(error);
-const peerFail = response => {const error=new Error(response.error.code);error.publicError=response.error;throw error;};
+// Region commit/undo responses carry the engine's named guard refusal and the original apply failure
+// next to the error (contracts v1 rc.2); keep them for the skill instead of collapsing to the code.
+const peerFail = response => {const error=new Error(response.error.code);error.publicError=response.error;
+ if('guardRefusal' in response)error.detail={guardRefusal:response.guardRefusal,applyFailure:response.applyFailure};throw error;};
+const regionFailure = (body,raw,error) => ({method:'REGION',sessionRef:body?.sessionRef??raw?.sessionRef??null,outcome:null,result:null,error:pub(error),
+ guardRefusal:copy(error?.detail?.guardRefusal??null),applyFailure:copy(error?.detail?.applyFailure??null)});
 const withoutRequest = ({requestId:_r,proposal:_p,...rest}) => rest;
 // Workshop owns this initial revision, including before a projection is created.
 // It is derived from the trusted lifecycle identity, never Core's storage revision.
@@ -534,7 +539,7 @@ export class WorkshopV3 {
    const brush=this.brushRegion,compiled=C.validateCompiledRegionSet(compile,await brush.call('CompileRegionBuild',copy(compile)));
    if(compiled.error)peerFail(compiled);if(brush!==this.brushRegion)fail('CURRENT_WORLD_MISMATCH');
    await this.#current(body,state);r.compiled=compiled.result;
-   const apply={contractVersion:'canvas-region/v1',sessionRef:body.sessionRef,requestId:`${body.requestId}:region-apply`,worldRef:body.worldRef,transactionId:`region-${randomUUID()}`,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,guarantee:'RECOVERABLE_VERIFIED',localContext:body.localContext};
+   const apply={contractVersion:'canvas-region/v2',sessionRef:body.sessionRef,requestId:`${body.requestId}:region-apply`,worldRef:body.worldRef,transactionId:`region-${randomUUID()}`,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,guarantee:'RECOVERABLE_VERIFIED',localContext:body.localContext};
    r.commitRequest=apply;r.dispatched=true;await this.#save(body.sessionRef,core,state);
    let response;try{response=await this.canvasRegion.call('ApplyRegionCommit',copy(apply));}catch{return out(null,'PENDING');}
    response=C.validateRegionCommit(apply,response);
@@ -545,7 +550,7 @@ export class WorkshopV3 {
    state.details[turn.turnRef].resultText=result.status==='VERIFIED'?'区域写入已验证，整片读回一致。':'区域写入失败，已整体回滚。';await this.#save(body.sessionRef,core,state);
    if(result.status==='ROLLED_BACK')fail('APPLY_FAILED',{mutationState:'ROLLED_BACK',transactionRef:apply.transactionId});
    return out(copy(result),'VERIFIED');
-  });}catch(error){return {method:'REGION',sessionRef:body?.sessionRef??raw?.sessionRef??null,outcome:null,result:null,error:pub(error)};}
+  });}catch(error){return regionFailure(body,raw,error);}
  }
  /** Whole-region Undo of the latest VERIFIED region build: same transaction, Canvas decides. */
  async undoRegionBuild(raw) {
@@ -558,7 +563,7 @@ export class WorkshopV3 {
    if(r.undo?.result)return out(copy(r.undo.result),r.undo.result.status);
    if(r.undo)return out(null,'PENDING');
    this.#gate('REGION');
-   const request={contractVersion:'canvas-region/v1',sessionRef:body.sessionRef,requestId:`${body.requestId}:region-undo`,worldRef:body.worldRef,originTransactionId:r.result.transactionId,undoTransactionId:`region-undo-${randomUUID()}`,expectedHistoryRevision:r.result.historyRevision,localContext:body.localContext};
+   const request={contractVersion:'canvas-region/v2',sessionRef:body.sessionRef,requestId:`${body.requestId}:region-undo`,worldRef:body.worldRef,originTransactionId:r.result.transactionId,undoTransactionId:`region-undo-${randomUUID()}`,expectedHistoryRevision:r.result.historyRevision,localContext:body.localContext};
    r.undo={request,result:null};await this.#save(body.sessionRef,core,state);
    let response;try{response=await this.canvasRegion.call('UndoRegionCommit',copy(request));}catch{return out(null,'PENDING');}
    response=C.validateRegionUndo(request,response,r.result);
@@ -566,7 +571,7 @@ export class WorkshopV3 {
    r.undo.result=copy(response.result);await this.#save(body.sessionRef,core,state);
    if(response.result.status!=='VERIFIED')fail('APPLY_FAILED',{mutationState:'ROLLED_BACK',transactionRef:request.undoTransactionId});
    return out(copy(response.result),'VERIFIED');
-  });}catch(error){return {method:'REGION',sessionRef:body?.sessionRef??raw?.sessionRef??null,outcome:null,result:null,error:pub(error)};}
+  });}catch(error){return regionFailure(body,raw,error);}
  }
  async #advance(body,core,state) {
   const {turn,saved}=this.#turn(state),build=state.builds[turn.turnRef];if(!build)fail('TARGET_REQUIRED');
