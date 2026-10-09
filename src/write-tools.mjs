@@ -12,8 +12,8 @@ const capsOf = wire => C.regionCapabilities.map(c => c.id).filter(id => id.start
  * Current public contracts define no separate Painter/Canvas per-cell capability id.
  * Their wire major/minor must still be explicitly advertised; region claims do not substitute. */
 export const PER_CELL_BRUSH = Object.freeze({ wire: 'BUILD/V4', capabilities: Object.freeze(['BUILD/V4:per-cell-compile']) });
-export const PER_CELL_PAINTER = C.deepFreeze({wire:'painter/v5',minMinor:0,capabilities:[]});
-export const PER_CELL_CANVAS = C.deepFreeze({wire:'canvas/v6',minMinor:0,capabilities:[]});
+export const PER_CELL_PAINTER = C.deepFreeze({wire:'painter/v6',minMinor:0,capabilities:[]});
+export const PER_CELL_CANVAS = C.deepFreeze({wire:'canvas/v7',minMinor:0,capabilities:[]});
 export const WRITE_METHOD_PORTS = C.deepFreeze({
  PER_CELL: [
   {field:'painter',service:'hanaworldsPainterV2PictureBlocks',label:'Painter',...PER_CELL_PAINTER},
@@ -21,7 +21,7 @@ export const WRITE_METHOD_PORTS = C.deepFreeze({
   { field: 'brush', service: 'hanaworldsBrushV3', label: 'Brush', wire: PER_CELL_BRUSH.wire, capabilities: [...PER_CELL_BRUSH.capabilities] },
  ],
  REGION: [
-  { field: 'painterRegion', service: 'hanaworldsPainterRegionV1', label: 'Painter', wire: 'painter-region/v2', capabilities: capsOf('painter-region/v2') },
+  { field: 'painterRegion', service: 'hanaworldsPainterRegionV1', label: 'Painter', wire: 'painter-region/v3', capabilities: capsOf('painter-region/v3') },
   { field: 'brushRegion', service: 'hanaworldsBrushRegionV1', label: 'Brush', wire: 'region-build/v1', capabilities: capsOf('region-build/v1') },
   { field: 'canvasRegion', service: 'hanaworldsCanvasRegionV1', label: 'Canvas', wire: 'canvas-region/v2', capabilities: capsOf('canvas-region/v2') },
  ],

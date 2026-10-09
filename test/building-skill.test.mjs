@@ -12,12 +12,12 @@ const { default: Workshop, WRITE_METHOD_PORTS } = await import(process.env.HW_WO
 
 // SOURCE/FIXTURE: official services + Workshop package's own late skill plugin.
 // Full-content SHA oracles: exact bd964cdf/426ca1b1 stage0 baseline (40d72a58/3d0ec2c5/15f8e350 on main 5a63915f)
-// plus the approved v1 edits and 2026-10-10 confirmation/coordinate/clearance guidance.
-// Current SHA oracles were derived from the prior exact full content + those two text edits before implementation; formatter/Region branches stay unchanged.
+// plus the approved v1 edits, 0.5.2 guidance, v2 wire identifiers and bounded structured-placement workflow.
+// Current SHA oracles were derived from the prior exact full content + the two v2 workflow edits before implementation; formatter/Region branches stay unchanged apart from wire.
 // Peer ports advertise fixture handshakes only; the agents service is a fixture.
 // No AgentLoop/model/world/auth/server/profile is created or called.
 const metadata = { name: 'hanaworlds-building' };
-const expectedSha = {"object-available": "955d7ae90f1cf1e905766bea3ca378d349650fe4ce77bc5550acbb67b2650629", "object-unavailable": "6f9f95869649a09ad3348c3642860064ce8d83eea3894f23a907cbdc23c98b60", "rejected-catch-null": "644edfb2b823a22360f1d22a7fe33a1d7cb7f705649d80fd21fea2ef2528be5e", "resolved-null": "644edfb2b823a22360f1d22a7fe33a1d7cb7f705649d80fd21fea2ef2528be5e", "config-undefined": "644edfb2b823a22360f1d22a7fe33a1d7cb7f705649d80fd21fea2ef2528be5e"};
+const expectedSha = {"object-available": "6d697ba8f0802db843025dfd05a91d09350cf41466af01e7f236e202c0068633", "object-unavailable": "f0e07b6197e4a47d264fa06afb473e0ab4771f90797cd261ae6ea84a816edf94", "rejected-catch-null": "32e68ca1dcd9b0337e90a7d796e13c222ec758144702f4b2a5f5f8d8f6c43c2c", "resolved-null": "32e68ca1dcd9b0337e90a7d796e13c222ec758144702f4b2a5f5f8d8f6c43c2c", "config-undefined": "32e68ca1dcd9b0337e90a7d796e13c222ec758144702f4b2a5f5f8d8f6c43c2c"};
 const results = [];
 const hash = value => createHash('sha256').update(value).digest('hex');
 function peerPorts() {
@@ -97,7 +97,10 @@ for (const scenario of ['object-available', 'object-unavailable', 'rejected-catc
       assert.ok(loadedContent.includes('world[axis] = sampledBounds.min[axis] + local[axis]'));
       assert.ok(loadedContent.includes('roofBottomY - floorTopY - 1'));
       assert.ok(loadedContent.includes('isError=false'));
-      assert.equal(hash(loadedContent), expectedSha[scenario], 'full byte digest equals Desktop baseline plus the two authorized guidance edits at the same peer composition');
+      assert.ok(loadedContent.includes('placementSourceRef and placementTarget together'));
+      assert.ok(loadedContent.includes('never rebase old local geometry'));
+      assert.ok(loadedContent.includes('PLACEMENT_REVISION_STALE'));
+      assert.equal(hash(loadedContent), expectedSha[scenario], 'full byte digest equals Desktop baseline plus the authorized guidance edits and wire identifiers at the same peer composition');
       assert.ok(order.indexOf('peers:await-settled') < order.indexOf('skill:registered'));
       if (scenario === 'object-available') {
         assert.ok(beforeAssembly.tools.every(t => !t.availability.available), 'before peer composition the original public descriptions differ');
@@ -144,7 +147,7 @@ for (const scenario of ['object-available', 'object-unavailable', 'rejected-catc
         configNullishCoalescingPreserved: true, fullContentBytes: Buffer.byteLength(loadedContent),
         fullContentSha256: hash(loadedContent), fullContent: loadedContent, consumedContentSha256: hash(output.content), renderedContentSha256: hash(renderedText), renderedContentBytes: Buffer.byteLength(renderedText),
         runtimeIdentity: { processId: process.pid, workshopEntry: process.env.HW_WORKSHOP_PACKAGE_ENTRY??new URL('../src/index.mjs',import.meta.url).href, skillEntry: process.env.HW_WORKSHOP_BUILDING_SKILL_ENTRY??new URL('../src/building-skill.mjs',import.meta.url).href, codeRuntimeAvailable: !!ctx.get('ptcRuntime'), codeToolExposed: ctx.tools.schemas().some(t=>t.name==='run_code') },
-        originalBaselineEqual: false, authorizedGuidanceEdits: 2, afterLoadUnchanged, realModelCalls: 0, worldWrites: 0, productRuntime: false });
+        originalBaselineEqual: false, authorizedGuidanceEdits: 4, candidateContracts: "2.0.0-rc.1", afterLoadUnchanged, realModelCalls: 0, worldWrites: 0, productRuntime: false });
     } finally { await ctx.fiber.dispose(); }
   });
 }
