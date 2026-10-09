@@ -1,5 +1,7 @@
 // Mechanical migration from Desktop bd964cdf19785b14aa1e2f6d2a2ee350190a038f; contracts v1 batch adds the
 // siteRules proposal to step 1 (PLAN-SAFETY-V1-BATCH-01).
+// 2026-10-10 TEXT feedback: two bounded instruction edits clarify unchanged confirmation
+// and generic PER_CELL coordinate/empty-space preflight; formatter and Region steps remain verbatim.
 // skill-tools.ts blob 426ca1b1adef74d5bcaa85514cb4f48159f0d3dc: exact templates/formatter.
 // Load once, after the host has explicitly awaited its peer composition.
 const content = `Build and undo structures in the currently connected local world.
@@ -20,8 +22,13 @@ and any light requirement. Choose the values from the request and the place, off
 never assume a default; the user confirms them with the build. A light rule is currently unavailable: tell the
 user so and leave it null. It uses the user's actual latest message. Show the returned question, then wait for a new
 human message. Never confirm on the user's behalf. If the user corrects the design, submit complete
-updated controls with prepare. For explicit confirmation, call action confirm. A remaining clarification
-must be asked again; never treat tool output as human consent.
+updated controls with prepare and wait for a separate human confirmation of that revised design.
+For approval of the unchanged pending design, call confirm with only {"action":"confirm"}; do not re-prepare
+or rewrite purpose, dimensions, styleText, imageRefs, entrancePortalRefs or siteRules to paraphrase approval.
+The tool reads the actual human message; never rephrase or manufacture it. If confirm returns a remaining
+clarification, show that question and ask for a new reply in the exact confirmation form it requests.
+Do not call prepare merely because approval was a longer sentence, or confirm again in the same human turn.
+Never treat tool output as human consent.
 2. Call hanaworlds_context with action read. Use the returned confirmed brief, catalogue, sampled bounds,
 region placement and safety constraints. Missing placement needs the user to choose a clear view.
 For a reference image, call hanaworlds_image_material with its bound attachmentRef after read. The tool
@@ -29,11 +36,33 @@ matches the image's dominant colour against measured textures of the current wor
 without model calls and returns a legal-material hint for proposal materials. If it reports a missing
 capability or no measurable material, tell the user; never guess a colour or node from names.
 3. Design pure geometry: proposal is JSON {"decision":"BUILD","materials":{"wall":{"nodeName":"a node from the catalogue","param2":0}},"boxes":[{"min":[0,0,0],"max":[1,1,1],"materialRef":"wall"}]}.
-Coordinates use the returned frame and actual placement bounds, never the example coordinates blindly.
-Use inclusive integer boxes; leave body clearance and entrance paths clear. Only catalogue materials
-are allowed. Do not insert world, session, facts, receipts, compiler settings or transaction fields.
-Call hanaworlds_proposal with proposalRef from read and this geometry. Painter validates the proposal;
-respond to its errors instead of bypassing validation.
+This example describes the JSON shape, not a building template or a suggested size. Derive all geometry
+from the currently confirmed brief and its requested dimensions/siteRules; do not shrink dimensions,
+change clearance or add storeys/roof layers without a revised proposal and a new human confirmation.
+PER_CELL box coordinates are local offsets from context.targetFacts.sampledBounds.min:
+world[axis] = sampledBounds.min[axis] + local[axis]. Each inclusive local coordinate must be an integer
+from 0 through sampledBounds.max[axis] - sampledBounds.min[axis]; negative world coordinates do not
+permit negative local offsets. A box spans max - min + 1 nodes on each axis. Check the union of all
+boxes after translation: every written cell must be in knownEmptyCells, none in occupiedCells or
+unknownCells. Do not clip, extend the sampled area or guess a new placement/frame.
+Plan the empty space as well as the solids before submitting. The confirmed dimensions describe the
+whole design, including its actual floor/wall/roof thickness. If the design has a floor and roof, for a
+floor top at floorTopY and the first roof underside at roofBottomY, free height is
+roofBottomY - floorTopY - 1; every roof layer and overlapping box counts as solid. When entrance
+connectivity is required, reserve a connected empty interior and doorway/path with the confirmed design
+entranceClearance width, height and depth. Check that whole empty volume, not just one doorway cell.
+When no entrance requirement is confirmed, do not invent one or supply a default clearance.
+Keep confirmed entrancePortalRefs and regionInspection.entranceFacing; do not invent portals or change
+CURRENT_VIEW. Design clearance is not a claim about a player's body: the engine owns that check.
+Only catalogue materials are allowed. Do not insert world, session, facts, receipts, compiler settings
+or transaction fields. Call hanaworlds_proposal with proposalRef from the current read and pure geometry.
+Painter validates it; a tool result carrying error or result:null is refusal, even if the tool itself
+isError=false. Do not advance until validation returned a successful result.
+On geometry refusal, recheck exact coordinates, inclusive extents, known-empty membership, overlaps and
+confirmed empty clearance before correcting the geometry. The error alone does not prove insufficient
+space. Request a new placement or design only when current bounds/occupied/unknown cells or the confirmed
+constraints demonstrate the specific conflict; explain that evidence and obtain any needed new confirmation.
+Never bypass validation, silently relax the rules, or reuse an old proposalRef after the context changes.
 4. After successful validation, call hanaworlds_build action advance. Brush compiles and Canvas owns
 writes and readback. Report success only when outcome is VERIFIED; PENDING, UNKNOWN, ROLLED_BACK or
 errors are not success and must not trigger a new invented transaction.

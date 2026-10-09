@@ -1,4 +1,4 @@
-# Workshop 0.5.1 — local-world skill business component
+# Workshop 0.5.2 — local-world skill business component
 
 Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.0.0` (formal contracts v1.0.0; same content as the rc.4 candidate it was adapted and tested on) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
@@ -283,3 +283,9 @@ PASS, product readiness or acceptance. No actual package declaration is forged.
 `npm run test:skill`：官方 Cordis/skills/tool-skill 的隔离 SOURCE/FIXTURE，核对原 Desktop bd964cdf 完整正文、五种输入分支及装配后单次注册。不代表真实模型、Desktop 或产品 UI 验收。
 
 Retained formal v0.5.3 check: actual Brush compilation is SKIP because HW_BRUSH_PACKAGE_ENTRY is not supplied; the current passing peer paths are FIXTURE, and historical actual-peer evidence is not a current formal result.
+
+## 0.5.2 building skill guidance feedback
+
+The original complete Desktop bd964cdf/426ca1b1 template and its late-registration formatter are preserved, with the v1 site rules and two 2026-10-10 instruction edits: unchanged human approval uses action-only confirm (no controls rephrasing/reprepare), and PER_CELL geometry explicitly checks local offsets, inclusive dimensions, known-empty coverage and the confirmed empty entrance/interior volume before submission. Floor/roof thickness is design-dependent; no template, fixed building size, default clearance or alternate planner is introduced. Validation failures require evidence before asking for another placement or relaxing the design. The original Region R1–R4, method descriptions, await/catch/null branches and public tool APIs are unchanged.
+
+This is a reviewable instruction improvement prompted by recorded TEXT refusals, not proof of their sole cause or a fix for the separate REGION transport failure. Official dsh-tool-skill consumption is verified for every full-content branch. Code is not added, mounted or required; the observed TEXT root had no Code tool, and the complete original skill did not require one. New-model geometry/real-world results remain NOT_RUN until the integration card consumes this package in its own run.
