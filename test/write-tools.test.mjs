@@ -41,7 +41,7 @@ function fixture(){
    return {contractVersion:'BUILD/V4',requestId:q.requestId,result:{projection,operationDigest:D('operations',projection),readBounds:q.targetFacts.sampledBounds,writeBounds:q.build.declaredBounds},error:null};}};
  const row=r=>({transactionId:r.transactionId,originTransactionId:null,affectedObjectRefs:['object-1'],operationDigest:r.operationDigest,beforeImageDigest:'d'.repeat(64),expectedAfterReadbackDigest:r.readbackDigest,receiptDigest:D('receipt',r),historyRevision:'history-1',status:'VERIFIED'});
  f.canvas={contractHandshake:C.contractHandshake,protocolHandshake:CELL_PROTOCOL('hanaworlds-canvas','canvas',6),async call(op,q){f.calls.push(op);C.validateBoundRequest('canvas/v6',op,q);
-   const ok=result=>({contractVersion:'canvas/v6',requestId:q.requestId,result,error:null});
+   const ok=result=>({contractVersion:'canvas/v6',requestId:q.requestId,result,error:null,...(['ApplyRecoverableCommit','Undo','Redo','RecoverPendingUndo','ReadPendingUndoResult','InspectPlacementRegion'].includes(op)?{guardRefusal:null}:{})});
    if(op==='ReadWorldSelectionContext')return ok({sessionRef:q.sessionRef,worldRef:q.worldRef,inventory:{capabilityRevision:'cap-1',connections:[]},selection:{status:'BOUND',connectionRef:f.local.connectionRef,context:ctx()}});
    if(op==='InspectPlacementRegion')return {...ok({outcome:'REGION_INSPECTED',inspection:clone(sample.request.regionInspection)}),unavailableSettings:null};
    if(op==='ListObjects')return ok({worldRef:q.worldRef,registryRevision:'registry-1',objects:f.receipt?[{worldRef:q.worldRef,objectRef:'object-1',objectRevision:f.undone?'object-2':'object-1',displayName:'石块',nameRevision:'name-1',creationSequence:1,status:'READY'}]:[]});

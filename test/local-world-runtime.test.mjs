@@ -29,9 +29,11 @@ function fixture() {
    return {contractVersion:'BUILD/V4',requestId:q.requestId,result:{projection,operationDigest:D('operations',projection),readBounds:q.targetFacts.sampledBounds,writeBounds:q.build.declaredBounds},error:null};}};
  const row=receipt=>({transactionId:receipt.transactionId,originTransactionId:null,affectedObjectRefs:['object-1'],operationDigest:receipt.operationDigest,beforeImageDigest:'d'.repeat(64),expectedAfterReadbackDigest:receipt.readbackDigest,receiptDigest:D('receipt',receipt),historyRevision:'history-1',status:'VERIFIED'});
  f.canvas={contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-canvas',protocols:[{protocol:'canvas',major:6,minor:0}],capabilities:[],provenance:{packageName:'hanaworlds-canvas',packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}},async call(op,q){f.calls.push(op); C.validateBoundRequest('canvas/v6',op,q);
-   const response=result=>({contractVersion:'canvas/v6',requestId:q.requestId,result,error:null});
+   const response=result=>({contractVersion:'canvas/v6',requestId:q.requestId,result,error:null,...(['ApplyRecoverableCommit','Undo','Redo','RecoverPendingUndo','ReadPendingUndoResult','InspectPlacementRegion'].includes(op)?{guardRefusal:null}:{})});
    if(op==='ReadWorldSelectionContext')return response({sessionRef:q.sessionRef,worldRef:q.worldRef,inventory:{capabilityRevision:'cap-1',connections:[]},selection:{status:'BOUND',connectionRef:f.local.connectionRef,context:f.context()}});
    assert.deepEqual(clone(q.localContext),f.local);
+   // Canvas envelope carrying an engine guard refusal (public relay fixture cases); nothing written.
+   if(f.refuse?.op===op)return {contractVersion:'canvas/v6',requestId:q.requestId,result:null,error:C.guardRefusalError(f.refuse.refusal,{preflight:!!f.refuse.preflight}),guardRefusal:clone(f.refuse.refusal),...(op==='InspectPlacementRegion'?{unavailableSettings:null}:{})};
    if(op==='InspectPlacementRegion')return {...response({outcome:'REGION_INSPECTED',inspection:clone(sample.request.regionInspection)}),unavailableSettings:null};
    if(op==='ListObjects')return response({worldRef:q.worldRef,registryRevision:'registry-1',objects:f.receipt&&!f.rolledBack?[{worldRef:q.worldRef,objectRef:'object-1',objectRevision:f.undone?'object-2':'object-1',displayName:'石块',nameRevision:'name-1',creationSequence:1,status:'READY'}]:[]});
    if(op==='AnalyzeAffectedObjects')return response({contractVersion:'canvas/v6',worldRef:q.worldRef,worldRevision:q.expectedRevision,registryRevision:q.expectedRegistryRevision,selectionRevision:q.expectedSelectionRevision,operationDigest:q.operationDigest,orderedSelectedRefs:[],affectedObjectRefs:f.conflict?['existing-object']:[]});
@@ -113,4 +115,37 @@ test('Painter rejects invalid geometry before Brush or Canvas transaction',async
  const context=await r.workshop.readBuildProposalContext({...advance,requestId:'replacement'});
  const bad={...context,requestId:'bad-proposal',proposal:clone(proposal.proposal)};bad.proposal.boxes[0].max[0]=Number.MAX_SAFE_INTEGER;
  const response=await r.workshop.submitBuildProposal(bad);assert.equal(response.error?.code,'BUILD_INVALID');assert.equal(f.calls.includes('BuildDocument'),false);assert.equal(f.writes,0);});
+});
+
+// contracts v1 rc.4: session/v4 Advance/Undo/RecoverPendingUndo carry guardRefusal (public relay fixture cases).
+const relay=JSON.parse(await readFile(new URL(import.meta.resolve('hanaworlds-contracts/fixtures/skill-site-rules')))).engineGuards.relay.cases;
+// Relay is verbatim: the session response carries exactly Canvas's refusal and the error it explains.
+const relayed=(response,c)=>{assert.deepEqual(clone(response.guardRefusal),c.refusal);assert.deepEqual(clone(response.error),clone(C.guardRefusalError(c.refusal,{preflight:!!c.preflight})));};
+for(const c of relay.filter(c=>c.refusal.stage==='APPLY_COMPILED'))test(`rc.4 AdvanceCurrentBuild relays Canvas guard refusal to Host/skill unchanged: ${c.title}`,async()=>{
+ const f=fixture();f.refuse={op:'ApplyRecoverableCommit',refusal:c.refusal,preflight:c.preflight};await withRuntime(f,async r=>{const {advance}=await ready(r,f);
+  const response=await r.workshop.call('AdvanceCurrentBuild',advance);relayed(response,c);assert.equal(f.writes,0);
+  C.validateBoundResponse('session/v4','AdvanceCurrentBuild',advance,response);
+  assert.deepEqual(await r.workshop.call('AdvanceCurrentBuild',advance),response,'durable replay keeps the refusal');
+ });
+});
+test('rc.4 UndoCurrentBuild relays the engine-form Undo restore refusal unchanged; normal build/undo carry guardRefusal null',async()=>{
+ const c=relay.find(c=>c.refusal.stage==='RESTORE');const f=fixture();await withRuntime(f,async r=>{const {advance}=await ready(r,f);
+  const built=await r.workshop.call('AdvanceCurrentBuild',advance);assert.equal(built.error,null);assert.equal(built.guardRefusal,null);
+  f.refuse={op:'Undo',refusal:c.refusal,preflight:c.preflight};
+  const undo={contractVersion:'session/v4',sessionRef:'s1',requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:'history-1'};
+  const refused=await r.workshop.call('UndoCurrentBuild',undo);relayed(refused,c);assert.equal(f.undoWrites,0);C.validateBoundResponse('session/v4','UndoCurrentBuild',undo,refused);
+ });
+});
+test('rc.4 unrelated errors and the unsupported RecoverPendingUndo carry guardRefusal null; contract accepts them',async()=>{
+ const f=fixture();f.conflict=true;await withRuntime(f,async r=>{const {advance}=await ready(r,f);
+  const conflict=await r.workshop.call('AdvanceCurrentBuild',advance);assert.equal(conflict.error.code,'OTHER_OBJECTS_AFFECTED');assert.equal(conflict.guardRefusal,null);
+  C.validateBoundResponse('session/v4','AdvanceCurrentBuild',advance,conflict);
+  // Negative: a response that drops the key, or names a refusal its error does not explain, is refused by the contract.
+  const {guardRefusal:_,...missing}=conflict;assert.throws(()=>C.validateBoundResponse('session/v4','AdvanceCurrentBuild',advance,missing));
+  assert.throws(()=>C.validateBoundResponse('session/v4','AdvanceCurrentBuild',advance,{...conflict,guardRefusal:relay[2].refusal}));
+  // Workshop has no pending-Undo recovery path: the named refusal still carries guardRefusal null in the v4 shape.
+  const recover={contractVersion:'session/v4',sessionRef:'s1',requestId:'recover',worldRef:f.local.worldRef,localContext:f.local};
+  const recovered=await r.workshop.call('RecoverPendingUndo',recover);assert.ok(recovered.error,'refused by name');assert.equal(recovered.guardRefusal,null);
+  C.validateBoundResponse('session/v4','RecoverPendingUndo',recover,recovered);
+ });
 });

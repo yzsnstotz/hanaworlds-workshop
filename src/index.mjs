@@ -18,6 +18,13 @@ const digest = (kind,value) => C.digestValue(kind,value).sha256;
 const fail = (code,details) => { throw new C.ContractError(code,'validate','REQUIRED_FACT_UNKNOWN',details); };
 const packet = (wire,id,result,error=null) => ({contractVersion:wire,requestId:id,result,error});
 const pub = error => error?.publicError ?? C.publicError(error);
+// session/v4 build responses carry the engine guard refusal (contracts v1 rc.4): null normally; a refusal
+// relayed by Canvas travels up unchanged with the error it explains, for the Host and the skill.
+const GUARDED = new Set(['AdvanceCurrentBuild','UndoCurrentBuild','RecoverPendingUndo']);
+// A peer's public error is relayed as is (pub); C.publicError alone would turn it into SCHEMA_INVALID.
+const sessionPacket = (operation,id,result,error=null) => GUARDED.has(operation)
+ ? {...packet(VERSION,id,result,error===null?null:pub(error)),guardRefusal:error===null?null:copy(error.detail?.guardRefusal??null)}
+ : packet(VERSION,id,result,error===null?null:pub(error));
 // Region commit/undo responses carry the engine's named guard refusal and the original apply failure
 // next to the error (contracts v1 rc.2); keep them for the skill instead of collapsing to the code.
 const peerFail = response => {const error=new Error(response.error.code);error.publicError=response.error;
@@ -97,7 +104,7 @@ export class WorkshopV3 {
   const port=this.#protocolPeer(this.canvas,PER_CELL_CANVAS);C.validateBoundRequest(CANVAS,op,request);
   const response=C.validateBoundResponse(CANVAS,op,request,await port.call(op,copy(request)));
   if(port!==this.canvas)fail('CURRENT_WORLD_MISMATCH');
-  if(response.error){const error=new Error(response.error.code);error.publicError=response.error;throw error;}
+  if(response.error)peerFail(response);
   return copy(response.result);
  }
  #child(body,step,fields={}) {return {contractVersion:CANVAS,sessionRef:body.sessionRef,requestId:`${body.requestId}:${step}`,worldRef:body.localContext.worldRef,localContext:copy(body.localContext),...fields};}
@@ -162,12 +169,12 @@ export class WorkshopV3 {
     const readOnly=['ReadCurrentUndoStatus','ReadSessionTurnDetails'].includes(operation);
     if(!readOnly){state.requests[key]={digest:admitted.requestDigest,response:null};await this.#save(body.sessionRef,core,state);}
     let response;
-    try {const result=await this.#dispatch(operation,body,core,state);response=C.validateResponse(VERSION,operation,packet(VERSION,body.requestId,result));}
-    catch(error){response=packet(VERSION,body.requestId,null,C.publicError(error));}
+    try {const result=await this.#dispatch(operation,body,core,state);response=C.validateResponse(VERSION,operation,sessionPacket(operation,body.requestId,result));}
+    catch(error){response=sessionPacket(operation,body.requestId,null,error);}
     if(!readOnly){const next=revision();response=copy(response);if(response.result?.context)response.result.context.sessionRevision=next;state.requests[key].response=copy(response);await this.#save(body.sessionRef,core,state,next);}
     return copy(response);
    });
-  }catch(error){return packet(VERSION,body?.requestId??raw?.requestId??null,null,C.publicError(error));}
+  }catch(error){return sessionPacket(operation,body?.requestId??raw?.requestId??null,null,error);}
  }
  /** Native tool execution supplies the live Core Session; model args contain only the URL. */
  async downloadImage(rawURL,exec) {
@@ -289,7 +296,9 @@ export class WorkshopV3 {
   }
   if(action==='read'){
    const {turn}=this.#turn(state),requestId=`context:${turn.turnRevision}`;
-   const context=await this.readBuildProposalContext({...base,requestId,worldRef:localContext.worldRef,expectedTurnRevision:turn.turnRevision});
+   const context=await this.readBuildProposalContext({...base,requestId,worldRef:localContext.worldRef,expectedTurnRevision:turn.turnRevision}).catch(error=>{
+    const g=error?.detail?.guardRefusal;if(!g)throw error;
+    throw Error(`${pub(error).code}: engine guard ${g.guard} refused at ${g.stage} (${g.finding}); tell the user why this place cannot be built on now.`);});
    signal.throwIfAborted();return {proposalRef:requestId,context};
   }
   throw Error('CONTEXT_ACTION_UNKNOWN');
