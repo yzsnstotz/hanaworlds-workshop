@@ -49,6 +49,22 @@ Canvas owns actual writes, footprint conflicts, complete readback and whole roll
 
 Earlier source and tests remain in `deferred/pre-local-world`, existing test files and Git 323bd5fe. They are not shipped as old-profile compatibility. Base plugin repositories are unchanged. The image attachment transport is restored by S1-WS-IMAGE-ATTACHMENT-01; actual model/image/world/Undo composition is NOT_RUN. Resource lifecycle, interior/entity completion and extended recovery remain deferred. The real skill closed loop has not yet happened, so fixed orchestration is not declared frozen.
 
+## Skill context tool `hanaworlds_context` (F-WS-IMAGE-ASK-01, contracts v1 batch)
+
+Workshop registers `hanaworlds_context` through the official `ctx.tools.register`
+(src/context-tool.mjs), replacing the Host-inline copy in Desktop
+bd964cdf skill-tools.ts (blob 426ca1b1, L163-177, `entrancePortalRefs: []`).
+Actions `prepare` / `confirm` / `read` / `images`; model arguments are only
+controls (purpose, width/depth/height, styleText, entrancePortalRefs, imageRefs).
+The Session is the native ToolExecution's Core Session; request text, images and
+consent come only from Core user messages. `confirm` needs a new human message
+after the question; tool output is never consent. `read` returns
+`{proposalRef, context}` with a stable context request per confirmed turn.
+The world binding is Workshop's own projection set by the Host through
+`SwitchWorldContext`; when absent the tool refuses with `LOCAL_CONTEXT_REQUIRED`
+and says so. siteRules proposal/confirmation (contracts v1.0.0) is added when the
+v1 candidate is published; until then this tool carries the 0.5.6 Controls shape.
+
 ## One native image-link tool (S1-WS-IMAGE-ATTACHMENT-01)
 
 Workshop registers `hanaworlds_download_image` when the existing public `tools`

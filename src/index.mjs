@@ -5,6 +5,7 @@ import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
 import * as C from 'hanaworlds-contracts';
 import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, uploadedImageBytes, mediaBinding, imageRef, imageDigest } from './image-attachment.mjs';
 import { prepareImageAsk } from './image-ask.mjs';
+import { registerContextTool } from './context-tool.mjs';
 export { prepareImageAsk, IMAGE_ASK_ALLOWED_TOOLS } from './image-ask.mjs';
 import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
 export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
@@ -246,6 +247,66 @@ export class WorkshopV3 {
   session.append('user/message',{id:sourceMessageId,role:'user',source:{kind:'user'},content:[{type:'image',attachment:result.image}]},{surfaceOp:'append'});
   await this.sessions.flush(session);signal.throwIfAborted();
   return this.readPanelImage(session,result.image.attachmentId,signal);
+ }
+ /** Skill public port `hanaworlds_context`, registered by this plugin through the
+  * official ctx.tools.register (context-tool.mjs). The Session is the native tool
+  * execution's live Core Session; text, images and consent come only from Core user
+  * messages, never from model arguments. World binding is Workshop's own projection,
+  * set by the trusted Host through SwitchWorldContext. */
+ async skillContext(action,args,exec) {
+  const signal=exec?.signal;if(!signal?.throwIfAborted)throw Error('CANCELLATION_REQUIRED');signal.throwIfAborted();
+  const session=exec?.agent?.session,id=session?.header?.id;if(!id)throw Error('AGENT_SESSION_REQUIRED');
+  const live=this.sessions?.get?.(id);if(live&&live!==session)throw Error('SESSION_MISMATCH');
+  if(live)await this.sessions.flush(live);signal.throwIfAborted();
+  const {core,state}=await this.#load(id,true);
+  if(!same(core.identity,coreIdentity(session.header,id)))throw Error('SESSION_MISMATCH');
+  if(action==='images')return {sessionRef:id,images:await this.#conversationImages(core,state,null,signal)};
+  const localContext=state.context.localContext;
+  if(!localContext)throw Error('LOCAL_CONTEXT_REQUIRED: this conversation is not bound to a current world yet; the Host must bind it (session/v3 SwitchWorldContext) before building.');
+  const base={contractVersion:VERSION,sessionRef:id,localContext:copy(localContext)};
+  const run=async(operation,fields)=>{signal.throwIfAborted();const out=await this.call(operation,{...base,...fields});signal.throwIfAborted();if(out.error)throw Error(`${out.error.code}: ${operation} refused`);return out.result;};
+  if(action==='prepare'){
+   const input=this.#human(core),done=state.requests[`AppendMultimodalTurn:${input.id}`]?.response;
+   if(done){if(done.error)throw Error(`${done.error.code}: the latest user message was already prepared and refused; ask the user for a new message.`);return copy(done.result);}
+   const controls={purpose:args.purpose??null,dimensions:[args.width,args.depth,args.height].some(v=>v===undefined)?null:{width:args.width,depth:args.depth,height:args.height,unit:'node'},
+    entrancePortalRefs:args.entrancePortalRefs??[],styleText:args.styleText??null};
+   const media=await this.#conversationImages(core,state,args.imageRefs??input.images,signal);
+   return run('AppendMultimodalTurn',{requestId:input.id,expectedRevision:state.context.sessionRevision,turnRef:`${media.length?'image':'text'}:${input.id}`,text:input.text,media,controls});
+  }
+  if(action==='confirm'){
+   const pending=state.pending,input=this.#human(core);
+   if(!pending||input.id===pending.invocationId)throw Error('HUMAN_CONFIRMATION_REQUIRED: show the pending question and wait for a new user message; tool output is never consent.');
+   return run('AnswerClarification',{requestId:input.id,expectedRevision:state.context.sessionRevision,turnRef:pending.turnRef,clarificationId:pending.clarificationId,answer:input.text});
+  }
+  if(action==='read'){
+   const {turn}=this.#turn(state),requestId=`context:${turn.turnRevision}`;
+   const context=await this.readBuildProposalContext({...base,requestId,worldRef:localContext.worldRef,expectedTurnRevision:turn.turnRevision});
+   signal.throwIfAborted();return {proposalRef:requestId,context};
+  }
+  throw Error('CONTEXT_ACTION_UNKNOWN');
+ }
+ /** Latest human Core message: its text and its own images plus images returned by tools after it. */
+ #human(core) {
+  const at=core.events.findLastIndex(e=>e.type==='user/message'&&e.data?.role==='user'&&e.data?.source?.kind==='user');
+  const message=core.events[at]?.data;
+  if(at<0||core.events[at].surfaceOp!=='append'||!message?.id||message.content?.some(p=>p.type!=='text'&&p.type!=='image'))throw Error('HUMAN_TEXT_REQUIRED: no user message in this conversation to act on.');
+  const images=message.content.filter(p=>p.type==='image').map(p=>p.attachment.attachmentId);
+  for(const e of core.events.slice(at+1))if(e.type==='tool/result'&&e.surfaceOp==='append'&&!e.data?.message?.isError)for(const p of e.data.message.content??[])if(p.type==='image')images.push(p.attachment.attachmentId);
+  return {id:message.id,text:message.content.filter(p=>p.type==='text').map(p=>p.text).join('\n'),images};
+ }
+ /** Media bindings of images actually in this conversation: user uploads or tool-downloaded links. `refs` null lists all. */
+ async #conversationImages(core,state,refs,signal) {
+  const found=new Map();
+  for(const e of core.events){const m=e.type==='user/message'?e.data:e.type==='tool/result'&&!e.data?.message?.isError?e.data?.message:null;
+   if(e.surfaceOp!=='append'||!m||(e.type==='user/message'&&(m.role!=='user'||m.source?.kind!=='user')))continue;
+   for(const p of m.content??[])if(p.type==='image')found.set(p.attachment.attachmentId,p.attachment);}
+  const wanted=refs??[...found.keys()],out=[];
+  for(const ref of new Set(wanted)){
+   const attachment=found.get(ref);if(!attachment)throw Error(`ATTACHMENT_NOT_IN_SESSION: ${ref} is not an image of this conversation; use action images for actual references.`);
+   const bound=state.images?.[ref]?.media;if(bound){out.push(copy(bound));continue;}
+   const stored=await this.#media$().readImage(attachment,signal);signal.throwIfAborted();out.push(mediaBinding(stored.ref,stored.data));
+  }
+  return out;
  }
  /** Building skill image step for one conversation's agent (prompt section +
   * read-only tool set). Returns the disposer; see image-ask.mjs. */
@@ -588,7 +649,7 @@ export function apply(ctx) {
  ctx.effect?.(()=>()=>projectionStore.close(),'hanaworlds-workshop.projection-close');
  const service=new WorkshopV3({projectionStore});
  for(const [field,port] of Object.entries({sessions:'sessions',agents:'agents',attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities',painterRegion:'hanaworldsPainterRegionV1',brushRegion:'hanaworldsBrushRegionV1',canvasRegion:'hanaworldsCanvasRegionV1'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
- registerImageTool(ctx,service);
+ registerImageTool(ctx,service);registerContextTool(ctx,service);
  ctx.provide('hanaworldsWorkshop',service);ctx.provide('hanaworldsWorkshopV3',service);
  new WorkshopImageLinkPanelService(ctx);
 }
