@@ -1,9 +1,10 @@
 import {requireNoCashAccountCapability} from './model-supply.mjs';
+import {readRouteLoginRecordState,assertBrowserCredentialMutationAllowed} from './sdk-auth-state.mjs';
 import { createServer } from 'node:http';
 import { createServer as createProbe } from 'node:net';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join,isAbsolute,resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Context } from '@deepseek-ai/cordis';
 import Sessions from '@deepseek-ai/dsh-session';
@@ -82,7 +83,8 @@ export class FixtureVisionModel extends LlmAdapter {
 const imageParts=content=>(content??[]).filter(p=>p.type==='image').map(p=>p.attachment);
 const textOf=content=>(content??[]).filter(p=>p.type==='text').map(p=>p.text).join('\n');
 
-export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0.1','::1'],authKey=REAL_AUTH_KEY,setup,preparationOnly=false,callbackPort=authKey===REAL_AUTH_KEY?OFFICIAL_CALLBACK_PORT:null}={}) {
+export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0.1','::1'],authKey=REAL_AUTH_KEY,credentialHome,setup,preparationOnly=false,callbackPort=authKey===REAL_AUTH_KEY?OFFICIAL_CALLBACK_PORT:null}={}) {
+ if(credentialHome!==undefined&&(typeof credentialHome!=='string'||!isAbsolute(credentialHome)||resolve(credentialHome)!==credentialHome))throw Error('EXPLICIT_CREDENTIAL_HOME_REQUIRED');
  await mkdir(runRoot,{recursive:true});const runtime=await mkdtemp(join(runRoot,'session-'));
  const ctx=new Context();const servers=[];
  try {
@@ -93,7 +95,7 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   await ctx.plugin(Llm).await();await ctx.plugin(SystemPrompt).await();await ctx.plugin(Tools).await();await ctx.plugin(AgentLoop).await();
   const model=new FixtureVisionModel(()=>ctx.attachments);ctx.llm.registerAdapter([PROVIDER],model);
   if(!preparationOnly){
-   await ctx.plugin(CredentialsLocal,{dshHome:join(runtime,'dsh-home')}).await();await ctx.plugin(Authorization).await();
+   await ctx.plugin(CredentialsLocal,{dshHome:credentialHome??join(runtime,'dsh-home')}).await();await ctx.plugin(Authorization).await();
    await ctx.plugin(LlmPiAi,{providers:{[REAL_PROVIDER]:{}}}).await();
   }
   await setup?.(ctx);
@@ -104,7 +106,7 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   await ctx.plugin(ToolSkill).await();
   const ws=ctx.get('hanaworldsWorkshop');
   const conversations=new Map();
-  const signedIn=async()=>preparationOnly?false:!!(await ctx.credentials.readRecord(REAL_AUTH_KEY));
+  const signedIn=async()=>preparationOnly?false:(await readRouteLoginRecordState(ctx,{signal:new AbortController().signal})).record.configured;
   async function models(){
    const listed=preparationOnly?[]:await ctx.llm.listModels(REAL_PROVIDER);const real=(listed.models??listed).filter(m=>(m.inputModalities??m.input??[]).includes('image'));
    return [{id:`${PROVIDER}/${MODEL}`,provider:PROVIDER,model:MODEL,kind:'FIXTURE',label:'FIXTURE 模型（不看图）'},
@@ -121,9 +123,10 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   /** One sign-in attempt at a time, driven by the person on the page through the official flow. */
   const auth={status:'idle',notices:[],prompt:null,error:null,method:null,waitingFor:null};let pendingPrompt=null;
   const authView=async()=>preparationOnly?({key:authKey,flow:null,signedIn:false,status:'idle',notices:[],prompt:null,error:null,method:null,waitingFor:null,callbackPort:null,
-   route:{provider:REAL_PROVIDER,label:'准备页：真实账户能力待供',cost:'仅运行 FIXTURE；真实模型请求关闭，不消耗真实模型额度。',storage:'本准备页未挂登录存储，不读取既有登录记录。'}}):({key:authKey,flow:ctx.authorization.describe(authKey)??null,signedIn:!!(await ctx.credentials.readRecord(authKey)),
+   route:{provider:REAL_PROVIDER,label:'准备页：真实账户能力待供',cost:'仅运行 FIXTURE；真实模型请求关闭，不消耗真实模型额度。',storage:'本准备页未挂登录存储，不读取既有登录记录。'}}):({key:authKey,flow:ctx.authorization.describe(authKey)??null,signedIn:await signedIn(),
    status:auth.status,notices:auth.notices,prompt:auth.prompt,error:auth.error,method:auth.method,waitingFor:auth.waitingFor,callbackPort,route:realRoute});
   async function beginAuth(){
+   assertBrowserCredentialMutationAllowed(credentialHome);
    const flow=ctx.authorization.describe(authKey);if(!flow)throw Error('SIGN_IN_FLOW_UNAVAILABLE');
    if(auth.status==='running')throw Error('SIGN_IN_ALREADY_RUNNING');
    // The official browser login silently degrades to a paste prompt when it cannot bind its callback port; refuse by name instead.
@@ -216,7 +219,7 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
      if(path==='/api/ask/auth/begin'){await beginAuth();return authView();}
      if(path==='/api/ask/auth/answer'){answerAuth(args.promptId,args.text);return authView();}
      if(path==='/api/ask/auth/cancel'){cancelAuth();return authView();}
-     if(path==='/api/ask/auth/signout'){if(auth.status==='running')throw Error('SIGN_IN_ALREADY_RUNNING');await ctx.credentials.deleteRecord(authKey);Object.assign(auth,{status:'idle',notices:[],prompt:null,error:null});return authView();}
+     if(path==='/api/ask/auth/signout'){assertBrowserCredentialMutationAllowed(credentialHome);if(auth.status==='running')throw Error('SIGN_IN_ALREADY_RUNNING');await ctx.credentials.deleteRecord(authKey);Object.assign(auth,{status:'idle',notices:[],prompt:null,error:null});return authView();}
      if(path==='/api/ask/new'){const id=await newConversation(args.model);return transcript(id,signal);}
      const c=conv(args.conversationId);
      if(path==='/api/ask/link')return ws.downloadImageForPanel(c.session,args.url,signal);
