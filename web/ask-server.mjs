@@ -127,7 +127,9 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   const auth={status:'idle',notices:[],prompt:null,error:null,method:null,waitingFor:null};let pendingPrompt=null;
   const authView=async()=>preparationOnly?({key:authKey,flow:null,signedIn:false,status:'idle',notices:[],prompt:null,error:null,method:null,waitingFor:null,callbackPort:null,
    route:{provider:REAL_PROVIDER,label:'准备页：真实账户能力待供',cost:'仅运行 FIXTURE；真实模型请求关闭，不消耗真实模型额度。',storage:'本准备页未挂登录存储，不读取既有登录记录。'}}):({key:authKey,flow:ctx.authorization.describe(authKey)??null,signedIn:await signedIn(),
-   status:auth.status,notices:auth.notices,prompt:auth.prompt,error:auth.error,method:auth.method,waitingFor:auth.waitingFor,callbackPort,route:realRoute});
+   status:auth.status,notices:auth.notices,prompt:auth.prompt,error:auth.error,method:auth.method,waitingFor:auth.waitingFor,callbackPort,
+   sharedLogin:credentialHome!==undefined,allowance:{setting:allowance.setting,last:allowance.decisions.at(-1)??null},
+   route:credentialHome===undefined?realRoute:{...realRoute,storage:'使用本机已有的 ChatGPT 登录（官方 SDK 正常复用/刷新）；本页不读取、不显示、不复制令牌，也不能在本页登录或退出这份共享登录。'}});
   async function beginAuth(){
    assertBrowserCredentialMutationAllowed(credentialHome);
    const flow=ctx.authorization.describe(authKey);if(!flow)throw Error('SIGN_IN_FLOW_UNAVAILABLE');
