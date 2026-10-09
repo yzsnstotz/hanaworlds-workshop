@@ -1,4 +1,4 @@
-import {requireNoCashAccountCapability} from './model-supply.mjs';
+import {guardRealDispatch,DEFAULT_MAX_INCLUDED_USED_PERCENT} from './account-allowance.mjs';
 import {readRouteLoginRecordState,assertBrowserCredentialMutationAllowed} from './sdk-auth-state.mjs';
 import { createServer } from 'node:http';
 import { createServer as createProbe } from 'node:net';
@@ -50,7 +50,7 @@ export const REAL_PROVIDER='openai-codex',REAL_AUTH_KEY=credentialKey('llm-pi-ai
 export const BROWSER_METHOD='browser',OFFICIAL_CALLBACK_PORT=1455;
 const portFree=port=>new Promise(resolve=>{const probe=createProbe();probe.once('error',()=>resolve(false));probe.listen(port,'127.0.0.1',()=>probe.close(()=>resolve(true)));});
 export const realRoute={provider:REAL_PROVIDER,label:'ChatGPT（OpenAI Codex 订阅登录）',
- cost:'账户适用额度与禁 paid-credit 能力未供，真实请求在发送前停止。',
+ cost:'只用订阅内含额度：每次真实模型调用前重读本账户用量，内含额度不可用或超过设定上限即在发送前拒绝，不动用 credits。',
  storage:'登录记录只存在本页运行目录，不读、不写 HanaWorlds App 或 ~/.dsh 的登录。可随时「退出登录」删除。'};
 
 /** FIXTURE model. It cannot see: it reads the actual stored bytes of every
@@ -83,10 +83,11 @@ export class FixtureVisionModel extends LlmAdapter {
 const imageParts=content=>(content??[]).filter(p=>p.type==='image').map(p=>p.attachment);
 const textOf=content=>(content??[]).filter(p=>p.type==='text').map(p=>p.text).join('\n');
 
-export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0.1','::1'],authKey=REAL_AUTH_KEY,credentialHome,setup,preparationOnly=false,callbackPort=authKey===REAL_AUTH_KEY?OFFICIAL_CALLBACK_PORT:null}={}) {
+export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0.1','::1'],authKey=REAL_AUTH_KEY,credentialHome,setup,preparationOnly=false,callbackPort=authKey===REAL_AUTH_KEY?OFFICIAL_CALLBACK_PORT:null,maxIncludedUsedPercent=DEFAULT_MAX_INCLUDED_USED_PERCENT,readAllowance}={}) {
  if(credentialHome!==undefined&&(typeof credentialHome!=='string'||!isAbsolute(credentialHome)||resolve(credentialHome)!==credentialHome))throw Error('EXPLICIT_CREDENTIAL_HOME_REQUIRED');
  await mkdir(runRoot,{recursive:true});const runtime=await mkdtemp(join(runRoot,'session-'));
  const ctx=new Context();const servers=[];
+ const allowance={setting:{name:'maxIncludedUsedPercent',value:maxIncludedUsedPercent,meaning:'真实模型调用开始时，任一订阅内含用量窗口最多已用的百分比；超过即在发送前拒绝'},decisions:[]};
  try {
   await ctx.plugin(Jsonl,{root:join(runtime,'core'),compression:'none'}).await();
   await ctx.plugin(Storage).await();await ctx.plugin(StorageJson,{root:join(runtime,'projection')}).await();await ctx.plugin(StorageDomain,{backend:'json'}).await();
@@ -97,6 +98,9 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   if(!preparationOnly){
    await ctx.plugin(CredentialsLocal,{dshHome:credentialHome??join(runtime,'dsh-home')}).await();await ctx.plugin(Authorization).await();
    await ctx.plugin(LlmPiAi,{providers:{[REAL_PROVIDER]:{}}}).await();
+   // Every REAL model call re-reads this account's included usage first (account-allowance.mjs).
+   guardRealDispatch(ctx,{provider:REAL_PROVIDER,...readAllowance?{read:readAllowance}:{},settings:()=>({maxIncludedUsedPercent}),
+    record:d=>allowance.decisions.push({at:new Date().toISOString(),allow:d.allow,code:d.code,why:d.why,allowance:d.allowance})});
   }
   await setup?.(ctx);
   await ctx.plugin(Workshop).await();
@@ -114,7 +118,6 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   }
   async function newConversation(choice=`${PROVIDER}/${MODEL}`){
    const picked=(await models()).find(m=>m.id===choice);if(!picked)throw Error('MODEL_NOT_AVAILABLE');
-   if(picked.kind==='REAL')requireNoCashAccountCapability();
    const id=`ask-${randomUUID()}`;
    const handle=await ctx.agents.create({sessionId:id,agentOptions:{provider:picked.provider,model:picked.model}});
    const lift=ws.prepareImageAsk(handle.agent);
@@ -175,7 +178,7 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   async function turn(id,text,signal){
    const c=conv(id);if(typeof text!=='string'||!text.trim())throw Error('QUESTION_REQUIRED');
    if(c.agent.status!=='idle')throw Error('AGENT_BUSY');
-   if(c.model.kind==='REAL'){requireNoCashAccountCapability();if(!(await signedIn()))throw Error('REAL_MODEL_SIGN_IN_REQUIRED');}
+   if(c.model.kind==='REAL'&&!(await signedIn()))throw Error('REAL_MODEL_SIGN_IN_REQUIRED');
    const before=(await durable(id)).length,asked=model.requests.length;
    c.agent.followup({id:`ask-prompt-${randomUUID()}`,role:'user',source:{kind:'user'},content:[{type:'text',text:text.trim()}]});
    await c.agent.whenIdle();await ctx.sessions.flush(c.session);signal.throwIfAborted();
@@ -200,7 +203,7 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
     if(req.method==='GET'){
      if(path==='/'){res.writeHead(302,{location:'/ask'});return res.end();}
      if(path==='/api/ask/auth')return send(res,200,await authView());
-     if(path==='/api/ask/state')return send(res,200,{fixture,preparationOnly,initial,models:await models(),auth:await authView(),conversations:[...conversations.values()].map(c=>({id:c.id,started:c.session.surface.nodes.length>0,createdAt:c.createdAt,model:c.model})),limits:{maxImageBytes:uploadCap,mediaTypes:limits.mediaTypes.filter(t=>['image/png','image/jpeg','image/webp','image/gif'].includes(t))}});
+     if(path==='/api/ask/state')return send(res,200,{fixture,preparationOnly,initial,allowance:{setting:allowance.setting,last:allowance.decisions.at(-1)??null,count:allowance.decisions.length},models:await models(),auth:await authView(),conversations:[...conversations.values()].map(c=>({id:c.id,started:c.session.surface.nodes.length>0,createdAt:c.createdAt,model:c.model})),limits:{maxImageBytes:uploadCap,mediaTypes:limits.mediaTypes.filter(t=>['image/png','image/jpeg','image/webp','image/gif'].includes(t))}});
      if(path==='/sample.png')return send(res,200,samplePNG,'image/png');
      if(path==='/sample-not-image')return send(res,200,'<html>not an image</html>','text/html; charset=utf-8');
      if(assets.has(path))return send(res,200,assets.get(path),path.endsWith('.css')?'text/css; charset=utf-8':path.endsWith('.mjs')?'text/javascript; charset=utf-8':'text/html; charset=utf-8');
@@ -235,11 +238,15 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
    }catch(error){if(!res.destroyed)send(res,422,{error:error.message??String(error),details:error.details,fixture});}
   };
   for(const h of hosts){const server=createServer(handler);await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,h,resolve);});servers.push(server);port=server.address().port;}
-  return {servers,initial,runtime,model,url:`http://127.0.0.1:${port}/ask`,async close(){for(const s of servers){s.closeAllConnections();await new Promise(r=>s.close(r));}await queue;for(const c of conversations.values())c.lift();await ctx.fiber.dispose();}};
+  return {servers,initial,runtime,model,allowance,url:`http://127.0.0.1:${port}/ask`,async close(){for(const s of servers){s.closeAllConnections();await new Promise(r=>s.close(r));}await queue;for(const c of conversations.values())c.lift();await ctx.fiber.dispose();}};
  }catch(error){for(const s of servers)s.close();await ctx.fiber.dispose();throw error;}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
- const service=await startAskWeb();
+ // Options: --port N --run-root ABS --credential-home ABS (existing SDK login, normal reuse only)
+ //          --max-included-used-percent N (visible setting, default above).
+ const arg=name=>{const i=process.argv.indexOf(name);return i<0?undefined:process.argv[i+1];};
+ const service=await startAskWeb({...arg('--port')?{port:Number(arg('--port'))}:{},...arg('--run-root')?{runRoot:arg('--run-root')}:{},
+  ...arg('--credential-home')?{credentialHome:arg('--credential-home')}:{},...arg('--max-included-used-percent')?{maxIncludedUsedPercent:Number(arg('--max-included-used-percent'))}:{}});
  console.log(JSON.stringify({event:'WORKSHOP_ASK_WEB_READY',pid:process.pid,url:service.url,initialConversation:service.initial,runtime:service.runtime,fixture}));
  for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>{service.close().then(()=>process.exit(0),error=>{console.error(error);process.exit(1);});});
 }
