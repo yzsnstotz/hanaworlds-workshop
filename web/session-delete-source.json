@@ -1,0 +1,144 @@
+{
+  "kind": "EXACT_PUBLISHED_SOURCE_ONLY",
+  "status": "UNSUPPORTED",
+  "inheritedEvidence": "F-WS-IMAGE-ASK-01 official-artifact-provenance.json; docs published-source review retained",
+  "artifacts": [
+    {
+      "package": "@deepseek-ai/dsh-session-persistence",
+      "version": "0.2.0-rc.2",
+      "registry_url": "https://registry.npmjs.org/@deepseek-ai%2Fdsh-session-persistence/0.2.0-rc.2",
+      "tarball_url": "https://registry.npmjs.org/@deepseek-ai/dsh-session-persistence/-/dsh-session-persistence-0.2.0-rc.2.tgz",
+      "tar_bytes": 24781,
+      "sha256": "1cc71f9c81fc3f9c6183f394864f087c87dfb275d170d06f58b9a5d1061ed3c6",
+      "integrity": "sha512-2OoRHZYWi5Vy0+1bPU37Y/NTh6uQiZ3VdpvDmW1oCgsapQr2JS/Lbody1gXOMJ1KXglCSLmePgTMC00uKw/UIg==",
+      "installed_files_equal": [
+        {
+          "path": "lib/index.js",
+          "bytes": 12920,
+          "sha256": "cc0b6d3a224133af611b428d5a49020e300f86c3b4ba28037aeb219029bde3eb"
+        },
+        {
+          "path": "package.json",
+          "bytes": 1270,
+          "sha256": "90eeba20c596a12b409facb6922890d75a4c7b11945f7b4b711ac54f6bbe2274"
+        },
+        {
+          "path": "lib/types/errors.d.ts",
+          "bytes": 4890,
+          "sha256": "05f55d1e3f2a80ea89562ee327e50f2a6fe200611e51ec38c7715f4c97bdbdb9"
+        },
+        {
+          "path": "lib/types/handle.d.ts",
+          "bytes": 5491,
+          "sha256": "0218ad845fb8191dc46c507a41bc56587321236cb6a2a9ac25ef78f83a4ddcc5"
+        },
+        {
+          "path": "lib/types/index.d.ts",
+          "bytes": 8419,
+          "sha256": "405eed914b242e16a07c8343004e134669b8948b26d1067e300fb222baf10b96"
+        },
+        {
+          "path": "lib/types/revision.d.ts",
+          "bytes": 680,
+          "sha256": "c2e32b7f71b4c39652b7d1bdb78203e46d56fb7a42f9a2bcbc83232cdd7a937f"
+        },
+        {
+          "path": "lib/types/storage-contract.d.ts",
+          "bytes": 3214,
+          "sha256": "44be027eb9dfd3bc55c801d1b804b9699127ae238f5d1e56b5056094f115d80d"
+        }
+      ]
+    },
+    {
+      "package": "@deepseek-ai/dsh-session-persistence-jsonl",
+      "version": "0.2.0-rc.2",
+      "registry_url": "https://registry.npmjs.org/@deepseek-ai%2Fdsh-session-persistence-jsonl/0.2.0-rc.2",
+      "tarball_url": "https://registry.npmjs.org/@deepseek-ai/dsh-session-persistence-jsonl/-/dsh-session-persistence-jsonl-0.2.0-rc.2.tgz",
+      "tar_bytes": 198836,
+      "sha256": "f5650bef896ef852dc5e5599aae5a0066b295c36674b9e4032c3c1d1e40bb7c8",
+      "integrity": "sha512-iAzXWC8jmiLYjK+wuN/fAKXLniAfClWm0CmEIwSxZnJGVy8c0iy7j5v8UfOqUbwuGfqo5HUWfyLGgxbWH7SG3g==",
+      "installed_files_equal": [
+        {
+          "path": "lib/worker.cjs",
+          "bytes": 539352,
+          "sha256": "cadd901598e2bb8a847409a980f59deea639eeadf21e30da324fb674a4ed8038"
+        },
+        {
+          "path": "lib/index.js",
+          "bytes": 142847,
+          "sha256": "0845707017acc2b4a8a75eab2244fa3fd88587b8094ab32014321dce7ca1e31b"
+        },
+        {
+          "path": "package.json",
+          "bytes": 1514,
+          "sha256": "5cb0f10f78e4336e4391912f2963d2f456cef1e3639916b20bebaebc5f8e9284"
+        },
+        {
+          "path": "lib/types/catalog-migration.d.ts",
+          "bytes": 1513,
+          "sha256": "dee8e830dca13ab3aaef72c61a0aad5881089ab99095e27dd826dd72386d94a7"
+        },
+        {
+          "path": "lib/types/format.d.ts",
+          "bytes": 9477,
+          "sha256": "deccb6e31d3a84a11122b2fb5f4b244aefe5dd3c8d34fe598da7ff4e6b58d294"
+        },
+        {
+          "path": "lib/types/generation.d.ts",
+          "bytes": 9789,
+          "sha256": "98e0a24166a91a4c737ab0ea62d2ba0b795aa10a4939f3c3d2db3ed522aacb9c"
+        },
+        {
+          "path": "lib/types/testing/generation.d.ts",
+          "bytes": 480,
+          "sha256": "1da765e30572ce0f285798831ec8d3dbc3ecadd6f7a797a4fd735254d1ea06c5"
+        },
+        {
+          "path": "lib/types/index.d.ts",
+          "bytes": 14575,
+          "sha256": "806dfa610c3ed3ce80ffac89900993288d7013d4278ab21e2b55b193c542f79a"
+        },
+        {
+          "path": "lib/types/lease.d.ts",
+          "bytes": 3172,
+          "sha256": "2b80f7691290130b2815dadcb4eb4fabfaad4b6eb1a93ba818084d41a5e6526e"
+        },
+        {
+          "path": "lib/types/migration-verifier.d.ts",
+          "bytes": 1101,
+          "sha256": "52cf0fcb2c48a8338f8073c866b3df684eb21f48290fefb1212ffc0c22014015"
+        },
+        {
+          "path": "lib/types/storage.d.ts",
+          "bytes": 13061,
+          "sha256": "e88eb76a2aca69172209a75a240c811b448b4746b2fef2bad554a32b8b64c119"
+        },
+        {
+          "path": "lib/types/win32.d.ts",
+          "bytes": 2537,
+          "sha256": "364e6b54a78280ef60dd3a93b521284c1ba52bd640fe7c6e7ddccb096855dcf9"
+        },
+        {
+          "path": "lib/types/worker.d.ts",
+          "bytes": 125,
+          "sha256": "31b66ee58ecf78c8f3ca920919d5fb1226d4bd4056e0c10d2040a13082067d85"
+        },
+        {
+          "path": "lib/types/zstd-private-decoder.d.ts",
+          "bytes": 1339,
+          "sha256": "3ac7e1537b6c11ec9cd9e5961311e1e356f704512871ea7006fd8243ec9ac332"
+        },
+        {
+          "path": "lib/types/zstd-public-decoder.d.ts",
+          "bytes": 602,
+          "sha256": "3155e2b6185842374fb0d4f4dd66fd4999d64131e9e17556b8e0bd67d7a777e9"
+        },
+        {
+          "path": "lib/types/zstd.d.ts",
+          "bytes": 3199,
+          "sha256": "4b1f793d0a1d12b242f0c9eb239ab6f67c2e8e38a3fc4ca4e0f0c0fadf120630"
+        }
+      ]
+    }
+  ]
+}

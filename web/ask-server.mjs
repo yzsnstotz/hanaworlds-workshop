@@ -1,3 +1,4 @@
+import {requireNoCashAccountCapability} from './model-supply.mjs';
 import { createServer } from 'node:http';
 import { createServer as createProbe } from 'node:net';
 import { createHash, randomUUID } from 'node:crypto';
@@ -33,7 +34,7 @@ const samplePNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXB
 const defaultRun=fileURLToPath(new URL('../../runtime/ask-web/',import.meta.url));
 export const PROVIDER='hanaworlds-fixture',MODEL='fixture-vision-1';
 export const fixture={kind:'FIXTURE',model:`${PROVIDER}/${MODEL}`,label:'FIXTURE 模型（不是真实模型，不会真正看图）',
- conversations:'本页独立会话，不是 HanaWorlds App 的当前对话',realModel:'UNKNOWN：未授权真实模型/鉴权/费用',worldWrites:0};
+ conversations:'本页独立会话，不是 HanaWorlds App 的当前对话',realModel:'真实模型账户能力未供；请求前拒绝',worldWrites:0};
 const sha=b=>createHash('sha256').update(b).digest('hex');
 // Recommended real route (owner packet A): official dsh-llm-pi-ai openai-codex,
 // signed in through the official dsh-authorization flow. The credential record
@@ -48,7 +49,7 @@ export const REAL_PROVIDER='openai-codex',REAL_AUTH_KEY=credentialKey('llm-pi-ai
 export const BROWSER_METHOD='browser',OFFICIAL_CALLBACK_PORT=1455;
 const portFree=port=>new Promise(resolve=>{const probe=createProbe();probe.once('error',()=>resolve(false));probe.listen(port,'127.0.0.1',()=>probe.close(()=>resolve(true)));});
 export const realRoute={provider:REAL_PROVIDER,label:'ChatGPT（OpenAI Codex 订阅登录）',
- cost:'计入登录账号的 ChatGPT Plus/Pro 订阅额度；本页不绑卡、不新建 API key。订阅之外是否另计费：UNKNOWN，请按自己的套餐判断。',
+ cost:'账户适用额度与禁 paid-credit 能力未供，真实请求在发送前停止。',
  storage:'登录记录只存在本页运行目录，不读、不写 HanaWorlds App 或 ~/.dsh 的登录。可随时「退出登录」删除。'};
 
 /** FIXTURE model. It cannot see: it reads the actual stored bytes of every
@@ -111,6 +112,7 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   }
   async function newConversation(choice=`${PROVIDER}/${MODEL}`){
    const picked=(await models()).find(m=>m.id===choice);if(!picked)throw Error('MODEL_NOT_AVAILABLE');
+   if(picked.kind==='REAL')requireNoCashAccountCapability();
    const id=`ask-${randomUUID()}`;
    const handle=await ctx.agents.create({sessionId:id,agentOptions:{provider:picked.provider,model:picked.model}});
    const lift=ws.prepareImageAsk(handle.agent);
@@ -119,7 +121,7 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   /** One sign-in attempt at a time, driven by the person on the page through the official flow. */
   const auth={status:'idle',notices:[],prompt:null,error:null,method:null,waitingFor:null};let pendingPrompt=null;
   const authView=async()=>preparationOnly?({key:authKey,flow:null,signedIn:false,status:'idle',notices:[],prompt:null,error:null,method:null,waitingFor:null,callbackPort:null,
-   route:{provider:REAL_PROVIDER,label:'准备页：真实模型待授权',cost:'仅运行 FIXTURE；真实模型请求关闭，不消耗真实模型额度。',storage:'本准备页未挂登录存储，不读取既有登录记录。'}}):({key:authKey,flow:ctx.authorization.describe(authKey)??null,signedIn:!!(await ctx.credentials.readRecord(authKey)),
+   route:{provider:REAL_PROVIDER,label:'准备页：真实账户能力待供',cost:'仅运行 FIXTURE；真实模型请求关闭，不消耗真实模型额度。',storage:'本准备页未挂登录存储，不读取既有登录记录。'}}):({key:authKey,flow:ctx.authorization.describe(authKey)??null,signedIn:!!(await ctx.credentials.readRecord(authKey)),
    status:auth.status,notices:auth.notices,prompt:auth.prompt,error:auth.error,method:auth.method,waitingFor:auth.waitingFor,callbackPort,route:realRoute});
   async function beginAuth(){
    const flow=ctx.authorization.describe(authKey);if(!flow)throw Error('SIGN_IN_FLOW_UNAVAILABLE');
@@ -170,7 +172,7 @@ export async function startAskWeb({port=47608,runRoot=defaultRun,hosts=['127.0.0
   async function turn(id,text,signal){
    const c=conv(id);if(typeof text!=='string'||!text.trim())throw Error('QUESTION_REQUIRED');
    if(c.agent.status!=='idle')throw Error('AGENT_BUSY');
-   if(c.model.kind==='REAL'&&!(await signedIn()))throw Error('REAL_MODEL_SIGN_IN_REQUIRED');
+   if(c.model.kind==='REAL'){requireNoCashAccountCapability();if(!(await signedIn()))throw Error('REAL_MODEL_SIGN_IN_REQUIRED');}
    const before=(await durable(id)).length,asked=model.requests.length;
    c.agent.followup({id:`ask-prompt-${randomUUID()}`,role:'user',source:{kind:'user'},content:[{type:'text',text:text.trim()}]});
    await c.agent.whenIdle();await ctx.sessions.flush(c.session);signal.throwIfAborted();
