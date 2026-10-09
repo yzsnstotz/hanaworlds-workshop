@@ -1,56 +1,68 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendFile, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as C from 'hanaworlds-contracts';
-let verifyContracts;
-try { ({ verifyContracts } = await import('../scripts/verify-contracts.mjs')); }
-catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+import { verifyContracts } from '../scripts/verify-contracts.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const installed = dirname(fileURLToPath(import.meta.resolve('hanaworlds-contracts/package.json')));
-const pin = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#v0.5.4';
-const revision = '85687fc3811e4c8ee6e69410d46d8026e19d2c75';
-const sha = 'b920097dee8bf57ef44cc9ca964829e568b14c9e1b15a77bf4599f69391062ec';
+const spec = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^0.5.6';
 
-test('formal contracts: Git tag/commit and exact published package files are verified, with no vendor', async () => {
-  assert.equal(typeof verifyContracts, 'function', 'formal provenance verifier must exist');
+async function scratch(t, name) {
+  const base = process.env.HW_RUNTIME_ROOT;
+  assert.ok(base, 'isolated HW_RUNTIME_ROOT required');
+  await mkdir(base, {recursive:true});
+  const temp = await mkdtemp(join(base, name));
+  t.after(() => rm(temp, {recursive:true,force:true}));
+  return temp;
+}
+async function withManifest(t, edit) {
+  const temp = await scratch(t, 'contracts-range-');
+  for (const name of ['package.json','package-lock.json']) await cp(join(root,name),join(temp,name));
+  const pkg = JSON.parse(await readFile(join(temp,'package.json'))), lock = JSON.parse(await readFile(join(temp,'package-lock.json')));
+  edit(pkg, lock);
+  await writeFile(join(temp,'package.json'), JSON.stringify(pkg));
+  await writeFile(join(temp,'package-lock.json'), JSON.stringify(lock));
+  return temp;
+}
+
+test('contracts: Git semver range from the contracts source, resolved by the lock, no vendor or provenance copy', async () => {
   const pkg = JSON.parse(await readFile(join(root, 'package.json')));
-  const lock = JSON.parse(await readFile(join(root, 'package-lock.json')));
-  assert.equal(pkg.dependencies['hanaworlds-contracts'], pin);
-  assert.equal(lock.packages['node_modules/hanaworlds-contracts'].resolved, pin.replace('v0.5.4', revision));
-  assert.equal(C.version, '0.5.4');
-  assert.equal(C.contractHandshake.contracts, 'hanaworlds-contracts@0.5.4');
-  assert.ok(!pkg.files.some(f => f.startsWith('vendor/')));
+  assert.equal(pkg.dependencies['hanaworlds-contracts'], spec);
+  assert.ok(!pkg.files.some(f => f.startsWith('vendor/') || f === 'CONTRACTS-PROVENANCE.json'));
+  await assert.rejects(access(join(root, 'CONTRACTS-PROVENANCE.json')));
+  await assert.rejects(access(join(root, 'vendor')));
   const proof = await verifyContracts();
-  assert.equal(proof.sourceRevision, revision);
-  assert.equal(proof.artifactSha256, sha);
-  assert.equal(proof.filesVerified, 26);
+  assert.equal(proof.spec, spec);
+  assert.equal(proof.installedVersion, C.version);
+  assert.match(proof.resolved, /#[0-9a-f]{40}$/);
+  assert.equal(C.contractHandshake.contracts, `hanaworlds-contracts@${C.version}`);
+  assert.equal(C.checkContractsVersion(C.contractHandshake.contracts).result, 'CONTRACTS_MAJOR_MATCH');
 });
 
-test('formal contracts: same version with altered runtime bytes is rejected', async t => {
-  assert.equal(typeof verifyContracts, 'function');
-  const base = process.env.HW_RUNTIME_ROOT;
-  assert.ok(base, 'isolated HW_RUNTIME_ROOT required');
-  await mkdir(base, {recursive:true});
-  const temp = await mkdtemp(join(base, 'formal-provenance-'));
-  t.after(() => rm(temp, {recursive:true,force:true}));
+test('contracts: a tag or commit pin instead of a range is rejected', async t => {
+  for (const pin of ['#v0.5.4', '#85687fc3811e4c8ee6e69410d46d8026e19d2c75', '#semver:0.5.4']) {
+    const temp = await withManifest(t, (pkg, lock) => { pkg.dependencies['hanaworlds-contracts'] = lock.packages[''].dependencies['hanaworlds-contracts'] = `git+https://github.com/yzsnstotz/hanaworlds-contracts.git${pin}`; });
+    await assert.rejects(verifyContracts({projectRoot:temp}), /CONTRACT_RANGE_REQUIRED/, pin);
+  }
+});
+
+test('contracts: a declared range of another contracts major is rejected by the source predicate', async t => {
+  const temp = await withManifest(t, (pkg, lock) => { pkg.dependencies['hanaworlds-contracts'] = lock.packages[''].dependencies['hanaworlds-contracts'] = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.0.0'; });
+  await assert.rejects(verifyContracts({projectRoot:temp}), e => e.code === 'UNSUPPORTED_VERSION');
+});
+
+test('contracts: a lock that does not match the declared range is rejected', async t => {
+  const temp = await withManifest(t, (pkg, lock) => { lock.packages[''].dependencies['hanaworlds-contracts'] = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#v0.5.4'; });
+  await assert.rejects(verifyContracts({projectRoot:temp}), /CONTRACT_LOCK_SPEC_MISMATCH/);
+});
+
+test('contracts: an installed package other than the locked version is rejected', async t => {
+  const temp = await scratch(t, 'contracts-installed-');
   await cp(installed, temp, {recursive:true});
-  await appendFile(join(temp, 'dist/local/runtime.mjs'), '\n');
-  assert.equal(JSON.parse(await readFile(join(temp, 'package.json'))).version, '0.5.4');
-  await assert.rejects(verifyContracts({packageRoot:temp}), /CONTRACT_FILE_DIGEST_MISMATCH:dist\/local\/runtime.mjs/);
-});
-
-test('formal contracts: a changed provenance revision is rejected', async t => {
-  assert.equal(typeof verifyContracts, 'function');
-  const base = process.env.HW_RUNTIME_ROOT;
-  assert.ok(base, 'isolated HW_RUNTIME_ROOT required');
-  await mkdir(base, {recursive:true});
-  const temp = await mkdtemp(join(base, 'formal-manifest-'));
-  t.after(() => rm(temp, {recursive:true,force:true}));
-  for (const name of ['package.json','package-lock.json','CONTRACTS-PROVENANCE.json']) await cp(join(root,name),join(temp,name));
-  const manifest = JSON.parse(await readFile(join(temp, 'CONTRACTS-PROVENANCE.json')));
-  manifest.sourceRevision = '0'.repeat(40);
-  await writeFile(join(temp, 'CONTRACTS-PROVENANCE.json'), JSON.stringify(manifest));
-  await assert.rejects(verifyContracts({projectRoot:temp}), /FORMAL_CONTRACT_PROVENANCE_MISMATCH/);
+  const p = JSON.parse(await readFile(join(temp, 'package.json')));
+  p.version = '0.4.0';
+  await writeFile(join(temp, 'package.json'), JSON.stringify(p));
+  await assert.rejects(verifyContracts({packageRoot:temp}), /CONTRACT_INSTALLED_MISMATCH/);
 });

@@ -87,15 +87,16 @@ DSH Core v4 规定：对话的系统提示必须是表面第 0 个节点，并�
 
 `npm run test:skill`：官方 Cordis/skills/tool-skill 的隔离 SOURCE/FIXTURE，核对原 Desktop bd964cdf 完整正文、五种输入分支及装配后单次注册。不代表真实模型、Desktop 或产品 UI 验收。
 
-## Session/world formal v0.5.4 (0.4.13)
+## Contracts dependency (range)
 
-The root dependency pins public tag `v0.5.4`, commit
-`85687fc3811e4c8ee6e69410d46d8026e19d2c75`. `CONTRACTS-PROVENANCE.json`
-records the supplied 157837-byte formal tar SHA256
-`b920097dee8bf57ef44cc9ca964829e568b14c9e1b15a77bf4599f69391062ec`
-and all 26 published file digests. `npm run verify:contracts` verifies the
-installed bytes and exact Git lock before build. This is the published formal v0.5.4; the protected rc.1 and v0.5.3
-evidence remains historical.
+The root dependency is the contracts source by Git semver range
+`git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^0.5.6`; no
+vendor copy, tag or commit pin. npm resolves the range and `package-lock.json`
+records the resolved commit. `npm run verify:contracts` (run before build)
+checks the range form, that the lock and the installed package agree, and that the
+declared lower bound is the installed package's major via the package's own
+`checkContractsVersion`. 0.5.6 is the lower bound because that predicate first
+ships there. The earlier exact v0.5.4 provenance and rc/v0.5.3 evidence remain historical in Git.
 
 `call('ReadSessionIdentity', request)` and `call('ListSessions', request)` expose
 trusted official Session metadata without selecting a world or creating a

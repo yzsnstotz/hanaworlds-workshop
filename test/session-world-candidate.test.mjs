@@ -78,9 +78,9 @@ function success(operation, body, response) {
   C.validateBoundResponse('session/v3', operation, body, response);
   assert.equal(response.error, null, JSON.stringify(response)); return response.result;
 }
-test('formal exact identity and public fixture validate under the same formal package', () => {
-  assert.equal(C.contractHandshake.contracts, 'hanaworlds-contracts@0.5.4');
-  assert.throws(() => C.checkContractHandshake({ contracts: 'hanaworlds-contracts@0.5.3' }));
+test('installed contracts identity and public fixture validate under the same installed package', () => {
+  assert.equal(C.checkContractsVersion(C.contractHandshake.contracts).result, 'CONTRACTS_MAJOR_MATCH');
+  assert.throws(() => C.checkContractHandshake({ ...C.contractHandshake, contracts: 'hanaworlds-contracts@1.0.0' }), e => e.code === 'UNSUPPORTED_VERSION');
   const f = seam.sessionDirectory.read;
   success('ReadSessionIdentity', f.request, f.response);
 });
