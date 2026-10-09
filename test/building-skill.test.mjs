@@ -12,11 +12,11 @@ const { default: Workshop, WRITE_METHOD_PORTS } = await import(process.env.HW_WO
 
 // SOURCE/FIXTURE: official services + Workshop package's own late skill plugin.
 // Full-content SHA oracles: exact bd964cdf/426ca1b1 stage0 baseline (40d72a58/3d0ec2c5/15f8e350 on main 5a63915f)
-// plus only the contracts v1 edits: step-1 siteRules proposal sentence and renamed wire ids; no duplicated production formatter.
+// plus only the contracts v1 edits: step-1 siteRules proposal sentence and renamed wire ids (rc.2: incl. canvas-region/v2); no duplicated production formatter.
 // Peer ports advertise fixture handshakes only; the agents service is a fixture.
 // No AgentLoop/model/world/auth/server/profile is created or called.
 const metadata = { name: 'hanaworlds-building' };
-const expectedSha = { 'object-available': 'e9cb90a6338cac54f48fb60d27f65c03dff31f59f233d4892d9d35dd1d74f80e', 'object-unavailable': '6ebd1c3981798e5bd1c5b6f64a9f026cb15ebe7ced39e5449655bf8701b57344', 'rejected-catch-null': 'a3a29f85355ec9d8b40b0f6f22647831225e25cbd842119713e1d85e7ae3134f', 'resolved-null': 'a3a29f85355ec9d8b40b0f6f22647831225e25cbd842119713e1d85e7ae3134f', 'config-undefined': 'a3a29f85355ec9d8b40b0f6f22647831225e25cbd842119713e1d85e7ae3134f' };
+const expectedSha = { 'object-available': '90a96943e573aac565615a5284fe7fa02c3863b6a16667ea8c722428ada14c9a', 'object-unavailable': '053617699aa6f5e11586e070dd29260cafd890981c451af9ac80f067f373d45b', 'rejected-catch-null': 'a3a29f85355ec9d8b40b0f6f22647831225e25cbd842119713e1d85e7ae3134f', 'resolved-null': 'a3a29f85355ec9d8b40b0f6f22647831225e25cbd842119713e1d85e7ae3134f', 'config-undefined': 'a3a29f85355ec9d8b40b0f6f22647831225e25cbd842119713e1d85e7ae3134f' };
 const results = [];
 const hash = value => createHash('sha256').update(value).digest('hex');
 function peerPorts() {

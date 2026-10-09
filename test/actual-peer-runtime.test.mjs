@@ -36,9 +36,9 @@ function adapterFixture(){
  const f={local:clone(sample.request.localContext),calls:[],writes:0,undoWrites:0,modelCalls:0,world:new Map(),prepared:new Map(),original:new Map(),worldRevision:'world-0'};
  const records=positions=>positions.map(position=>clone(f.world.get(position.join(','))??{position,nodeName:position[1]===0?'fixture:stone':'air',param1:0,param2:0,metadata:{},inventory:{},timer:null}));
  f.records=records;
- f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:['image/png'],model:null};
+ f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:['image/png'],model:null,engineGuards:null};
  const projection=(q,positions)=>({worldRef:q.worldRef,coveredPositions:clone(positions),records:records(positions),stateProfile:clone(q.stateProfile??stateProfile)});
- const receipt=(q,payload,operationDigest,before,after)=>({contractVersion:'canvas/v6',transactionId:q.transactionId,operationDigest,transactionPayloadDigest:payload,status:'VERIFIED',previousWorldRevision:before,observedWorldRevision:after,readbackDigest:D('readback',projection(q,q.scope?.checkedPositions??f.original.get(q.originTransactionId).positions)),restoreStatus:'NOT_REQUIRED',error:null,localContext:clone(q.localContext)});
+ const receipt=(q,payload,operationDigest,before,after)=>({contractVersion:'canvas/v6',transactionId:q.transactionId,operationDigest,transactionPayloadDigest:payload,status:'VERIFIED',previousWorldRevision:before,observedWorldRevision:after,readbackDigest:D('readback',projection(q,q.scope?.checkedPositions??f.original.get(q.originTransactionId).positions)),restoreStatus:'NOT_REQUIRED',error:null,localContext:clone(q.localContext),guardRefusal:null,applyFailure:null});
  // NativeFacts comes only from Canvas0.5.3's complete public fixed provider.
 
  f.adapter={contractHandshake:C.contractHandshake,async call(op,q){
@@ -153,7 +153,7 @@ test('ACTUAL public peer requirements: both descriptors and REGION capabilities;
  // The public per-cell and region requirements stay in the two descriptors.
  for(const method of W.WRITE_METHODS){const d=W.describeWriteMethod(method,{ports:{}}).descriptor;C.validateType('WriteMethodDescriptor',d);assert.match(d.typicalScale,/not a limit/);assert.match(d.typicalScale,/never truncates/);}
  C.checkProtocolCompatibility(W.peerProtocolHandshake(brush),[C.protocolRequirement('BUILD/V4',['BUILD/V4:per-cell-compile']),C.protocolRequirement('region-build/v1',['region-build/v1:compile-mapblock-chunks'])]);
- C.checkProtocolCompatibility(V.canvasProtocolHandshake,[C.protocolRequirement('canvas-region/v1',W.WRITE_METHOD_PORTS.REGION.find(s=>s.field==='canvasRegion').capabilities)]);
+ C.checkProtocolCompatibility(V.canvasProtocolHandshake,[C.protocolRequirement('canvas-region/v2',W.WRITE_METHOD_PORTS.REGION.find(s=>s.field==='canvasRegion').capabilities)]);
  const hs=W.peerProtocolHandshake(brush);const altered=clone(hs);altered.protocols.find(p=>p.protocol==='BUILD').major=4;
  assert.throws(()=>C.checkProtocolCompatibility(altered,[C.protocolRequirement('BUILD/V4',['BUILD/V4:per-cell-compile'])]),e=>e.code==='UNSUPPORTED_VERSION');
  const missing=clone(hs);missing.capabilities=missing.capabilities.filter(c=>c!=='BUILD/V4:per-cell-compile');

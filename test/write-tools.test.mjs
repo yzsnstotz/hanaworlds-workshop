@@ -32,7 +32,7 @@ const user=(id,text)=>({type:'user/message',time:100,surfaceOp:'append',data:{id
 function fixture(){
  const f={local:clone(sample.request.localContext),calls:[],writes:0,undoWrites:0,modelCalls:0,history:[],receipt:null,painterContexts:[]};
  const ctx=()=>({currentSession:'s1',activeWorldRef:f.local.worldRef,orderedSelectedObjectRefs:[],sessionRevision:'canvas-selection-1',selectionRevision:f.local.selectionRevision,localContext:clone(f.local)});
- f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:['image/png'],model:null};
+ f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:['image/png'],model:null,engineGuards:null};
  f.painter={contractHandshake:C.contractHandshake,protocolHandshake:CELL_PROTOCOL('hanaworlds-building-exterior-painter','painter',5),async call(op,q){f.calls.push(op);C.validateBuildProposalRequest(q);const facts=await f.readFacts(q);C.validateBuildProposalContext(q,facts);f.painterContexts.push(clone(facts.sourceContext));
    const result=clone(sample.response.result);result.invocationId=q.invocationId;return {contractVersion:'painter/v5',requestId:q.requestId,result,error:null};}};
  f.brush={contractHandshake:C.contractHandshake,protocolHandshake:BUILD_PROTOCOL(),async compile(q){f.calls.push('BuildDocument');C.validateBoundRequest('BUILD/V4','BuildDocument',q);
@@ -46,7 +46,7 @@ function fixture(){
    if(op==='InspectPlacementRegion')return {...ok({outcome:'REGION_INSPECTED',inspection:clone(sample.request.regionInspection)}),unavailableSettings:null};
    if(op==='ListObjects')return ok({worldRef:q.worldRef,registryRevision:'registry-1',objects:f.receipt?[{worldRef:q.worldRef,objectRef:'object-1',objectRevision:f.undone?'object-2':'object-1',displayName:'石块',nameRevision:'name-1',creationSequence:1,status:'READY'}]:[]});
    if(op==='AnalyzeAffectedObjects')return ok({contractVersion:'canvas/v6',worldRef:q.worldRef,worldRevision:q.expectedRevision,registryRevision:q.expectedRegistryRevision,selectionRevision:q.expectedSelectionRevision,operationDigest:q.operationDigest,orderedSelectedRefs:[],affectedObjectRefs:[]});
-   if(op==='ApplyRecoverableCommit'){f.writes++;f.receipt={contractVersion:'canvas/v6',transactionId:q.transactionId,operationDigest:q.operationDigest,transactionPayloadDigest:'a'.repeat(64),status:'VERIFIED',previousWorldRevision:q.expectedWorldRevision,observedWorldRevision:'world-after',readbackDigest:'c'.repeat(64),restoreStatus:'NOT_REQUIRED',error:null,localContext:clone(f.local)};f.history=[row(f.receipt)];return ok(f.receipt);}
+   if(op==='ApplyRecoverableCommit'){f.writes++;f.receipt={contractVersion:'canvas/v6',transactionId:q.transactionId,operationDigest:q.operationDigest,transactionPayloadDigest:'a'.repeat(64),status:'VERIFIED',previousWorldRevision:q.expectedWorldRevision,observedWorldRevision:'world-after',readbackDigest:'c'.repeat(64),restoreStatus:'NOT_REQUIRED',error:null,localContext:clone(f.local),guardRefusal:null,applyFailure:null};f.history=[row(f.receipt)];return ok(f.receipt);}
    if(op==='Readback')return ok(f.receipt);
    if(op==='HistoryQuery')return ok({worldRef:q.worldRef,objectRef:q.objectRef,historyRevision:f.undone?'history-2':'history-1',headTransactionId:f.undone?(f.badUndoHead?null:f.history.at(-1).transactionId):f.receipt.transactionId,entries:clone(f.history),undoAvailable:!f.undone,redoAvailable:!!f.undone});
    if(op==='InspectObject')return ok({...clone(sample.request.targetFacts),source:'INSPECTED',objectRef:'object-1',worldRevision:'world-after',objectRevision:'object-1',buildDigest:null,planRevision:null});
@@ -106,7 +106,7 @@ const cellsOf=box=>{const out=[];for(let z=box.min[2];z<=box.max[2];z++)for(let 
 // Flat fixture world: y<=0 stone, y>0 air. Region states are produced with the contract's own helpers.
 const flatState=(worldRef,box)=>C.validateType('RegionState',{profileVersion:'region-state/v1',worldRef,block:C.encodeRegionBlock({origin:box.min,size:box.max.map((v,a)=>v-box.min[a]+1),palette:[AIR,STONE],indices:Int32Array.from(cellsOf(box),p=>p[1]<=0?1:0)}),extras:[],derivedLightMode:'recompute-with-readback'});
 const nodeAt=(states,p)=>{for(const s of Object.values(states)){const e=C.expandRegionBlock(s.block),b=e.box;if(p.every((v,a)=>v>=b.min[a]&&v<=b.max[a])){const sx=b.max[0]-b.min[0]+1,sy=b.max[1]-b.min[1]+1;const i=(p[0]-b.min[0])+sx*((p[1]-b.min[1])+sy*(p[2]-b.min[2]));return e.palette[e.indices[i]].nodeName;}}return null;};
-function regionPeers(f,{canvasMajor=1}={}){
+function regionPeers(f,{canvasMajor=2}={}){
  const r={calls:[],writes:0,undoWrites:0,painterMedia:[],world:{},rollback:false};
  r.painter={protocolHandshake:handshake('fixture-painter','painter-region',2,2,caps('painter-region/v2')),async call(op,q){r.calls.push(op);assert.equal(op,'ValidateRegionProposal');C.validateRegionProposalRequest(q);r.painterMedia.push(structuredClone(q.referenceBrief.media));
    const build={contractVersion:'region-build/v1',documentId:`region-doc-${q.invocationId}`,coordinateSpace:'WORLD_NODE',worldRef:q.worldRef,catalogueDigest:q.catalogueDigest,block:q.proposal.block,declaredBounds:C.regionBlockBox(q.proposal.block)};
@@ -117,8 +117,8 @@ function regionPeers(f,{canvasMajor=1}={}){
     if(idx.every(v=>v===-1))continue;chunks.push({chunkPos:[...c.chunkPos],block:C.encodeRegionBlock({origin:c.box.min,size:c.box.max.map((v,a)=>v-c.box.min[a]+1),palette:e.palette,indices:idx})});}
    const projection={contractVersion:'region-operations/v1',buildDigest:q.buildDigest,compilerRevision:q.compilerRevision,worldRef:q.worldRef,catalogueDigest:q.catalogueDigest,chunkEdge:16,chunks};
    return {contractVersion:'region-build/v1',requestId:q.requestId,result:{projection,operationDigest:sha('region-operations',projection),writeBounds:q.build.declaredBounds},error:null};}};
- r.canvas={protocolHandshake:handshake('fixture-canvas','canvas-region',canvasMajor,0,caps('canvas-region/v1')),async call(op,q){r.calls.push(op);assert.deepEqual(structuredClone(q.localContext),f.local);
-   const ok=result=>({contractVersion:'canvas-region/v1',requestId:q.requestId,result,error:null});
+ r.canvas={protocolHandshake:handshake('fixture-canvas','canvas-region',canvasMajor,0,caps('canvas-region/v2')),async call(op,q){r.calls.push(op);assert.deepEqual(structuredClone(q.localContext),f.local);
+   const ok=result=>({contractVersion:'canvas-region/v2',requestId:q.requestId,result,error:null,guardRefusal:null,applyFailure:null});
    const lightBox=chunks=>({min:[0,1,2].map(a=>Math.min(...chunks.map(c=>C.regionBlockBox(c.block).min[a]))),max:[0,1,2].map(a=>Math.max(...chunks.map(c=>C.regionBlockBox(c.block).max[a])))});
    if(op==='ApplyRegionCommit'){
     const before=q.operations.chunks.map(c=>({chunkPos:c.chunkPos,state:r.world[c.chunkPos]??flatState(q.worldRef,C.regionBlockBox(c.block))}));
@@ -128,6 +128,7 @@ function regionPeers(f,{canvasMajor=1}={}){
     const gz=gzipSync(Buffer.from(C.canonicalJSON(content)));
     const snapshot={profileVersion:'region-snapshot/v1',contentDigest:sha('region-snapshot-content',content),beforeSummaryDigest:sha('region-summary',beforeSummary),compression:'gzip',compressedSha256:createHash('sha256').update(gz).digest('hex'),compressedByteLength:gz.length};
     C.validateRegionSnapshotContent(content,snapshot,beforeSummary);
+    if(r.refusal)return {contractVersion:'canvas-region/v2',requestId:q.requestId,result:null,error:{...C.guardRefusalError(r.refusal),transactionRef:q.transactionId},guardRefusal:r.refusal,applyFailure:null};
     r.writes++;if(!r.rollback)for(const a of after)r.world[a.chunkPos]=a.state;else for(const b of before)r.world[b.chunkPos]=b.state;
     r.before=before;r.commit={transactionId:q.transactionId,worldRef:q.worldRef,status:r.rollback?'ROLLED_BACK':'VERIFIED',operationDigest:q.operationDigest,beforeSummary,expectedAfterSummary,actualSummary:r.rollback?beforeSummary:expectedAfterSummary,snapshot,historyRevision:'region-history-1',lighting:{status:'COMPLETE',box:lightBox(q.operations.chunks),method:'fixture:voxelmanip.calc_lighting+write_to_map'},affectedObjectRefs:[],localContext:structuredClone(q.localContext)};
     r.lightBox=r.commit.lighting.box;return ok(r.commit);}
@@ -150,7 +151,7 @@ test('two contract WriteMethodDescriptors: purpose, input type, typical scale in
   for(const k of ['whenToUse','notFor','input'])assert.ok(t.guidance[k].length>20);}
  assert.deepEqual(tools.map(t=>t.descriptor.inputType),['BuildProposal','RegionProposal']);
  assert.deepEqual(tools[0].descriptor.requiredCapabilities,['BUILD/V4:per-cell-compile']);
- assert.deepEqual(tools[1].descriptor.requiredCapabilities,[...caps('canvas-region/v1'),...caps('painter-region/v2'),...caps('region-build/v1')].sort());
+ assert.deepEqual(tools[1].descriptor.requiredCapabilities,[...caps('canvas-region/v2'),...caps('painter-region/v2'),...caps('region-build/v1')].sort());
  assert.match(tools[1].guidance.input,/null means unspecified and is never air/);
  assert.match(W.writeToolSkillGuidance,/not limits/);assert.match(W.writeToolSkillGuidance,/do not silently switch methods or shrink the target/);
  assert.ok(tools[1].descriptor.unavailableReason.includes('PEER_UNAVAILABLE'));
@@ -158,9 +159,9 @@ test('two contract WriteMethodDescriptors: purpose, input type, typical scale in
 });
 
 test('protocol major + capability: same major other minor/provenance accepted; wrong major, missing capability, exact-only peer rejected',()=>{
- const ports=over=>({painterRegion:{protocolHandshake:handshake('p','painter-region',2,7,caps('painter-region/v2'),'0.0.1')},brushRegion:{protocolHandshake:handshake('b','region-build',1,0,caps('region-build/v1'),'3.1.4')},canvasRegion:{protocolHandshake:handshake('c','canvas-region',1,1,caps('canvas-region/v1'),'0.9.0-other-patch')},...over});
+ const ports=over=>({painterRegion:{protocolHandshake:handshake('p','painter-region',2,7,caps('painter-region/v2'),'0.0.1')},brushRegion:{protocolHandshake:handshake('b','region-build',1,0,caps('region-build/v1'),'3.1.4')},canvasRegion:{protocolHandshake:handshake('c','canvas-region',2,1,caps('canvas-region/v2'),'0.9.0-other-patch')},...over});
  const same=W.evaluateWriteMethod('REGION',{ports:ports({})});assert.equal(same.available,true,JSON.stringify(same));
- const major=W.evaluateWriteMethod('REGION',{ports:ports({canvasRegion:{protocolHandshake:handshake('c','canvas-region',2,0,caps('canvas-region/v1'))}})});assert.deepEqual(codes(major),['UNSUPPORTED_VERSION']);
+ const major=W.evaluateWriteMethod('REGION',{ports:ports({canvasRegion:{protocolHandshake:handshake('c','canvas-region',3,0,caps('canvas-region/v2'))}})});assert.deepEqual(codes(major),['UNSUPPORTED_VERSION']);
  const cap=W.evaluateWriteMethod('REGION',{ports:ports({brushRegion:{protocolHandshake:handshake('b','region-build',1,0,[])}})});assert.deepEqual(codes(cap),['CAPABILITY_UNAVAILABLE']);
  const exact=W.evaluateWriteMethod('REGION',{ports:ports({painterRegion:{contractHandshake:C.contractHandshake}})});assert.deepEqual(codes(exact),['UNSUPPORTED_VERSION']);
  const absent=W.evaluateWriteMethod('REGION',{ports:{}});assert.deepEqual(codes(absent),['PEER_UNAVAILABLE','PEER_UNAVAILABLE','PEER_UNAVAILABLE']);
@@ -210,8 +211,18 @@ test('REGION Canvas rollback is surfaced as ROLLED_BACK failure, world unchanged
  });
 });
 
+test('REGION engine guard refusal reaches the skill by name (guard, stage, finding), not only an error code; zero writes',async()=>{
+ const f=fixture();f.region=regionPeers(f);f.region.refusal={guard:'CELL_PROTECTION',stage:'REGION_APPLY',finding:'PROTECTED_CELL'};await withRuntime(f,async r=>{
+  const {advance}=await imageBrief(r,f);const context=await r.ws.readWriteProposalContext('REGION',{...advance,requestId:'region-context'});
+  assert.equal((await r.ws.submitWriteProposal('REGION',{...context,requestId:'p',proposal:{decision:'REGION',block:regionBlock()}})).response.error,null);
+  const built=await r.ws.advanceRegionBuild({...advance,requestId:'a'});
+  assert.equal(built.error?.code,'SAFETY_INVARIANT_FAILED');assert.deepEqual(built.guardRefusal,f.region.refusal);assert.equal(built.applyFailure,null);assert.equal(f.region.writes,0);
+  log('REGION_GUARD_REFUSAL',{error:built.error,guardRefusal:built.guardRefusal,writes:0});
+ });
+});
+
 test('REGION unavailable on wrong Canvas major: explains needs, zero Painter calls and writes, no fallback; skill may still choose PER_CELL',async()=>{
- const f=fixture();f.region=regionPeers(f,{canvasMajor:2});await withRuntime(f,async r=>{
+ const f=fixture();f.region=regionPeers(f,{canvasMajor:3});await withRuntime(f,async r=>{
   const {advance}=await imageBrief(r,f);const context=await r.ws.readWriteProposalContext('REGION',{...advance,requestId:'region-context'});
   const sent=await r.ws.submitWriteProposal('REGION',{...context,requestId:'region-proposal',proposal:{decision:'REGION',block:regionBlock()}});
   assert.equal(sent.response.error?.code,'CAPABILITY_UNAVAILABLE');assert.deepEqual(codes(sent.availability),['UNSUPPORTED_VERSION']);

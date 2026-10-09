@@ -18,7 +18,7 @@ const stateProfile={profileVersion:'state-profile/v2',nodeFields:['nodeName','pa
 function fixture() {
  const f={local:clone(sample.request.localContext),calls:[],writes:0,undoWrites:0,modelCalls:0,history:[],receipt:null,rolledBack:false};
  f.context=()=>({currentSession:'s1',activeWorldRef:f.local.worldRef,orderedSelectedObjectRefs:[],sessionRevision:'canvas-selection-1',selectionRevision:f.local.selectionRevision,localContext:clone(f.local)});
- f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:[],model:null};
+ f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:[],model:null,engineGuards:null};
  f.painter={contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-building-exterior-painter',protocols:[{protocol:'painter',major:5,minor:0}],capabilities:[],provenance:{packageName:'hanaworlds-building-exterior-painter',packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}},async call(op,q){assert.equal(op,'ValidateBuildProposal'); f.calls.push(op); C.validateBuildProposalRequest(q); C.validateBuildProposalContext(q,await f.readFacts(q));
    const result=clone(sample.response.result); result.invocationId=q.invocationId;
    return {contractVersion:'painter/v5',requestId:q.requestId,result,error:null};}};
@@ -37,7 +37,7 @@ function fixture() {
    if(op==='AnalyzeAffectedObjects')return response({contractVersion:'canvas/v6',worldRef:q.worldRef,worldRevision:q.expectedRevision,registryRevision:q.expectedRegistryRevision,selectionRevision:q.expectedSelectionRevision,operationDigest:q.operationDigest,orderedSelectedRefs:[],affectedObjectRefs:f.conflict?['existing-object']:[]});
    if(op==='ApplyRecoverableCommit'){
      f.writes++; f.applied=clone(q);
-     f.receipt={contractVersion:'canvas/v6',transactionId:q.transactionId,operationDigest:q.operationDigest,transactionPayloadDigest:'a'.repeat(64),status:f.rollback?'ROLLED_BACK':'VERIFIED',previousWorldRevision:q.expectedWorldRevision,observedWorldRevision:'world-after',readbackDigest:'c'.repeat(64),restoreStatus:f.rollback?'VERIFIED_RESTORED':'NOT_REQUIRED',error:null,localContext:clone(f.local)};
+     f.receipt={contractVersion:'canvas/v6',transactionId:q.transactionId,operationDigest:q.operationDigest,transactionPayloadDigest:'a'.repeat(64),status:f.rollback?'ROLLED_BACK':'VERIFIED',previousWorldRevision:q.expectedWorldRevision,observedWorldRevision:'world-after',readbackDigest:'c'.repeat(64),restoreStatus:f.rollback?'VERIFIED_RESTORED':'NOT_REQUIRED',error:null,localContext:clone(f.local),guardRefusal:null,applyFailure:null};
      if(f.rollback){ f.rolledBack=true; f.worldNodes=[]; } else {f.worldNodes=clone(q.operations.effects);f.history=[row(f.receipt)];}
      return response(f.receipt);
    }

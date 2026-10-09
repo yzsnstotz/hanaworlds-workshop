@@ -18,7 +18,7 @@ const capabilities = { providerRef: 'contracts-FIXTURE', capabilityRevision: 'ca
   limits: [], recoveryGuarantee: 'RECOVERABLE_VERIFIED',
   stateProfile: { profileVersion: 'state-profile/v2', nodeFields: ['nodeName', 'param1', 'param2'],
     metadataMode: 'exact', inventoryMode: 'exact', timerMode: 'exact', derivedLightMode: 'recompute-with-readback' },
-  sessionDeleteSupported: false, imageMediaTypes: [], model: null };
+  sessionDeleteSupported: false, imageMediaTypes: [], model: null,engineGuards:null };
 const request = (operation, sessionRef = 's1') => operation === 'ListSessions'
   ? { contractVersion: 'session/v4', requestId: 'list' }
   : { contractVersion: 'session/v4', requestId: 'read-' + sessionRef, sessionRef };

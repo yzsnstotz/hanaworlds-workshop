@@ -23,7 +23,7 @@ export const WRITE_METHOD_PORTS = C.deepFreeze({
  REGION: [
   { field: 'painterRegion', service: 'hanaworldsPainterRegionV1', label: 'Painter', wire: 'painter-region/v2', capabilities: capsOf('painter-region/v2') },
   { field: 'brushRegion', service: 'hanaworldsBrushRegionV1', label: 'Brush', wire: 'region-build/v1', capabilities: capsOf('region-build/v1') },
-  { field: 'canvasRegion', service: 'hanaworldsCanvasRegionV1', label: 'Canvas', wire: 'canvas-region/v1', capabilities: capsOf('canvas-region/v1') },
+  { field: 'canvasRegion', service: 'hanaworldsCanvasRegionV1', label: 'Canvas', wire: 'canvas-region/v2', capabilities: capsOf('canvas-region/v2') },
  ],
 });
 const scaleNote = 'Typical scale is guidance for the skill, not a limit: Workshop has no size threshold or setting, never truncates a proposal, changes its target or switches method.';

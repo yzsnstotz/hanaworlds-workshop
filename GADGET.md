@@ -1,6 +1,6 @@
 # Workshop 0.5.0 — local-world skill business component
 
-Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.0.0-rc.1` (contracts v1.0.0 candidate; after the formal v1.0.0 only the range and lock change to `^1.0.0`) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
+Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.0.0-rc.2` (contracts v1.0.0 candidate; after the formal v1.0.0 only the range and lock change to `^1.0.0`) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
 ## Session identity and deletion
 
@@ -80,6 +80,14 @@ the user's message) and on the wire; a confirmed entrance requirement is refused
 the REGION path (`painter-region/v2:entrance-rule`). Projections use the new
 domain root `hanaworlds_workshop_v1`; 0.x projections are not migrated. Contracts
 v1 carry no player body geometry, so stored contexts hold none.
+
+Engine guards (contracts v1 rc.2): `SessionSnapshot.capabilities` passes the Host's
+`PublicCapabilities` through, including `engineGuards` (the Host/engine declares
+it; Workshop never fills a value). Region commit/undo failures keep the engine's
+public `guardRefusal {guard, stage, finding}` and `applyFailure` next to the error
+in Workshop's REGION envelope, so the skill can name the cause (for example a
+protected cell) instead of only an error code. Per-cell receipts reach the skill
+unchanged inside `BuildEntryOutcome` with the same two fields.
 
 ## One native image-link tool (S1-WS-IMAGE-ATTACHMENT-01)
 
