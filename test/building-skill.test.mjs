@@ -5,18 +5,19 @@ import { createHash } from 'node:crypto';
 import { Context } from '@deepseek-ai/cordis';
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import Tools from '@deepseek-ai/dsh-tools';
-import Skills from '@deepseek-ai/dsh-skill';
+import Skills, { renderSkillContent } from '@deepseek-ai/dsh-skill';
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill';
 let BuildingSkill; try { BuildingSkill = (await import(process.env.HW_WORKSHOP_BUILDING_SKILL_ENTRY ?? '../src/building-skill.mjs')).default; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
 const { default: Workshop, WRITE_METHOD_PORTS } = await import(process.env.HW_WORKSHOP_PACKAGE_ENTRY ?? '../src/index.mjs');
 
 // SOURCE/FIXTURE: official services + Workshop package's own late skill plugin.
 // Full-content SHA oracles: exact bd964cdf/426ca1b1 stage0 baseline (40d72a58/3d0ec2c5/15f8e350 on main 5a63915f)
-// plus only the contracts v1 edits: step-1 siteRules proposal sentence and renamed wire ids (rc.2: incl. canvas-region/v2); no duplicated production formatter.
+// plus the approved v1 edits and 2026-10-10 confirmation/coordinate/clearance guidance.
+// Current SHA oracles were derived from the prior exact full content + those two text edits before implementation; formatter/Region branches stay unchanged.
 // Peer ports advertise fixture handshakes only; the agents service is a fixture.
 // No AgentLoop/model/world/auth/server/profile is created or called.
 const metadata = { name: 'hanaworlds-building' };
-const expectedSha = { 'object-available': '90a96943e573aac565615a5284fe7fa02c3863b6a16667ea8c722428ada14c9a', 'object-unavailable': '053617699aa6f5e11586e070dd29260cafd890981c451af9ac80f067f373d45b', 'rejected-catch-null': 'a3a29f85355ec9d8b40b0f6f22647831225e25cbd842119713e1d85e7ae3134f', 'resolved-null': 'a3a29f85355ec9d8b40b0f6f22647831225e25cbd842119713e1d85e7ae3134f', 'config-undefined': 'a3a29f85355ec9d8b40b0f6f22647831225e25cbd842119713e1d85e7ae3134f' };
+const expectedSha = {"object-available": "955d7ae90f1cf1e905766bea3ca378d349650fe4ce77bc5550acbb67b2650629", "object-unavailable": "6f9f95869649a09ad3348c3642860064ce8d83eea3894f23a907cbdc23c98b60", "rejected-catch-null": "644edfb2b823a22360f1d22a7fe33a1d7cb7f705649d80fd21fea2ef2528be5e", "resolved-null": "644edfb2b823a22360f1d22a7fe33a1d7cb7f705649d80fd21fea2ef2528be5e", "config-undefined": "644edfb2b823a22360f1d22a7fe33a1d7cb7f705649d80fd21fea2ef2528be5e"};
 const results = [];
 const hash = value => createHash('sha256').update(value).digest('hex');
 function peerPorts() {
@@ -92,7 +93,11 @@ for (const scenario of ['object-available', 'object-unavailable', 'rejected-catc
       assert.equal(registrationFiber.state, 2); // official Cordis FiberState.ACTIVE
       assert.equal(counts.register, 1);
       assert.equal(counts.describe, 1);
-      assert.equal(hash(loadedContent), expectedSha[scenario], 'full byte digest equals exact Desktop source baseline at the same peer composition');
+      assert.ok(loadedContent.includes('confirm with only {"action":"confirm"}'));
+      assert.ok(loadedContent.includes('world[axis] = sampledBounds.min[axis] + local[axis]'));
+      assert.ok(loadedContent.includes('roofBottomY - floorTopY - 1'));
+      assert.ok(loadedContent.includes('isError=false'));
+      assert.equal(hash(loadedContent), expectedSha[scenario], 'full byte digest equals Desktop baseline plus the two authorized guidance edits at the same peer composition');
       assert.ok(order.indexOf('peers:await-settled') < order.indexOf('skill:registered'));
       if (scenario === 'object-available') {
         assert.ok(beforeAssembly.tools.every(t => !t.availability.available), 'before peer composition the original public descriptions differ');
@@ -116,6 +121,12 @@ for (const scenario of ['object-available', 'object-unavailable', 'rejected-catc
       assert.equal(output.content, loadedContent);
       assert.equal(hash(output.content), expectedSha[scenario]);
       assert.equal(output.name, metadata.name);
+      const rendered = await ctx.tools.execute({name:'skill',callId:'full-skill-'+scenario,arguments:metadata,signal:new AbortController().signal});
+      assert.equal(rendered.isError,false,JSON.stringify(rendered));
+      counts.consume++;
+      const renderedText = rendered.content.map(part=>part.text??'').join('');
+      assert.equal(renderedText,renderSkillContent(definition),'actual official model-facing consumer preserves the full canonical wrapper and instructions');
+      assert.ok(renderedText.includes('<skill_instructions>\n'+loadedContent+'\n</skill_instructions>'));
       assert.equal(counts.register, 1);
       // Changing peer state after load does not trigger a refresh or a second registration.
       let afterLoadUnchanged = true;
@@ -131,8 +142,9 @@ for (const scenario of ['object-available', 'object-unavailable', 'rejected-catc
         source: 'Desktop bd964cdf/426ca1b1 baseline; current Workshop source/package; official packages 0.2.0-rc.2/Cordis 4.0.4',
         generatedBranch: scenario.startsWith('object-') ? 'object' : 'null', inputRejected: scenario === 'rejected-catch-null',
         configNullishCoalescingPreserved: true, fullContentBytes: Buffer.byteLength(loadedContent),
-        fullContentSha256: hash(loadedContent), fullContent: loadedContent, consumedContentSha256: hash(output.content),
-        originalBaselineEqual: true, afterLoadUnchanged, realModelCalls: 0, worldWrites: 0, productRuntime: false });
+        fullContentSha256: hash(loadedContent), fullContent: loadedContent, consumedContentSha256: hash(output.content), renderedContentSha256: hash(renderedText), renderedContentBytes: Buffer.byteLength(renderedText),
+        runtimeIdentity: { processId: process.pid, workshopEntry: process.env.HW_WORKSHOP_PACKAGE_ENTRY??new URL('../src/index.mjs',import.meta.url).href, skillEntry: process.env.HW_WORKSHOP_BUILDING_SKILL_ENTRY??new URL('../src/building-skill.mjs',import.meta.url).href, codeRuntimeAvailable: !!ctx.get('ptcRuntime'), codeToolExposed: ctx.tools.schemas().some(t=>t.name==='run_code') },
+        originalBaselineEqual: false, authorizedGuidanceEdits: 2, afterLoadUnchanged, realModelCalls: 0, worldWrites: 0, productRuntime: false });
     } finally { await ctx.fiber.dispose(); }
   });
 }
