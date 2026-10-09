@@ -59,7 +59,7 @@
     "test": "node --test test/context-tool.test.mjs test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/image-panel-new-session.test.mjs test/image-ask.test.mjs test/write-tools.test.mjs",
     "test:image": "node --test test/image-attachment.test.mjs test/image-panel-new-session.test.mjs",
     "test:new-session": "node --test test/image-panel-new-session.test.mjs",
-    "test:ask": "node --test test/image-ask.test.mjs test/ask-web.test.mjs",
+    "test:ask": "node --test test/image-ask.test.mjs test/ask-web.test.mjs test/account-allowance.test.mjs",
     "test:text-normal": "node --test --test-name-pattern='local text proposal' test/local-world-runtime.test.mjs",
     "test:context-tool": "node --test test/context-tool.test.mjs",
     "test:write-tools": "node --test test/write-tools.test.mjs",

@@ -8,12 +8,19 @@ async function call(path,args={}){const r=await fetch(path,{method:'POST',header
 async function run(label,fn){if(state.busy)return;$('error').hidden=true;lock(true);status(label);try{await fn();}catch(e){show(e);status('上一步没有完成，已保持原状态。');}finally{lock(false);}}
 const statusText={QUEUED_FOR_NEXT_TURN:'已排入：下一次提问时随消息一起交给模型',ATTACHED:'已在对话中'};
 function thumb(img){const fig=document.createElement('figure');fig.className='thumb';if(img.data){const i=document.createElement('img');i.src=`data:${img.mediaType};base64,${img.data}`;i.alt='附图缩略图';fig.append(i);}const c=document.createElement('figcaption');c.textContent=`${img.mediaType} · ${img.width}×${img.height} px · ${Number(img.bytes).toLocaleString()} B · ${statusText[img.status]??img.status}`;fig.append(c);return fig;}
+// The banner names what answers the current conversation: FIXTURE stays loud, a real model is named plainly.
+function renderBanner(model){
+ const b=$('fixture'),real=model?.kind==='REAL';b.classList.toggle('real',real);
+ b.querySelector('strong').textContent=real?`当前对话：真实模型 ${model.model}（会真正看图）`:'FIXTURE 模型 · 不是真实模型，不会真正看图';
+}
 function renderTranscript(t){
+ renderBanner(t.model);
  $('conv-state').textContent=t.started?'已开始的对话':'新对话（还没有回合）';const cm=$('conv-model');cm.textContent=t.model?.kind==='REAL'?`真实模型 ${t.model.model}`:'FIXTURE 模型';cm.classList.toggle('real',t.model?.kind==='REAL');
  const chat=$('chat');chat.replaceChildren();const atts=$('attachments');atts.replaceChildren();
  const all=[...t.items,...t.queued];
  if(!all.length){const p=document.createElement('p');p.className='empty';p.textContent='附一张图，再提问。模型回答会显示在这里。';chat.append(p);}
  for(const m of all){
+  if(m.role==='assistant'&&!m.text)continue; // a tool step (e.g. loading the skill), not a reply
   const d=document.createElement('div');d.className=`msg ${m.role}${m.queued?' queued':''}`;
   const real=t.model?.kind==='REAL';if(m.role==='assistant'&&real)d.classList.add('real');const who=document.createElement('b');who.textContent=m.role==='assistant'?(real?`模型（真实 · ${t.model.model}）`:'模型（FIXTURE）'):m.queued?'你 · 排队中':'你';d.append(who);
   if(m.text){const p=document.createElement('p');p.textContent=m.text;d.append(p);}
@@ -27,8 +34,9 @@ async function loadState(select){
  const r=await fetch('/api/ask/state');if(!r.ok)throw Error(`HTTP ${r.status}`);const s=await r.json();
  if(s.fixture?.kind!=='FIXTURE')throw Error('FIXTURE_LABEL_REQUIRED');
  if(s.preparationOnly)$('fixture').querySelector('p').textContent='本准备页仅运行 FIXTURE 模型，不会真正看图；真实图片字节走同一官方 AgentLoop。会话是本页独立 FIXTURE 会话，不是 HanaWorlds App 的当前对话。本页不挂登录服务、不写世界；真实模型待授权，无需登录。';
- $('fixture-model').textContent=s.preparationOnly?`准备页 · ${s.fixture.model}（FIXTURE）· 真实模型未启用，无需登录`:`默认模型 ${s.fixture.model}（FIXTURE）· 真实模型需先登录`;state.limits=s.limits;state.conversations=s.conversations;
- const ms=$('model'),keep=ms.value;ms.replaceChildren();for(const m of s.models){const o=document.createElement('option');o.value=m.id;o.textContent=m.label;ms.append(o);}if([...ms.options].some(o=>o.value===keep))ms.value=keep;
+ $('fixture-model').textContent=s.preparationOnly?`准备页 · ${s.fixture.model}（FIXTURE）· 真实模型未启用，无需登录`:`默认模型 ${s.fixture.model}（FIXTURE）· ${s.auth?.signedIn?'真实模型已登录：在「新对话模型」里选它再点「新对话」':'真实模型需先登录'}`;state.limits=s.limits;state.conversations=s.conversations;
+ const ms=$('model'),keep=ms.value;ms.replaceChildren();for(const m of s.models){const o=document.createElement('option');o.value=m.id;o.textContent=m.label;ms.append(o);}const pinned='openai-codex/gpt-5.6-luna';
+ if([...ms.options].some(o=>o.value===keep))ms.value=keep;else if(s.auth?.signedIn&&[...ms.options].some(o=>o.value===pinned))ms.value=pinned;
  renderAuth(s.auth);
  $('limits').textContent=`上限 ${Math.floor(s.limits.maxImageBytes/1024/1024)} MiB · 类型 ${s.limits.mediaTypes.join(' / ')}`;
  const sel=$('conversation');sel.replaceChildren();s.conversations.forEach((c,i)=>{const o=document.createElement('option');o.value=c.id;o.textContent=`对话 ${i+1}${c.started?'':'（新）'} · ${c.model?.kind==='REAL'?'真实':'FIXTURE'} · ${c.id.slice(4,12)}`;sel.append(o);});
@@ -49,11 +57,12 @@ run('正在连接…',async()=>{await loadState(new URLSearchParams(location.sea
 const authText={idle:'未登录',running:'登录进行中…',authorized:'已登录',cancelled:'已取消',failed:'登录失败'};
 function renderAuth(a){
  if(!a)return;state.auth=a;
- $('auth-route').textContent=a.route.label;$('auth-cost').textContent=`费用：${a.route.cost}`;$('auth-storage').textContent=`存储：${a.route.storage}`;
+ $('auth-route').textContent=a.route.label;const last=a.allowance?.last,usedWin=last?.allowance?.rateLimit;
+ $('auth-cost').textContent=`费用：${a.route.cost}${a.allowance?` 设定：任一内含窗口已用 ≤ ${a.allowance.setting.value}% 才发送。`:''}${last?` 最近一次检查：${last.allow?'允许':'拒绝'} ${last.code}${usedWin?.primary?`（内含已用 ${usedWin.primary.usedPercent}%）`:''}。`:''}`;$('auth-storage').textContent=`存储：${a.route.storage}`;
  const st=$('auth-status');st.textContent=a.signedIn&&a.status!=='running'?'已登录':authText[a.status]??a.status;st.classList.toggle('ok',a.signedIn);
  const running=a.status==='running';
- $('auth-begin').disabled=!a.flow||running||a.signedIn;$('auth-begin').textContent=a.flow?`登录 ${a.flow.methods?.[0]?.label??a.flow.label}`:'登录不可用';
- $('auth-cancel').disabled=!running;$('auth-signout').disabled=running||!a.signedIn;
+ $('auth-begin').disabled=!a.flow||running||a.signedIn||a.sharedLogin;$('auth-begin').textContent=a.flow?`登录 ${a.flow.methods?.[0]?.label??a.flow.label}`:'登录不可用';
+ $('auth-cancel').disabled=!running;$('auth-signout').disabled=running||!a.signedIn||a.sharedLogin;
  const ul=$('auth-notices');ul.replaceChildren();for(const n of a.notices){const li=document.createElement('li');li.append(n.url?'官方登录页已就绪：':n.message);if(n.url){const link=document.createElement('a');link.href=n.url;link.target='_blank';link.rel='noopener';link.textContent='打开 OpenAI 登录页';li.append(link);}if(n.code){const c=document.createElement('code');c.textContent=` ${n.code}`;li.append(c);}ul.append(li);}
  const f=$('auth-prompt-form');f.hidden=!a.prompt;if(a.prompt){f.dataset.id=a.prompt.id;$('auth-prompt-label').textContent=a.prompt.message;const sel=a.prompt.kind==='select';$('auth-select').hidden=!sel;$('auth-answer').hidden=sel;$('auth-answer').type=a.prompt.kind==='secret'?'password':'text';$('auth-answer').placeholder=a.prompt.placeholder??'';if(sel&&$('auth-select').dataset.id!==a.prompt.id){$('auth-select').dataset.id=a.prompt.id;$('auth-select').replaceChildren(...a.prompt.options.map(o=>{const x=document.createElement('option');x.value=o.id;x.textContent=o.label;return x;}));}}
  const w=$('auth-waiting');w.hidden=a.waitingFor!=='BROWSER_CALLBACK';w.textContent=`在打开的 OpenAI 页面登录并确认后，本页会${a.callbackPort?`通过本机 ${a.callbackPort} 端口`:''}自动接回，不需要粘贴任何代码。`;
