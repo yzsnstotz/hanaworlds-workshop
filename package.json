@@ -1,6 +1,6 @@
 {
   "name": "hanaworlds-workshop",
-  "version": "0.4.13",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -26,6 +26,7 @@
     "src/building-skill.mjs",
     "src/image-attachment.mjs",
     "src/image-ask.mjs",
+    "src/context-tool.mjs",
     "src/write-tools.mjs",
     "src/projection-store.mjs",
     "client.cjs",
@@ -54,12 +55,13 @@
   },
   "scripts": {
     "test:session-metadata": "node --test test/session-metadata.test.mjs",
-    "build": "node scripts/verify-contracts.mjs && node --check src/index.mjs && node --check src/building-skill.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/image-ask.mjs && node --check src/write-tools.mjs && node scripts/build-image-panel.mjs",
-    "test": "node --test test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/image-panel-new-session.test.mjs test/image-ask.test.mjs test/write-tools.test.mjs",
+    "build": "node scripts/verify-contracts.mjs && node --check src/index.mjs && node --check src/building-skill.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/image-ask.mjs && node --check src/context-tool.mjs && node --check src/write-tools.mjs && node scripts/build-image-panel.mjs",
+    "test": "node --test test/context-tool.test.mjs test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/image-panel-new-session.test.mjs test/image-ask.test.mjs test/write-tools.test.mjs",
     "test:image": "node --test test/image-attachment.test.mjs test/image-panel-new-session.test.mjs",
     "test:new-session": "node --test test/image-panel-new-session.test.mjs",
     "test:ask": "node --test test/image-ask.test.mjs test/ask-web.test.mjs",
     "test:text-normal": "node --test --test-name-pattern='local text proposal' test/local-world-runtime.test.mjs",
+    "test:context-tool": "node --test test/context-tool.test.mjs",
     "test:write-tools": "node --test test/write-tools.test.mjs",
     "build:panel": "node scripts/build-image-panel.mjs",
     "test:panel": "node --test test/image-panel-client.test.mjs && node --test --test-name-pattern=\"panel \" test/image-attachment.test.mjs",
@@ -69,7 +71,7 @@
     "typecheck:skill": "node node_modules/typescript/bin/tsc --noEmit --allowJs --module NodeNext --moduleResolution NodeNext --target ES2022 --strict --skipLibCheck test/building-skill-consumer.mts",
     "verify:contracts": "node scripts/verify-contracts.mjs",
     "test:contracts-history-042": "node --test test/contracts-042-consumption.test.mjs",
-    "test:contracts": "node --test test/package-provenance.test.mjs test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/image-panel-new-session.test.mjs test/image-panel-client.test.mjs test/image-ask.test.mjs test/write-tools.test.mjs test/building-skill.test.mjs",
+    "test:contracts": "node --test test/package-provenance.test.mjs test/context-tool.test.mjs test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/image-panel-new-session.test.mjs test/image-panel-client.test.mjs test/image-ask.test.mjs test/write-tools.test.mjs test/building-skill.test.mjs",
     "typecheck:contracts": "node node_modules/typescript/bin/tsc --project test/types/tsconfig.json",
     "test:session-world": "node --test test/session-world-candidate.test.mjs"
   },
@@ -83,7 +85,7 @@
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
     "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.2",
     "canonicalize": "5.1.0",
-    "hanaworlds-contracts": "git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^0.5.6",
+    "hanaworlds-contracts": "git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.0.0-rc.1",
     "zod": "4.6.5"
   },
   "devDependencies": {

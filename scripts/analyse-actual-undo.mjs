@@ -7,7 +7,7 @@ const histories=trace.filter(x=>x.operation==='HistoryQuery');
 const before=histories.findLast(x=>x.request.requestId.includes('undo-head:'))?.response.result;
 const after=histories.findLast(x=>x.request.requestId.includes('undo-after:'))?.response.result;
 if(!receipt||!before||!after)throw Error('PUBLIC_UNDO_TRACE_INCOMPLETE');
-for(const call of trace.filter(x=>['Undo','HistoryQuery'].includes(x.operation)))C.validateBoundResponse('canvas/v5',call.operation,call.request,call.response);
+for(const call of trace.filter(x=>['Undo','HistoryQuery'].includes(x.operation)))C.validateBoundResponse('canvas/v6',call.operation,call.request,call.response);
 const original=before.entries.find(e=>e.transactionId===before.headTransactionId);
 const row=after.entries.find(e=>e.transactionId===receipt.transactionId);
 const receiptDigest=C.digestValue('receipt',receipt).sha256;

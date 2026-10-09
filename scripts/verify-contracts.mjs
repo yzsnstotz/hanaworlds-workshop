@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const source = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git';
-const range = /^#semver:\^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
+const range = /^#semver:\^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.(0|[1-9][0-9]*))?$/u;
 export async function verifyContracts({ projectRoot = fileURLToPath(new URL('../', import.meta.url)),
  packageRoot = dirname(fileURLToPath(import.meta.resolve('hanaworlds-contracts/package.json'))) } = {}) {
  const readJSON = async name => JSON.parse(await readFile(join(projectRoot, name)));

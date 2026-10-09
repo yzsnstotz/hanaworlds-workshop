@@ -23,7 +23,7 @@ import {createPainterLocalFactsPort,appendStartedUserInput} from './c4-supply.mj
 
 const failure = code => Object.assign(new Error(code),{code});
 const succeeded = (op,request,response) => {
- C.validateBoundResponse('session/v3',op,request,response);
+ C.validateBoundResponse('session/v4',op,request,response);
  if(response.error)throw failure(response.error.code);
  return response.result;
 };
@@ -47,7 +47,7 @@ export async function startSupplyPage({root,port}) {
   await ctx.plugin({name:'workshop-c4-local-facts-host',apply(ownerCtx){ownerCtx.provide('hanaworldsPainterLocalFacts',createPainterLocalFactsPort(()=>ownerCtx.get('hanaworldsWorkshopV3')));}}).await();
   const ws=ctx.get('hanaworldsWorkshopV3');
   const status=async()=>{
-   const request={contractVersion:'session/v3',requestId:`supply-list-${randomUUID()}`};
+   const request={contractVersion:'session/v4',requestId:`supply-list-${randomUUID()}`};
    const directory=succeeded('ListSessions',request,await ws.call('ListSessions',request));
    return {kind:'REAL_OFFICIAL_GS_ONLY',modelAdapters:0,modelSteps,inputCommits,worldWrites:0,creationAttempted,createdSessionRef,
     sessions:directory.sessions.map((identity,i)=>{const session=ctx.sessions.get(identity.sessionRef),head=session?.surface.nodes[0];return {identity,label:`供给对话 ${i+1}`,started:session?head!==undefined&&session.eventAt(head)?.type==='system/message':null};}),

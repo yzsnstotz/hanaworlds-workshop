@@ -1,6 +1,6 @@
 # hanaworlds-workshop
 
-HanaWorlds Stage 1 Workshop 0.4.13 component. See [GADGET.md](GADGET.md)
+HanaWorlds Stage 1 Workshop 0.5.0 component. See [GADGET.md](GADGET.md)
 for its host ports, Session flow, installation and recovery boundary. Product
 composition and human acceptance remain unproven.
 
@@ -56,6 +56,7 @@ PASS, product readiness or acceptance. No actual package declaration is forged.
 
 Workshop 为一个对话的 Agent 提供建造 skill 的「看图」步骤：
 
+- `hanaworlds_context`：本插件经官方 `ctx.tools.register` 注册（`src/context-tool.mjs`，取代 Desktop 内联版）；`workshop.skillContext(action,args,exec)` 为其实现，会话来自原生工具执行，文字/图片/确认只取 Core 用户消息，未绑定世界时具名拒绝 `LOCAL_CONTEXT_REQUIRED`。见 GADGET.md。
 - `workshop.prepareImageAsk(agent)`：用官方 `ctx.tools.restrict({allow:['hanaworlds_download_image','skill']})` 限制当前 Agent 的工具，返回解除限制的 disposer。完整 building skill 由本包 `hanaworlds-workshop/building-skill` 插件供给；宿主先逐个 await 实际 peer 装配，再 await 此插件注册一次，最后 await 官方 `dsh-tool-skill` 消费插件。注册时使用本 Workshop 的 `describeWriteTools(null)`，保留原 await/catch→null 与 config??null 分支；不刷新、不冻结其他 Host 的正文。缺 `tools` 时具名拒绝。
 - `workshop.attachImageForPanel(session,{data,mediaType},signal)`：本机图片（用户选的字节），与链接同一套 Session 核对、存储、绑定和新/已开始对话语义（新对话 `QUEUED_FOR_NEXT_TURN` 经公开 Agent inbox，已开始对话 `ATTACHED`）。类型、空图、大小上限具名拒绝；附件存储仍完整解码校验。
 
@@ -90,13 +91,14 @@ DSH Core v4 规定：对话的系统提示必须是表面第 0 个节点，并�
 ## Contracts dependency (range)
 
 The root dependency is the contracts source by Git semver range
-`git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^0.5.6`; no
+`git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.0.0-rc.1`; no
 vendor copy, tag or commit pin. npm resolves the range and `package-lock.json`
 records the resolved commit. `npm run verify:contracts` (run before build)
 checks the range form, that the lock and the installed package agree, and that the
 declared lower bound is the installed package's major via the package's own
-`checkContractsVersion`. 0.5.6 is the lower bound because that predicate first
-ships there. The earlier exact v0.5.4 provenance and rc/v0.5.3 evidence remain historical in Git.
+`checkContractsVersion`. The lower bound is the contracts v1.0.0 candidate (rc.1:
+site rules, no player geometry); after the formal v1.0.0 only the range and lock
+change to `^1.0.0`. 0.x peers are refused by major. The earlier exact v0.5.4 provenance and rc/v0.5.3 evidence remain historical in Git.
 
 `call('ReadSessionIdentity', request)` and `call('ListSessions', request)` expose
 trusted official Session metadata without selecting a world or creating a
