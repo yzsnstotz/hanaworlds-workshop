@@ -70,7 +70,6 @@ export async function mount(root, f) {
     hanaworldsProposalAuthority: f.proposalAuthority,
     hanaworldsPainterV2PictureBlocks: f.painter ?? { contractHandshake, call() { assert.fail('text must not invoke image Painter'); } },
     hanaworldsCatalogue: { read: async () => plain(chain.painterRequest.catalogue) },
-    hanaworldsSafetyProfile: { read: async () => plain(chain.painterRequest.safetyProfile) },
     hanaworldsCompilerConfig: { read: async () => ({ compilationConfig: plain(chain.brushRequest.compilationConfig), compilerRevision: chain.brushRequest.compilerRevision }) },
     hanaworldsApplyAuthority: f.applyAuthority ?? { contractHandshake, readCurrentBuildContext() {}, async issue(facts) {
       f.issueCalls.push(plain(facts));

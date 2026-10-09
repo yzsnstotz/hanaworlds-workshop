@@ -11,11 +11,12 @@ let BuildingSkill; try { BuildingSkill = (await import(process.env.HW_WORKSHOP_B
 const { default: Workshop, WRITE_METHOD_PORTS } = await import(process.env.HW_WORKSHOP_PACKAGE_ENTRY ?? '../src/index.mjs');
 
 // SOURCE/FIXTURE: official services + Workshop package's own late skill plugin.
-// Full-content SHA oracles are from exact bd964cdf/426ca1b1 stage0 baseline; no duplicated production formatter.
+// Full-content SHA oracles: exact bd964cdf/426ca1b1 stage0 baseline (40d72a58/3d0ec2c5/15f8e350 on main 5a63915f)
+// plus only the contracts v1 edits: step-1 siteRules proposal sentence and renamed wire ids; no duplicated production formatter.
 // Peer ports advertise fixture handshakes only; the agents service is a fixture.
 // No AgentLoop/model/world/auth/server/profile is created or called.
 const metadata = { name: 'hanaworlds-building' };
-const expectedSha = { 'object-available': '40d72a5849350660d4faa0e1ae4f18376b6b5eeaf0b3d9eaa7406ea0a7a1fafc', 'object-unavailable': '3d0ec2c52a5b1e19cb48811f772d011b91cf9f6913673cae1bbf1545c042c670', 'rejected-catch-null': '15f8e350ab4b084cc2f74bb3e42fdab4fcbb4c3d815ea6529ffca800391193a2', 'resolved-null': '15f8e350ab4b084cc2f74bb3e42fdab4fcbb4c3d815ea6529ffca800391193a2', 'config-undefined': '15f8e350ab4b084cc2f74bb3e42fdab4fcbb4c3d815ea6529ffca800391193a2' };
+const expectedSha = { 'object-available': 'e9cb90a6338cac54f48fb60d27f65c03dff31f59f233d4892d9d35dd1d74f80e', 'object-unavailable': '6ebd1c3981798e5bd1c5b6f64a9f026cb15ebe7ced39e5449655bf8701b57344', 'rejected-catch-null': 'a3a29f85355ec9d8b40b0f6f22647831225e25cbd842119713e1d85e7ae3134f', 'resolved-null': 'a3a29f85355ec9d8b40b0f6f22647831225e25cbd842119713e1d85e7ae3134f', 'config-undefined': 'a3a29f85355ec9d8b40b0f6f22647831225e25cbd842119713e1d85e7ae3134f' };
 const results = [];
 const hash = value => createHash('sha256').update(value).digest('hex');
 function peerPorts() {
@@ -130,7 +131,7 @@ for (const scenario of ['object-available', 'object-unavailable', 'rejected-catc
         source: 'Desktop bd964cdf/426ca1b1 baseline; current Workshop source/package; official packages 0.2.0-rc.2/Cordis 4.0.4',
         generatedBranch: scenario.startsWith('object-') ? 'object' : 'null', inputRejected: scenario === 'rejected-catch-null',
         configNullishCoalescingPreserved: true, fullContentBytes: Buffer.byteLength(loadedContent),
-        fullContentSha256: hash(loadedContent), consumedContentSha256: hash(output.content),
+        fullContentSha256: hash(loadedContent), fullContent: loadedContent, consumedContentSha256: hash(output.content),
         originalBaselineEqual: true, afterLoadUnchanged, realModelCalls: 0, worldWrites: 0, productRuntime: false });
     } finally { await ctx.fiber.dispose(); }
   });

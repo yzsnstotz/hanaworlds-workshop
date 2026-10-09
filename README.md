@@ -1,6 +1,6 @@
 # hanaworlds-workshop
 
-HanaWorlds Stage 1 Workshop 0.4.13 component. See [GADGET.md](GADGET.md)
+HanaWorlds Stage 1 Workshop 0.5.0 component. See [GADGET.md](GADGET.md)
 for its host ports, Session flow, installation and recovery boundary. Product
 composition and human acceptance remain unproven.
 
@@ -91,13 +91,14 @@ DSH Core v4 规定：对话的系统提示必须是表面第 0 个节点，并�
 ## Contracts dependency (range)
 
 The root dependency is the contracts source by Git semver range
-`git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^0.5.6`; no
+`git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.0.0-rc.1`; no
 vendor copy, tag or commit pin. npm resolves the range and `package-lock.json`
 records the resolved commit. `npm run verify:contracts` (run before build)
 checks the range form, that the lock and the installed package agree, and that the
 declared lower bound is the installed package's major via the package's own
-`checkContractsVersion`. 0.5.6 is the lower bound because that predicate first
-ships there. The earlier exact v0.5.4 provenance and rc/v0.5.3 evidence remain historical in Git.
+`checkContractsVersion`. The lower bound is the contracts v1.0.0 candidate (rc.1:
+site rules, no player geometry); after the formal v1.0.0 only the range and lock
+change to `^1.0.0`. 0.x peers are refused by major. The earlier exact v0.5.4 provenance and rc/v0.5.3 evidence remain historical in Git.
 
 `call('ReadSessionIdentity', request)` and `call('ListSessions', request)` expose
 trusted official Session metadata without selecting a world or creating a

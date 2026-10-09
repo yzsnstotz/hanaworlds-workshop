@@ -9,7 +9,7 @@ import { registerContextTool } from './context-tool.mjs';
 export { prepareImageAsk, IMAGE_ASK_ALLOWED_TOOLS } from './image-ask.mjs';
 import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
 export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
-const VERSION = 'session/v3', CANVAS = 'canvas/v5';
+const VERSION = 'session/v4', CANVAS = 'canvas/v6';
 const copy = structuredClone, revision = () => `rev-${randomUUID()}`;
 const same = (a,b) => C.canonicalJSON(a) === C.canonicalJSON(b);
 // Cordis supplies a new caller-context proxy per get; compare its public origin.
@@ -22,6 +22,8 @@ const peerFail = response => {const error=new Error(response.error.code);error.p
 const withoutRequest = ({requestId:_r,proposal:_p,...rest}) => rest;
 // Workshop owns this initial revision, including before a projection is created.
 // It is derived from the trusted lifecycle identity, never Core's storage revision.
+/** Player-facing text of the skill-proposed site rules, values verbatim. */
+const siteRulesText = r => `入口${r.requireEntranceConnectivity?`需要连通（净空${r.entranceClearance.width}×${r.entranceClearance.depth}×${r.entranceClearance.height}个节点）`:'不要求连通'}；危险物：${r.hazardPolicy.forbidLiquid?'禁止液体':'允许液体'}，伤害上限每秒${r.hazardPolicy.maximumDamagePerSecond}；光照：${r.optionalLightRule===null?'不要求':`至少${r.optionalLightRule.minimumLight}`}`;
 const initialRevision = identity => `rev-core-${createHash('sha256').update(C.canonicalJSON(identity)).digest('hex')}`;
 const initial = (id,identity) => ({context:{currentSession:id,activeWorldRef:null,orderedSelectedObjectRefs:[],sessionRevision:initialRevision(identity),selectionRevision:'0',localContext:null},turns:[],details:{},confirmed:{},pending:null,requests:{},contexts:{},builds:{},undos:{}});
 
@@ -30,11 +32,11 @@ const initial = (id,identity) => ({context:{currentSession:id,activeWorldRef:nul
 export class WorkshopV3 {
  constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;
   this.protocolHandshake=C.validateType('ProtocolHandshake',{profileVersion:'protocol-handshake/v1',component:'hanaworlds-workshop',
-   protocols:[{protocol:'session',major:3,minor:1}],capabilities:[],
-   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.4.13',sourceRevision:null,artifactDigest:null}});
+   protocols:[{protocol:'session',major:4,minor:0}],capabilities:[],
+   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.5.0',sourceRevision:null,artifactDigest:null}});
   this.locks=new Map(); }
  /** Trusted composition-only metadata preparation for G-S. Returns the official
-  * SessionPersistence snapshot verbatim; this is not a session/v3 wire operation.
+  * SessionPersistence snapshot verbatim; this is not a session/v4 wire operation.
   * No World selection, Workshop projection, full log read or Session creation. */
  async readSessionMetadata(sessionRef) {
   const port=this.sessionPersistence;
@@ -262,14 +264,16 @@ export class WorkshopV3 {
   if(!same(core.identity,coreIdentity(session.header,id)))throw Error('SESSION_MISMATCH');
   if(action==='images')return {sessionRef:id,images:await this.#conversationImages(core,state,null,signal)};
   const localContext=state.context.localContext;
-  if(!localContext)throw Error('LOCAL_CONTEXT_REQUIRED: this conversation is not bound to a current world yet; the Host must bind it (session/v3 SwitchWorldContext) before building.');
+  if(!localContext)throw Error('LOCAL_CONTEXT_REQUIRED: this conversation is not bound to a current world yet; the Host must bind it (session/v4 SwitchWorldContext) before building.');
   const base={contractVersion:VERSION,sessionRef:id,localContext:copy(localContext)};
   const run=async(operation,fields)=>{signal.throwIfAborted();const out=await this.call(operation,{...base,...fields});signal.throwIfAborted();if(out.error)throw Error(`${out.error.code}: ${operation} refused`);return out.result;};
   if(action==='prepare'){
    const input=this.#human(core),done=state.requests[`AppendMultimodalTurn:${input.id}`]?.response;
    if(done){if(done.error)throw Error(`${done.error.code}: the latest user message was already prepared and refused; ask the user for a new message.`);return copy(done.result);}
    const controls={purpose:args.purpose??null,dimensions:[args.width,args.depth,args.height].some(v=>v===undefined)?null:{width:args.width,depth:args.depth,height:args.height,unit:'node'},
-    entrancePortalRefs:args.entrancePortalRefs??[],styleText:args.styleText??null};
+    entrancePortalRefs:args.entrancePortalRefs??[],styleText:args.styleText??null,siteRules:args.siteRules??null};
+   if(controls.siteRules?.optionalLightRule!=null)throw Error('CAPABILITY_UNAVAILABLE: painter/v5:light-rule — no peer can check a light rule yet. Tell the player the light requirement is currently unavailable; it can be kept for later or left out (optionalLightRule null).');
+   if(controls.siteRules)C.requireSiteRuleChecks(controls.siteRules,{entrance:true});
    const media=await this.#conversationImages(core,state,args.imageRefs??input.images,signal);
    return run('AppendMultimodalTurn',{requestId:input.id,expectedRevision:state.context.sessionRevision,turnRef:`${media.length?'image':'text'}:${input.id}`,text:input.text,media,controls});
   }
@@ -357,10 +361,13 @@ export class WorkshopV3 {
   if(operation==='AppendMultimodalTurn'){
    const media=await this.#media(body.media,core,state);
    if(state.turns.some(t=>t.turnRef===body.turnRef))fail('REPLAY_MISMATCH');
-   const dims=body.controls.dimensions;
-   const complete=body.text.trim()&&body.controls.purpose?.trim()&&dims?.unit==='node'&&['width','height','depth'].every(k=>Number.isSafeInteger(dims[k])&&dims[k]>0);
+   const dims=body.controls.dimensions,rules=body.controls.siteRules;
+   // Rule values are the skill's proposal; a rule no peer of this major can check is refused by name, never ignored.
+   if(rules)C.requireSiteRuleChecks(rules,{entrance:true});
+   const complete=body.text.trim()&&body.controls.purpose?.trim()&&dims?.unit==='node'&&['width','height','depth'].every(k=>Number.isSafeInteger(dims[k])&&dims[k]>0)&&rules!==null&&(!rules.requireEntranceConnectivity||rules.entranceClearance!==null);
    const turn={turnRef:body.turnRef,turnRevision:revision(),text:body.text,media,referenceBriefDigest:null,intentDigest:null,actionReceiptDigest:null};state.turns.push(turn);
-   const question=complete?`请确认建造${body.text}，尺寸${dims.width}×${dims.depth}×${dims.height}个节点。回复“确认”或修改。`:'请由当前skill补齐用途和节点尺寸后重新提交。';
+   const question=complete?`请确认建造${body.text}，尺寸${dims.width}×${dims.depth}×${dims.height}个节点；场地规则：${siteRulesText(rules)}。回复“确认”或修改。`:
+    rules===null?'请由当前skill提出入口、危险物、光照规则选项并补齐用途和节点尺寸后重新提交。':'请由当前skill补齐用途、节点尺寸和所需入口净空后重新提交。';
    state.pending={sessionRef:body.sessionRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,invocationId:body.requestId,clarificationId:revision(),question,complete:!!complete,controls:body.controls,afterSeq:core.events.length-1};
    state.details[turn.turnRef]={resultText:question,confirmedBrief:null};
    return this.#turnReceipt(body,state,turn,question,this.#clarification(state.pending));
@@ -375,9 +382,9 @@ export class WorkshopV3 {
     pending.complete=false;pending.afterSeq=core.events.length-1;pending.clarificationId=revision();pending.question='请更新建造参数并重新提交，之后再确认。';
     return this.#turnReceipt(body,state,turn,pending.question,this.#clarification(pending));
    }
-   const brief=C.validateType('BriefProjection',{contractVersion:'ReferenceBrief/v3',sessionRef:body.sessionRef,turnRevision:turn.turnRevision,briefRevision:revision(),media:await this.#media(turn.media,core,state),text:turn.text,controls:pending.controls});
+   const brief=C.validateType('BriefProjection',{contractVersion:'ReferenceBrief/v4',sessionRef:body.sessionRef,turnRevision:turn.turnRevision,briefRevision:revision(),media:await this.#media(turn.media,core,state),text:turn.text,controls:pending.controls});
    const briefDigest=digest('reference-brief',brief);
-   const intent=C.validateType('IntentProjection',{contractVersion:VERSION,referenceBriefDigest:briefDigest,confirmedIntent:{kind:'BUILD_STRUCTURE',text:turn.text,purpose:pending.controls.purpose,dimensions:pending.controls.dimensions,entrancePortalRefs:pending.controls.entrancePortalRefs,confirmedTurnRevision:turn.turnRevision},intendedWorldRef:body.localContext.worldRef,orderedTargetRefs:[]});
+   const intent=C.validateType('IntentProjection',{contractVersion:VERSION,referenceBriefDigest:briefDigest,confirmedIntent:{kind:'BUILD_STRUCTURE',text:turn.text,purpose:pending.controls.purpose,dimensions:pending.controls.dimensions,entrancePortalRefs:pending.controls.entrancePortalRefs,confirmedTurnRevision:turn.turnRevision,siteRules:pending.controls.siteRules},intendedWorldRef:body.localContext.worldRef,orderedTargetRefs:[]});
    turn.referenceBriefDigest=briefDigest;turn.intentDigest=digest('intent',intent);
    state.confirmed[turn.turnRef]={brief,intent,confirmationInputId:message.id,localContext:copy(body.localContext)};state.pending=null;
    state.details[turn.turnRef]={resultText:'已确认建造意图。',confirmedBrief:brief};return this.#turnReceipt(body,state,turn,'已确认建造意图。',null);
@@ -394,9 +401,10 @@ export class WorkshopV3 {
   const {turn,saved}=this.#turn(state);await this.#current(body,state);
   if(body.expectedTurnRevision&&body.expectedTurnRevision!==turn.turnRevision)fail('TURN_REVISION_MISMATCH');
   const catalogue=C.validateType('Catalogue',await this.catalogue.read(body.localContext.worldRef));
-  const safetyProfile=C.validateType('SafetyProfile',await this.safety.read(body.localContext.worldRef));
+  // Sole SafetyProfile source: invariants plus the player-confirmed site rules bound by intentDigest.
+  const safetyProfile=C.safetyProfileFromConfirmedIntent(saved.intent);
   const region=C.validateRegionInspection(stored.inspection);
-  return copy(C.validateType('BuildProposalContext',{contractVersion:'painter/v4',sessionRef:body.sessionRef,worldRef:body.localContext.worldRef,turnRevision:turn.turnRevision,painterId:'picture-blocks',invocationId:stored.invocationId,intent:saved.intent,intentDigest:turn.intentDigest,referenceBrief:saved.brief,referenceBriefDigest:turn.referenceBriefDigest,catalogue,targetFacts:region.targetFacts,targetFactsDigest:region.targetFactsDigest,safetyProfile,safetyProfileDigest:digest('safety-profile',safetyProfile),regionInspection:region,localContext:body.localContext}));
+  return copy(C.validateType('BuildProposalContext',{contractVersion:'painter/v5',sessionRef:body.sessionRef,worldRef:body.localContext.worldRef,turnRevision:turn.turnRevision,painterId:'picture-blocks',invocationId:stored.invocationId,intent:saved.intent,intentDigest:turn.intentDigest,referenceBrief:saved.brief,referenceBriefDigest:turn.referenceBriefDigest,catalogue,targetFacts:region.targetFacts,targetFactsDigest:region.targetFactsDigest,safetyProfile,safetyProfileDigest:digest('safety-profile',safetyProfile),regionInspection:region,localContext:body.localContext}));
  }
  async readBuildProposalContext(raw) {
   const body=copy(C.validateBoundRequest(VERSION,'AdvanceCurrentBuild',raw));
@@ -417,7 +425,7 @@ export class WorkshopV3 {
  async #proposalFacts(request,state,stored) {
   if(!stored||state.contexts[state.currentContextId]!==stored)fail('TARGET_FACTS_STALE');
   const currentContext=await this.#context(request,state,stored);
-  const record=stored.response?{response:stored.response,digest:C.requestDigest('painter/v4','ValidateBuildProposal',stored.request)}:null;
+  const record=stored.response?{response:stored.response,digest:C.requestDigest('painter/v5','ValidateBuildProposal',stored.request)}:null;
   const requestFacts=await this.#facts(request,state,record);
   return C.validateType('BuildProposalProviderFacts',{sourceContext:stored.context,currentContext,requestFacts});
  }
@@ -436,7 +444,7 @@ export class WorkshopV3 {
  /** Existing proposal entry: the PER_CELL write method. */
  async submitBuildProposal(raw) {return (await this.#submit(raw,'PER_CELL')).response;}
  /** Same skill, either self-described write method. Returns a Workshop business
-  * envelope around the exact painter/v4 or painter-region/v1 response; unmet needs
+  * envelope around the exact painter/v5 or painter-region/v2 response; unmet needs
   * are explained and nothing is sent to Painter. No method switch, truncation or
   * target rewrite. */
  async submitWriteProposal(method,raw) {const {availability,response}=await this.#submit(raw,method);return {method,availability,response};}
@@ -457,7 +465,7 @@ export class WorkshopV3 {
   return copy({skillGuidance:writeToolSkillGuidance,tools:WRITE_METHODS.map(method=>describeWriteMethod(method,facts)),currentBuild:current});
  }
  /** PER_CELL delegates to readBuildProposalContext. REGION captures the current
-  * confirmed brief (with verified media), intent and catalogue for painter-region/v1;
+  * confirmed brief (with verified media), intent and catalogue for painter-region/v2;
   * the region itself is in world node coordinates, so no placement inspection. */
  async readWriteProposalContext(method,raw) {
   if(method==='PER_CELL')return this.readBuildProposalContext(raw);
@@ -478,8 +486,10 @@ export class WorkshopV3 {
  }
  async #regionContext(body,state,stored) {
   const {turn,saved}=this.#turn(state);await this.#current(body,state);
+  // The region path has no entrance check in this major: a confirmed entrance requirement is refused by name.
+  C.requireSiteRuleChecks(saved.intent.confirmedIntent.siteRules,{entrance:false});
   const catalogue=C.validateType('Catalogue',await this.catalogue.read(body.localContext.worldRef));
-  return copy({contractVersion:'painter-region/v1',sessionRef:body.sessionRef,worldRef:body.localContext.worldRef,turnRevision:turn.turnRevision,invocationId:stored.invocationId,intent:saved.intent,intentDigest:turn.intentDigest,referenceBrief:saved.brief,referenceBriefDigest:turn.referenceBriefDigest,catalogue,catalogueDigest:digest('catalogue',catalogue),localContext:copy(body.localContext)});
+  return copy({contractVersion:'painter-region/v2',sessionRef:body.sessionRef,worldRef:body.localContext.worldRef,turnRevision:turn.turnRevision,invocationId:stored.invocationId,intent:saved.intent,intentDigest:turn.intentDigest,referenceBrief:saved.brief,referenceBriefDigest:turn.referenceBriefDigest,catalogue,catalogueDigest:digest('catalogue',catalogue),localContext:copy(body.localContext)});
  }
  async #submit(raw,method) {
   let request,availability=null;const region=method==='REGION';
@@ -503,7 +513,7 @@ export class WorkshopV3 {
    if(painter!==(region?this.painterRegion:this.painter))fail('CURRENT_WORLD_MISMATCH');
    if(!response.error){stored.response=copy(response);state.builds[turn.turnRef]={contextId:state.currentContextId,method,plan:response.result,compiled:null,submission:null,dispatched:false,outcome:null,...(region?{region:{compiled:null,commitRequest:null,dispatched:false,result:null,undo:null}}:{})};await this.#save(request.sessionRef,core,state);}
    return {availability,response:copy(response)};
-  });}catch(error){return {availability,response:packet(region?'painter-region/v1':'painter/v4',request?.requestId??raw?.requestId??null,null,pub(error))};}
+  });}catch(error){return {availability,response:packet(region?'painter-region/v2':'painter/v5',request?.requestId??raw?.requestId??null,null,pub(error))};}
  }
  /** REGION Advance: validated plan → Brush CompileRegionBuild → Canvas
   * ApplyRegionCommit (one logical transaction). Request is persisted before
@@ -567,9 +577,9 @@ export class WorkshopV3 {
   if(build.dispatched)return pending();
   const stored=state.contexts[build.contextId];C.validateBuildProposalContext(stored.request,await this.#proposalFacts(stored.request,state,stored));
   const ctx=stored.context,settings=await this.compilerConfig.read(body.worldRef);
-  const compile={contractVersion:'BUILD/V3',sessionRef:body.sessionRef,requestId:`${body.requestId}:compile`,worldRef:body.worldRef,localContext:body.localContext,build:build.plan.build,buildDigest:build.plan.buildDigest,catalogue:ctx.catalogue,catalogueDigest:digest('catalogue',ctx.catalogue),targetFacts:ctx.targetFacts,targetFactsDigest:ctx.targetFactsDigest,safetyProfile:ctx.safetyProfile,safetyProfileDigest:ctx.safetyProfileDigest,compilationConfig:settings.compilationConfig,compilationConfigDigest:digest('compilation-config',settings.compilationConfig),compilerRevision:settings.compilerRevision};
-  const brush=this.#protocolPeer(this.brush,PER_CELL_BRUSH);C.validateBoundRequest('BUILD/V3','BuildDocument',compile);
-  const compiled=C.validateBoundResponse('BUILD/V3','BuildDocument',compile,await brush.compile(copy(compile)));
+  const compile={contractVersion:'BUILD/V4',sessionRef:body.sessionRef,requestId:`${body.requestId}:compile`,worldRef:body.worldRef,localContext:body.localContext,build:build.plan.build,buildDigest:build.plan.buildDigest,catalogue:ctx.catalogue,catalogueDigest:digest('catalogue',ctx.catalogue),targetFacts:ctx.targetFacts,targetFactsDigest:ctx.targetFactsDigest,safetyProfile:ctx.safetyProfile,safetyProfileDigest:ctx.safetyProfileDigest,compilationConfig:settings.compilationConfig,compilationConfigDigest:digest('compilation-config',settings.compilationConfig),compilerRevision:settings.compilerRevision};
+  const brush=this.#protocolPeer(this.brush,PER_CELL_BRUSH);C.validateBoundRequest('BUILD/V4','BuildDocument',compile);
+  const compiled=C.validateBoundResponse('BUILD/V4','BuildDocument',compile,await brush.compile(copy(compile)));
   if(compiled.error){const e=new Error(compiled.error.code);e.publicError=compiled.error;throw e;}
   await this.#current(body,state);build.compiled=compiled.result;
   const objects=await this.#canvas('ListObjects',this.#child(body,'objects',{expectedRevision:null}));
@@ -648,7 +658,7 @@ export function apply(ctx) {
  const projectionStore=new WorkshopProjectionStore(()=>ctx.get('storageDomain'));
  ctx.effect?.(()=>()=>projectionStore.close(),'hanaworlds-workshop.projection-close');
  const service=new WorkshopV3({projectionStore});
- for(const [field,port] of Object.entries({sessions:'sessions',agents:'agents',attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities',painterRegion:'hanaworldsPainterRegionV1',brushRegion:'hanaworldsBrushRegionV1',canvasRegion:'hanaworldsCanvasRegionV1'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
+ for(const [field,port] of Object.entries({sessions:'sessions',agents:'agents',attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities',painterRegion:'hanaworldsPainterRegionV1',brushRegion:'hanaworldsBrushRegionV1',canvasRegion:'hanaworldsCanvasRegionV1'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
  registerImageTool(ctx,service);registerContextTool(ctx,service);
  ctx.provide('hanaworldsWorkshop',service);ctx.provide('hanaworldsWorkshopV3',service);
  new WorkshopImageLinkPanelService(ctx);

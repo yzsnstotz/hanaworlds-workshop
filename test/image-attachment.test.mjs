@@ -29,7 +29,7 @@ async function mount(root){
  await ctx.plugin(Attachments,{dshHome:join(root,'media')}).await();await ctx.plugin(SystemPrompt).await();await ctx.plugin(Tools).await();
  const caps={providerRef:'fixture-host',capabilityRevision:'cap1',worldRef:local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile:{profileVersion:'state-profile/v2',nodeFields:['nodeName','param1','param2'],metadataMode:'exact',inventoryMode:'exact',timerMode:'exact',derivedLightMode:'recompute-with-readback'},sessionDeleteSupported:false,imageMediaTypes:['image/png'],model:null};
  ctx.provide('hanaworldsCapabilities',caps);
- ctx.provide('hanaworldsCanvasV5',{contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-canvas',protocols:[{protocol:'canvas',major:5,minor:0}],capabilities:[],provenance:{packageName:'hanaworlds-canvas',packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}},async call(op,q){assert.equal(op,'ReadWorldSelectionContext','image tool must never write world');return {contractVersion:'canvas/v5',requestId:q.requestId,result:{sessionRef:q.sessionRef,worldRef:q.worldRef,inventory:{capabilityRevision:'cap1',connections:[]},selection:{status:'BOUND',connectionRef:local.connectionRef,context:{currentSession:q.sessionRef,activeWorldRef:local.worldRef,orderedSelectedObjectRefs:[],sessionRevision:'c1',selectionRevision:local.selectionRevision,localContext:local}}},error:null};}});
+ ctx.provide('hanaworldsCanvasV5',{contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-canvas',protocols:[{protocol:'canvas',major:6,minor:0}],capabilities:[],provenance:{packageName:'hanaworlds-canvas',packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}},async call(op,q){assert.equal(op,'ReadWorldSelectionContext','image tool must never write world');return {contractVersion:'canvas/v6',requestId:q.requestId,result:{sessionRef:q.sessionRef,worldRef:q.worldRef,inventory:{capabilityRevision:'cap1',connections:[]},selection:{status:'BOUND',connectionRef:local.connectionRef,context:{currentSession:q.sessionRef,activeWorldRef:local.worldRef,orderedSelectedObjectRefs:[],sessionRevision:'c1',selectionRevision:local.selectionRevision,localContext:local}}},error:null};}});
  ctx.provide('llm',{async stream(){assert.fail('no model calls');}});
  await ctx.plugin(plugin).await();const ws=ctx.get('hanaworldsWorkshop');
  return {ctx,ws,async append(id,event){const w=await ctx.sessionPersistence.open(id,'write');try{const log=await w.read();await w.append([{...event,seq:log.events.length}]);}finally{await w.close();}},async close(){await ws.projectionStore.close();await ctx.fiber.dispose();}};
@@ -43,7 +43,7 @@ async function setup(fn){
  await fn({...r,root,url,execute,requests:()=>requests,whenSlow:fn=>{onSlow=fn;}});
  }finally{await r.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(root,{recursive:true,force:true});}
 }
-async function call(r,op,fields){const q={contractVersion:'session/v3',sessionRef:'s1',requestId:op,...(op==='ReadSessionTurnDetails'?{localContext:local}:{expectedRevision:null}),...fields};const out=await r.ws.call(op,q);assert.equal(out.error,null,JSON.stringify(out));return out.result;}
+async function call(r,op,fields){const q={contractVersion:'session/v4',sessionRef:'s1',requestId:op,...(op==='ReadSessionTurnDetails'?{localContext:local}:{expectedRevision:null}),...fields};const out=await r.ws.call(op,q);assert.equal(out.error,null,JSON.stringify(out));return out.result;}
 
 test('real HTTP → actual attachment store → native image result → same brief and durable reopen',async()=>setup(async r=>{
  const out=await r.execute();assert.equal(out.isError,false,JSON.stringify(out));assert.equal(r.requests(),1);
@@ -55,7 +55,7 @@ test('real HTTP → actual attachment store → native image result → same bri
  await r.append('s1',{type:'tool/result',time:101,surfaceOp:'append',data:{turn:1,step:1,message:{id:'image-result',role:'tool',toolCallId:'download-s1',source:{kind:'tool',callId:'download-s1'},isError:false,content:out.content}}});
  const started=await call(r,'StartOrResumeSession',{});
  const switched=await call(r,'SwitchWorldContext',{expectedRevision:started.context.sessionRevision,worldRef:local.worldRef,selectionRevision:local.selectionRevision,localContext:local});
- const input=await call(r,'AppendMultimodalTurn',{expectedRevision:switched.context.sessionRevision,turnRef:'image-turn',text:'图片中的房子',media:[out.value.media],controls:{purpose:'house',dimensions:{width:3,height:3,depth:3,unit:'node'},entrancePortalRefs:[],styleText:null},localContext:local});
+ const input=await call(r,'AppendMultimodalTurn',{expectedRevision:switched.context.sessionRevision,turnRef:'image-turn',text:'图片中的房子',media:[out.value.media],controls:{purpose:'house',dimensions:{width:3,height:3,depth:3,unit:'node'},entrancePortalRefs:[],styleText:null,siteRules:{requireEntranceConnectivity:false,entranceClearance:null,hazardPolicy:{forbidLiquid:true,maximumDamagePerSecond:0},optionalLightRule:null}},localContext:local});
  await r.append('s1',user('confirm','确认'));const fresh=await call(r,'StartOrResumeSession',{});
  await call(r,'AnswerClarification',{requestId:'confirm',expectedRevision:fresh.context.sessionRevision,turnRef:'image-turn',clarificationId:input.clarification.clarificationId,answer:'确认',localContext:local});
  const details=await call(r,'ReadSessionTurnDetails',{});assert.deepEqual(details.turns[0].confirmedBrief.media,[out.value.media]);
@@ -66,9 +66,9 @@ test('real HTTP → actual attachment store → native image result → same bri
 test('wrong Session cannot download another Session user link or consume its media',async()=>setup(async r=>{
  const denied=await r.execute({url:r.url},'s2');assert.equal(denied.isError,true);assert.equal(r.requests(),0);
  const out=await r.execute();assert.equal(out.isError,false,JSON.stringify(out));
- const s=await r.ws.call('StartOrResumeSession',{contractVersion:'session/v3',sessionRef:'s2',requestId:'start',expectedRevision:null});
- const switched=await r.ws.call('SwitchWorldContext',{contractVersion:'session/v3',sessionRef:'s2',requestId:'switch',expectedRevision:s.result.context.sessionRevision,worldRef:local.worldRef,selectionRevision:local.selectionRevision,localContext:local});
- const refused=await r.ws.call('AppendMultimodalTurn',{contractVersion:'session/v3',sessionRef:'s2',requestId:'input',expectedRevision:switched.result.context.sessionRevision,turnRef:'wrong',text:'house',media:[out.value.media],controls:{purpose:null,dimensions:null,entrancePortalRefs:[],styleText:null},localContext:local});assert.ok(refused.error);
+ const s=await r.ws.call('StartOrResumeSession',{contractVersion:'session/v4',sessionRef:'s2',requestId:'start',expectedRevision:null});
+ const switched=await r.ws.call('SwitchWorldContext',{contractVersion:'session/v4',sessionRef:'s2',requestId:'switch',expectedRevision:s.result.context.sessionRevision,worldRef:local.worldRef,selectionRevision:local.selectionRevision,localContext:local});
+ const refused=await r.ws.call('AppendMultimodalTurn',{contractVersion:'session/v4',sessionRef:'s2',requestId:'input',expectedRevision:switched.result.context.sessionRevision,turnRef:'wrong',text:'house',media:[out.value.media],controls:{purpose:null,dimensions:null,entrancePortalRefs:[],styleText:null,siteRules:null},localContext:local});assert.ok(refused.error);
 }));
 test('cancelled execution, missing media service, and lying image content refuse without attachment result',async()=>setup(async r=>{
  const ctl=new AbortController();ctl.abort();assert.equal((await r.execute({url:r.url},'s1',ctl.signal)).isError,true);assert.equal(r.requests(),0);
@@ -86,7 +86,7 @@ test('existing uploaded Core image can bind a brief; unreferenced attachment can
  const ref=await r.ctx.attachments.saveImage({data:png,mediaType:'image/png'});const stored=await r.ctx.attachments.readImage(ref);
  const media={attachmentRef:ref.attachmentId,storedBytesDigest:sha(stored.data),projectionVariantId:null,projectionBytesDigest:null,mediaType:ref.mediaType,bytes:ref.bytes,width:ref.width,height:ref.height};
  const start=await call(r,'StartOrResumeSession',{});let snapshot=await call(r,'SwitchWorldContext',{expectedRevision:start.context.sessionRevision,worldRef:local.worldRef,selectionRevision:local.selectionRevision,localContext:local});
- const input={contractVersion:'session/v3',sessionRef:'s1',requestId:'missing-provenance',expectedRevision:snapshot.context.sessionRevision,turnRef:'upload-turn',text:'uploaded house',media:[media],controls:{purpose:null,dimensions:null,entrancePortalRefs:[],styleText:null},localContext:local};
+ const input={contractVersion:'session/v4',sessionRef:'s1',requestId:'missing-provenance',expectedRevision:snapshot.context.sessionRevision,turnRef:'upload-turn',text:'uploaded house',media:[media],controls:{purpose:null,dimensions:null,entrancePortalRefs:[],styleText:null,siteRules:null},localContext:local};
  const denied=await r.ws.call('AppendMultimodalTurn',input);assert.equal(denied.error.code,'ATTACHMENT_REJECTED');
  await r.append('s1',user('upload','this house',[{type:'image',attachment:ref}]));snapshot=await call(r,'StartOrResumeSession',{});
  const accepted=await r.ws.call('AppendMultimodalTurn',{...input,requestId:'uploaded',expectedRevision:snapshot.context.sessionRevision});assert.equal(accepted.error,null,JSON.stringify(accepted));

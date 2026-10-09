@@ -75,5 +75,5 @@ set -e
 printf 'baseline exit %s\n' "$BASELINE_EXIT" >> "$TASK_EVIDENCE/baseline-041-k3.log"
 test "$BASELINE_EXIT" -ne 0
 grep -q 'UNSUPPORTED_VERSION' "$TASK_EVIDENCE/baseline-041-k3.log"
-grep -q 'Brush advertising BUILD/V3 on hanaworlds-contracts@0.5.0' "$TASK_EVIDENCE/baseline-041-k3.log"
+grep -q 'Brush advertising BUILD/V4 on hanaworlds-contracts@0.5.0' "$TASK_EVIDENCE/baseline-041-k3.log"
 printf 'write-tools gate completed\n'

@@ -1,6 +1,6 @@
-# Workshop 0.4.13 — local-world skill business component
+# Workshop 0.5.0 — local-world skill business component
 
-Fresh profile only. Contracts from the contracts source by Git range `#semver:^0.5.6` (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
+Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.0.0-rc.1` (contracts v1.0.0 candidate; after the formal v1.0.0 only the range and lock change to `^1.0.0`) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
 ## Session identity and deletion
 
@@ -19,13 +19,13 @@ The successful G-L deletion route remains unavailable pending official supply.
 
 ## Host assembly
 
-Cordis services: `hanaworldsWorkshop` and `hanaworldsWorkshopV3` refer to the same service. Inject real `sessionPersistence`, `storageDomain`, `hanaworldsCanvasV5`, `hanaworldsPainterV2PictureBlocks`, `hanaworldsBrushV3`, `hanaworldsCatalogue.read(worldRef)`, `hanaworldsSafetyProfile.read(worldRef)`, `hanaworldsCompilerConfig.read(worldRef)` and `hanaworldsCapabilities`. Compiler settings return `{compilationConfig,compilerRevision}`. Per-cell services advertise public `ProtocolHandshake`: Painter requires painter major 4, Canvas requires canvas major 5, and Brush requires BUILD major 3 plus `BUILD/V3:per-cell-compile`. Package patch/hash is provenance only. No other plugin import, model loop, MCP or world mutator is included.
+Cordis services: `hanaworldsWorkshop` and `hanaworldsWorkshopV3` refer to the same service. Inject real `sessionPersistence`, `storageDomain`, `hanaworldsCanvasV5`, `hanaworldsPainterV2PictureBlocks`, `hanaworldsBrushV3`, `hanaworldsCatalogue.read(worldRef)`, `hanaworldsCompilerConfig.read(worldRef)` and `hanaworldsCapabilities`. Compiler settings return `{compilationConfig,compilerRevision}`. Per-cell services advertise public `ProtocolHandshake`: Painter requires painter major 5, Canvas requires canvas major 6, and Brush requires BUILD major 4 plus `BUILD/V4:per-cell-compile`. Package patch/hash is provenance only. No other plugin import, model loop, MCP or world mutator is included.
 
 Host must keep these ports in its internal runtime. Keep the three existing business categories as agent tools and derive the real Core Session and selected local context in Host. A model does not choose a service or call Canvas/Adapter mutators. `LocalRequestFacts` is generated from Workshop's own durable journal/current brief and fresh Canvas `ReadWorldSelectionContext`; it is never a tool input or a permission assertion.
 
-The Host first selects the actual connection through Canvas `SelectWorldConnection` using the real transport incarnation and expectedContext. Then `call('SwitchWorldContext', session/v3 request)` reads that selection back and binds Workshop to it. It does not create an incarnation or assume selection from JSON. Session, world, connection and incarnation must agree. Unbound/current mismatch is an explicit rejection.
+The Host first selects the actual connection through Canvas `SelectWorldConnection` using the real transport incarnation and expectedContext. Then `call('SwitchWorldContext', session/v4 request)` reads that selection back and binds Workshop to it. It does not create an incarnation or assume selection from JSON. Session, world, connection and incarnation must agree. Unbound/current mismatch is an explicit rejection.
 
-The delivered Painter0.3.0 retains service name `hanaworldsPainterV2PictureBlocks` while accepting only new painter/v4. Desktop supplies `hanaworldsPainterLocalFacts.read(request, operation, {signal})`; for ValidateBuildProposal it can call Workshop's **read-only internal** `readBuildProposalProviderFacts(request)`. This returns public BuildProposalProviderFacts from the exact reserved request, durable source/current brief and fresh Canvas connection readback. No private state access or model-supplied facts. The read method is reentrant during Painter validation and never acquires the mutation lock. Host remains responsible for its real Session/connection dispatch and cancellation; this accessor is not a fourth agent tool. CreateBuildPlan's Host LocalRequestFacts port belongs to the deferred fixed/image route, not this text-only getter.
+The delivered Painter0.3.0 retains service name `hanaworldsPainterV2PictureBlocks` while accepting only new painter/v5. Desktop supplies `hanaworldsPainterLocalFacts.read(request, operation, {signal})`; for ValidateBuildProposal it can call Workshop's **read-only internal** `readBuildProposalProviderFacts(request)`. This returns public BuildProposalProviderFacts from the exact reserved request, durable source/current brief and fresh Canvas connection readback. No private state access or model-supplied facts. The read method is reentrant during Painter validation and never acquires the mutation lock. Host remains responsible for its real Session/connection dispatch and cancellation; this accessor is not a fourth agent tool. CreateBuildPlan's Host LocalRequestFacts port belongs to the deferred fixed/image route, not this text-only getter.
 
 ## Three business actions
 
@@ -33,7 +33,7 @@ The delivered Painter0.3.0 retains service name `hanaworldsPainterV2PictureBlock
 2. `submitBuildProposal(ValidateBuildProposalRequest): Promise<ValidateBuildProposalResponse>` — Host joins captured context with the model's pure `BuildProposal`; exact Painter validation, same current context/brief/turn and durable result. No direct plan injection.
 3. `call('AdvanceCurrentBuild', AdvanceCurrentBuildRequest)` — reuses validated plan through Brush BuildDocument, Canvas analysis and CurrentBuildSubmission, durable apply, public Readback and linked object/history. No bypass of Painter/Brush/Canvas.
 
-Request types are from root contracts. Current wires: session/v3, painter/v4, BUILD/V3 and canvas/v5. Session controls use original `AppendMultimodalTurn` with complete text controls and `AnswerClarification`; user intent confirmation is backed by a real subsequent Core `user/message`. It is not a world/range permission confirmation. The skill owns understanding, clarification and proposal; Workshop has zero model calls. Incomplete controls return a question for the skill; corrections resubmit complete parameters. Image media may now be included using the same-session binding described below.
+Request types are from root contracts. Current wires: session/v4, painter/v5, BUILD/V4 and canvas/v6. Session controls use original `AppendMultimodalTurn` with complete text controls and `AnswerClarification`; user intent confirmation is backed by a real subsequent Core `user/message`. It is not a world/range permission confirmation. The skill owns understanding, clarification and proposal; Workshop has zero model calls. Incomplete controls return a question for the skill; corrections resubmit complete parameters. Image media may now be included using the same-session binding described below.
 
 `call('StartOrResumeSession')` returns current snapshot; `ReadSessionTurnDetails` provides durable text/briefs. `ReadCurrentUndoStatus` and `UndoCurrentBuild` reuse the original verified build, current object inspection and linked history. Undo stores its actual invocation/action descriptor, original transaction and new Undo request before dispatch; only a VERIFIED receipt plus changed, correctly linked history becomes user-visible success. Canvas appends the Undo row: the new head must equal that verified Undo transactionId, its originTransactionId must equal the original BUILD, and receipt/readback/operation digests, affected objects and history revision must all match.
 
@@ -62,8 +62,24 @@ after the question; tool output is never consent. `read` returns
 `{proposalRef, context}` with a stable context request per confirmed turn.
 The world binding is Workshop's own projection set by the Host through
 `SwitchWorldContext`; when absent the tool refuses with `LOCAL_CONTEXT_REQUIRED`
-and says so. siteRules proposal/confirmation (contracts v1.0.0) is added when the
-v1 candidate is published; until then this tool carries the 0.5.6 Controls shape.
+and says so.
+
+Site rules (contracts v1): the skill proposes `siteRules` (entrance connectivity with
+its design clearance, hazard policy, optional light rule) as a `prepare` argument;
+values are the skill's, Workshop and contracts supply no default or enum.
+`AppendMultimodalTurn` shows them to the player verbatim in the question; without
+a proposal (or a required entrance without clearance) the turn stays incomplete and
+"确认" cannot confirm. The human confirmation copies them into
+`ConfirmedIntent.siteRules`, bound by the brief/intent digests; a later change is a
+new turn and the old context is stale. `#context` derives the SafetyProfile only
+through the contract's `safetyProfileFromConfirmedIntent`; Workshop no longer reads
+a `hanaworldsSafetyProfile` (Host/Canvas/World) service. A non-null light rule is
+refused by capability name (`painter/v5:light-rule`, CAPABILITY_UNAVAILABLE) on the
+tool (with a "currently unavailable" explanation for the player, without consuming
+the user's message) and on the wire; a confirmed entrance requirement is refused on
+the REGION path (`painter-region/v2:entrance-rule`). Projections use the new
+domain root `hanaworlds_workshop_v1`; 0.x projections are not migrated. Contracts
+v1 carry no player body geometry, so stored contexts hold none.
 
 ## One native image-link tool (S1-WS-IMAGE-ATTACHMENT-01)
 
@@ -106,7 +122,7 @@ skill; image interpretation, pixel material selection and world changes are not
 performed by this tool.
 
 The same `media` enters `AppendMultimodalTurn.media`, persists in its turn, and
-is re-read and digest-checked before confirmation into `ReferenceBrief/v3.media`.
+is re-read and digest-checked before confirmation into `ReferenceBrief/v4.media`.
 For an uploaded image, Host uses the existing `attachments.saveImage` /
 `admitPromptContent` path and persists a user image block in the same Core Session.
 Host derives MediaBinding from `readImage` bytes (SHA256, not URL/name). Workshop
@@ -147,7 +163,7 @@ Workshop 为一个对话的 Agent 提供建造 skill 的「看图」步骤：
 
 `npm run test:ask`：`test/image-ask.test.mjs`（真实 Loop + FIXTURE 模型）与 `test/ask-web.test.mjs`（47608 路由与信任边界）。
 
-## Two write methods (S1-WS-WRITE-TOOLS-01; contracts `^0.5.6`)
+## Two write methods (S1-WS-WRITE-TOOLS-01; contracts `^1.0.0-rc.1`)
 
 The one building skill has two write methods, each published as a contracts
 `WriteMethodDescriptor` (`method`, `toolName`, `purpose`, `inputType`,
@@ -169,7 +185,7 @@ Compatibility: REGION requires each region port to advertise a contracts
 `ProtocolHandshake` and pass `checkProtocolCompatibility` for its wire and the
 `regionCapabilities` it owns (same major, minor ≥ required, all capabilities;
 provenance only recorded). PER_CELL requires Brush's public `ProtocolHandshake`
-to pass `protocolRequirement('BUILD/V3',['BUILD/V3:per-cell-compile'])`: BUILD
+to pass `protocolRequirement('BUILD/V4',['BUILD/V4:per-cell-compile'])`: BUILD
 major 3, the required minor and capability. Descriptor availability and
 `AdvanceCurrentBuild` share `PER_CELL_BRUSH`; package patch/source/hash never
 decide Brush compatibility. Wrong major or absent protocol is
@@ -201,7 +217,7 @@ Service methods:
   `availability.unmet = [{code, need, remedy}]`. Read-only.
 - `readWriteProposalContext(method, AdvanceCurrentBuildRequest)` — PER_CELL is
   `readBuildProposalContext`; REGION captures the confirmed brief (verified media
-  kept), intent and catalogue as the painter-region/v1 request minus
+  kept), intent and catalogue as the painter-region/v2 request minus
   `requestId`/`proposal`. Regions use world node coordinates; no placement inspection.
 - `submitWriteProposal(method, request)` → `{method, availability, response}`.
   Unavailable methods return `CAPABILITY_UNAVAILABLE` plus the unmet list and send

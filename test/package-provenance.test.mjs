@@ -7,7 +7,7 @@ import * as C from 'hanaworlds-contracts';
 import { verifyContracts } from '../scripts/verify-contracts.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const installed = dirname(fileURLToPath(import.meta.resolve('hanaworlds-contracts/package.json')));
-const spec = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^0.5.6';
+const spec = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.0.0-rc.1';
 
 async function scratch(t, name) {
   const base = process.env.HW_RUNTIME_ROOT;
@@ -49,7 +49,7 @@ test('contracts: a tag or commit pin instead of a range is rejected', async t =>
 });
 
 test('contracts: a declared range of another contracts major is rejected by the source predicate', async t => {
-  const temp = await withManifest(t, (pkg, lock) => { pkg.dependencies['hanaworlds-contracts'] = lock.packages[''].dependencies['hanaworlds-contracts'] = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.0.0'; });
+  const temp = await withManifest(t, (pkg, lock) => { pkg.dependencies['hanaworlds-contracts'] = lock.packages[''].dependencies['hanaworlds-contracts'] = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^0.5.6'; });
   await assert.rejects(verifyContracts({projectRoot:temp}), e => e.code === 'UNSUPPORTED_VERSION');
 });
 

@@ -9,7 +9,7 @@ process.env.HW_RUNTIME_ROOT ??= new URL('../../runtimes/', import.meta.url).path
 function skillFixture() {
   const f = authorize(fixture());
   f.modelCalls = 0; f.proposalCalls = 0; f.providerChanges = {}; f.afterProposal = async () => {};
-  f.controls = { purpose: 'first building', dimensions: { width: 1, depth: 1, height: 1, unit: 'node' }, entrancePortalRefs: [], styleText: null };
+  f.controls = { purpose: 'first building', dimensions: { width: 1, depth: 1, height: 1, unit: 'node' }, entrancePortalRefs: [], styleText: null, siteRules:{requireEntranceConnectivity:false,entranceClearance:null,hazardPolicy:{forbidLiquid:true,maximumDamagePerSecond:0},optionalLightRule:null} };
   f.llm = { async *stream() { f.modelCalls++; throw Error('skill must own interpretation'); } };
   const binding = context => ({ ...plain(example.facts.originalBinding), actorRef: context.actorRef,
     sessionRef: context.sessionRef, authorizationRef: context.authorizationRef, worldRef: context.worldRef,

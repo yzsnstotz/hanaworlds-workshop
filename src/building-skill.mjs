@@ -1,4 +1,5 @@
-// Mechanical migration from Desktop bd964cdf19785b14aa1e2f6d2a2ee350190a038f.
+// Mechanical migration from Desktop bd964cdf19785b14aa1e2f6d2a2ee350190a038f; contracts v1 batch adds the
+// siteRules proposal to step 1 (PLAN-SAFETY-V1-BATCH-01).
 // skill-tools.ts blob 426ca1b1adef74d5bcaa85514cb4f48159f0d3dc: exact templates/formatter.
 // Load once, after the host has explicitly awaited its peer composition.
 const content = `Build and undo structures in the currently connected local world.
@@ -12,8 +13,12 @@ when scale or purpose is unclear; do not infer a real-world scale from pixels. U
 action images to list actual conversation image references; pass only relevant imageRefs when preparing
 after clarification. Empty imageRefs explicitly selects text only. Entities and interior workflows remain deferred.
 
-1. Call hanaworlds_context with action prepare and complete purpose, width, depth, height and optional
-styleText and relevant imageRefs. It uses the user's actual latest message. Show the returned question, then wait for a new
+1. Call hanaworlds_context with action prepare and complete purpose, width, depth, height, siteRules and optional
+styleText and relevant imageRefs. siteRules is your proposal for this site: whether the entrance must stay
+connected (with its design clearance in whole nodes), the hazard policy (liquids, maximum damage per second)
+and any light requirement. Choose the values from the request and the place, offer the user the options and
+never assume a default; the user confirms them with the build. A light rule is currently unavailable: tell the
+user so and leave it null. It uses the user's actual latest message. Show the returned question, then wait for a new
 human message. Never confirm on the user's behalf. If the user corrects the design, submit complete
 updated controls with prepare. For explicit confirmation, call action confirm. A remaining clarification
 must be asked again; never treat tool output as human consent.
@@ -39,7 +44,7 @@ bounding box or claim Undo from an optimistic message.
 No shell commands, direct world writes, other model calls, or alternate planner are part of this skill.`
 /** Region steps: same confirmed brief, then the region proposal tool instead of steps 2-3 of the cell path. */
 const regionSteps = `Region write (method REGION, tool hanaworlds_region_proposal), after the same prepare/confirm step 1:
-R1. Call hanaworlds_region_proposal action context. It returns proposalRef, the captured painter-region/v1
+R1. Call hanaworlds_region_proposal action context. It returns proposalRef, the captured painter-region/v2
 context (catalogue, brief, localContext) and worldFacts (for a world created here: game and flat mapgen,
 for example the ground level). Coordinates are absolute world node coordinates; there is no placement frame.
 R2. Call hanaworlds_region_proposal action submit with proposalRef and proposal JSON
