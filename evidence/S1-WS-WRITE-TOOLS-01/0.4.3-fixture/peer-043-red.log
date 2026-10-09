@@ -1,0 +1,131 @@
+✖ K3 Painter/Canvas: cross patch/hash and methods accept normal image proposal → advance → same-build Undo (FIXTURE) (1218.357ms)
+✖ K3 Painter/Canvas: wrong major, no protocol, region-only and exact-only are named and unavailable (0.983708ms)
+✖ K3 Painter: protocol change before submission rejects without Painter/Canvas calls (219.523834ms)
+✖ K3 Canvas: protocol change before advance rejects with zero writes (265.207667ms)
+✖ K3 Canvas: missing declaration before Undo rejects with zero undo writes (340.9925ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 0
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2192.567041
+
+✖ failing tests:
+
+test at test/write-tools.test.mjs:320:1
+✖ K3 Painter/Canvas: cross patch/hash and methods accept normal image proposal → advance → same-build Undo (FIXTURE) (1218.357ms)
+  AssertionError [ERR_ASSERTION]: {"contractVersion":"session/v3","requestId":"switch","result":null,"error":{"code":"UNSUPPORTED_VERSION","phase":"decode","retryability":"NEVER","mutationState":"NONE","transactionRef":null,"causeCode":null,"reason":"VERSION_UNSUPPORTED"}}
+  + actual - expected
+  
+  + {
+  +   causeCode: null,
+  +   code: 'UNSUPPORTED_VERSION',
+  +   mutationState: 'NONE',
+  +   phase: 'decode',
+  +   reason: 'VERSION_UNSUPPORTED',
+  +   retryability: 'NEVER',
+  +   transactionRef: null
+  + }
+  - null
+  
+      at call (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:71:81)
+      at async imageBrief (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:84:11)
+      at async file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:264:25
+      at async withRuntime (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:67:7)
+      at async perCellFlow (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:263:2)
+      at async TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:327:2)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { code: 'UNSUPPORTED_VERSION', phase: 'decode', retryability: 'NEVER', mutationState: 'NONE', transactionRef: null, causeCode: null, reason: 'VERSION_UNSUPPORTED' },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/write-tools.test.mjs:329:1
+✖ K3 Painter/Canvas: wrong major, no protocol, region-only and exact-only are named and unavailable (0.983708ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Painter ProtocolHandshake/. Input:
+  
+  'Painter advertising painter/v4 on hanaworlds-contracts@0.5.2'
+  
+      at TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:340:62)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1103:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:785:18)
+      at Test.postRun (node:internal/test_runner/test:1232:19)
+      at Test.run (node:internal/test_runner/test:1160:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Painter advertising painter/v4 on hanaworlds-contracts@0.5.2',
+    expected: /Painter ProtocolHandshake/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test/write-tools.test.mjs:346:1
+✖ K3 Painter: protocol change before submission rejects without Painter/Canvas calls (219.523834ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'UNSUPPORTED_VERSION'
+  
+      at file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:351:10
+      at async withRuntime (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:67:7)
+      at async TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:347:20)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:785:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'UNSUPPORTED_VERSION',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/write-tools.test.mjs:355:1
+✖ K3 Canvas: protocol change before advance rejects with zero writes (265.207667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'UNSUPPORTED_VERSION'
+  
+      at file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:360:67
+      at async withRuntime (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:67:7)
+      at async TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:356:20)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:785:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'UNSUPPORTED_VERSION',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/write-tools.test.mjs:364:1
+✖ K3 Canvas: missing declaration before Undo rejects with zero undo writes (340.9925ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'UNSUPPORTED_VERSION'
+  
+      at file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:371:10
+      at async withRuntime (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:67:7)
+      at async TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:365:20)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:785:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'UNSUPPORTED_VERSION',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

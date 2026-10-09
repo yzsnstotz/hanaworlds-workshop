@@ -5,10 +5,16 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
 import { WorkshopV1, apply } from '../src/index.mjs';
-import * as contractsV4 from '../vendor/contracts/dist/v4/index.mjs';
+import * as contractsV4 from 'hanaworlds-contracts/v4';
+import { worldFixture } from './helpers/world-context.mjs';
 
 class CoreSessions {
   logs = new Map();
+  constructor() {
+    this.logs.set('s1', { meta: { version: SESSION_FORMAT_VERSION,
+      id: 's1', createdAt: 1, isSeeded: false },
+    events: [], owned: true, flushes: 0 });
+  }
   async create(header) {
     assert.equal(header.version, SESSION_FORMAT_VERSION);
     assert.equal(header.isSeeded, false);
@@ -27,7 +33,8 @@ class CoreSessions {
     return this.#handle(row, access);
   }
   #handle(row, access) {
-    return { async read() { return { eventState: 'exclusive', events: structuredClone(row.events) }; },
+    return { header: row.meta,
+      async read() { return { eventState: 'exclusive', events: structuredClone(row.events) }; },
       async append(events) { assert.equal(access, 'write');
         assert.equal(events[0].seq, row.events.length); row.events.push(...structuredClone(events)); },
       async flush() { assert.equal(access, 'write'); row.flushes++; },
@@ -35,19 +42,86 @@ class CoreSessions {
   }
 }
 
+class ProjectionStore {
+  rows = new Map();
+  writes = 0;
+  async get(id, identity) {
+    const row = this.rows.get(id);
+    if (!row) return null;
+    assert.deepEqual(row.identity, identity);
+    return structuredClone(row.state);
+  }
+  async create(id, identity, state) {
+    assert.equal(this.rows.has(id), false);
+    this.rows.set(id, { identity, state: structuredClone(state) });
+    this.writes++;
+  }
+  async replace(id, identity, expectedRevision, state) {
+    const row = this.rows.get(id);
+    assert.deepEqual(row.identity, identity);
+    assert.equal(row.state.context.sessionRevision, expectedRevision);
+    row.state = structuredClone(state);
+    this.writes++;
+  }
+  state(id = 's1') { return this.rows.get(id)?.state; }
+}
+
 function setup(overrides = {}) {
   const sessions = new CoreSessions();
+  const projectionStore = new ProjectionStore();
   const calls = [];
   const workshop = new WorkshopV1({
-    sessionPersistence: sessions,
-    authority: { async verify(request) { return { current: true, actorRef: request.actorRef, sessionRef: request.sessionRef, authorizationRef: request.authorizationRef, surface: 'SHELL', allowedActions: ['READ', 'APPEND', 'INSPECT', 'SELECT', 'ANALYZE', 'APPLY_RECOVERABLE'] }; } },
+    sessionPersistence: sessions, projectionStore,
+    authority: { async verify(request) { return { current: true, actorRef: request.actorRef, sessionRef: request.sessionRef, authorizationRef: request.authorizationRef, surface: 'SHELL', worldRef: request.worldRef, sessionIncarnationRef: 'inc-1', nativeGrantRef: 'native-1', invocationRef: 'invoke-1', invocationStatus: 'ACTIVE', grantStatus: 'CURRENT', allowedActions: ['READ', 'APPEND', 'INSPECT', 'SELECT', 'ANALYZE', 'APPLY_RECOVERABLE'] }; } },
     capabilities: { providerRef: 'core', capabilityRevision: '1', worldRef: null, engineBounds: null, limits: [], recoveryGuarantee: null, stateProfile: null, regionProtectionWriters: [], sessionDeleteSupported: false, imageMediaTypes: ['image/png'], model: 'gpt-5.6-luna' },
     ...overrides,
   });
-  return { workshop, sessions, calls };
+  if (workshop.canvas) {
+    // Existing model/build tests use a typed external world-selection fixture;
+    // their original Canvas callback still owns all later build operations.
+    const selection = worldFixture();
+    const authority = workshop.authority;
+    const canvas = workshop.canvas;
+    workshop.authority = { async verify(body, operation) {
+      const proof = await authority.verify(body, operation);
+      if (operation !== 'SwitchWorldContext') return proof;
+      if (selection.parent?.requestId !== body.requestId) selection.capture(body);
+      return { ...await selection.authority.verify(body, operation), ...proof };
+    } };
+    workshop.canvas = { ...canvas, async call(operation, body) {
+      if (['ReadWorldSelectionContext', 'SelectWorldConnection',
+        'SwitchWorldConnection'].includes(operation)) return selection.canvas.call(operation, body);
+      return canvas.call(operation, body);
+    } };
+  }
+  return { workshop, sessions, projectionStore, calls };
 }
 
 const start = (sessionRef = 's1') => ({ contractVersion: 'session/v2', actorRef: 'user', sessionRef, requestId: `start-${sessionRef}`, authorizationRef: 'grant', expectedRevision: null });
+
+test('action receipt cannot attach a verified Apply from another turn', async () => {
+  const { workshop, projectionStore } = setup();
+  const opened = await workshop.call('StartOrResumeSession', start());
+  const state = projectionStore.state();
+  state.turns.push({ turnRef: 'turn-a', turnRevision: 'rev-a', text: 'A' },
+    { turnRef: 'turn-b', turnRevision: 'rev-b', text: 'B' });
+  const receipt = { contractVersion: 'canvas/v2', transactionId: 'tx-a',
+    operationDigest: 'a'.repeat(64), transactionPayloadDigest: 'b'.repeat(64),
+    status: 'VERIFIED', previousWorldRevision: 'world-0',
+    observedWorldRevision: 'world-1', readbackDigest: 'c'.repeat(64),
+    restoreStatus: 'NOT_REQUIRED', error: null };
+  state.pendingApply = { turnRef: 'turn-a', status: 'VERIFIED',
+    request: { sessionRef: 's1', actorRef: 'user', worldRef: 'world-a',
+      authorizationRef: 'grant', transactionId: 'tx-a' },
+    response: { result: receipt } };
+  const result = await workshop.call('RecordActionReceipt', {
+    contractVersion: 'session/v2', actorRef: 'user', sessionRef: 's1',
+    requestId: 'attach-wrong-turn', authorizationRef: 'grant',
+    turnRef: 'turn-b', expectedRevision: opened.result.context.sessionRevision,
+    actionId: 'apply', domainReceiptDigest: contractsV4.digestValue('receipt', receipt).sha256 });
+  assert.equal(result.error.code, 'RECOVERY_PENDING');
+  assert.equal(state.turns[1].actionReceiptDigest, undefined);
+});
 
 function recordUserInput(sessions, requestId, text, sessionRef = 's1') {
   const events = sessions.logs.get(sessionRef).events;
@@ -57,13 +131,16 @@ function recordUserInput(sessions, requestId, text, sessionRef = 's1') {
       content: [{ type: 'text', text }] } });
 }
 
-test('uses Core SessionPersistence for a durable session across Workshop instances', async () => {
-  const { workshop, sessions } = setup();
+test('uses the existing Core Session as read-only fact source and durable projection across Workshop instances', async () => {
+  const { workshop, sessions, projectionStore } = setup();
   const created = await workshop.call('StartOrResumeSession', start());
   assert.equal(created.error, null);
   assert.equal(created.result.context.currentSession, 's1');
-  assert.equal(sessions.logs.get('s1').events.length > 0, true);
-  const resumed = new WorkshopV1({ sessionPersistence: sessions, authority: workshop.authority, capabilities: workshop.capabilities });
+  assert.equal(sessions.logs.get('s1').events.length, 0);
+  assert.equal(sessions.logs.get('s1').owned, true);
+  assert.equal(projectionStore.writes, 1);
+  const resumed = new WorkshopV1({ sessionPersistence: sessions, projectionStore,
+    authority: workshop.authority, capabilities: workshop.capabilities });
   const again = await resumed.call('StartOrResumeSession', { ...start(), requestId: 'resume', expectedRevision: created.result.context.sessionRevision });
   assert.equal(again.result.context.currentSession, 's1');
   assert.equal(again.result.context.sessionRevision, created.result.context.sessionRevision);
@@ -74,8 +151,12 @@ test('DSH plugin resolves late host ports and rejects stale Session revision', a
   const services = new Map();
   apply({ get(name) { return ports.get(name); }, provide(name, value) {
     services.set(name, value); } });
-  assert.deepEqual([...services.keys()], ['hanaworldsWorkshopV1', 'hanaworldsWorkshop']);
+  assert.deepEqual([...services.keys()], ['hanaworldsWorkshopV1', 'hanaworldsWorkshop',
+    'hanaworldsWorkshopLegacyHistoryV1']);
   const service = services.get('hanaworldsWorkshop');
+  const legacy = services.get('hanaworldsWorkshopLegacyHistoryV1');
+  assert.equal(typeof legacy.importArchive, 'function');
+  assert.equal(typeof legacy.readArchive, 'function');
   assert.equal(service, services.get('hanaworldsWorkshopV1'));
   assert.equal(typeof service.invokeAction, 'function');
   assert.equal(typeof service.verifyFrameDelivery, 'function');
@@ -83,6 +164,15 @@ test('DSH plugin resolves late host ports and rejects stale Session revision', a
   assert.equal(missing.error.code, 'CAPABILITY_UNAVAILABLE');
   const fixture = setup();
   ports.set('sessionPersistence', fixture.sessions);
+  ports.set('storageDomain', { async open() { return {
+    table() { return { get(id) { const row = fixture.projectionStore.rows.get(id);
+      return row && { coreIdentity: row.identity, state: row.state }; },
+    async put(id, row) { fixture.projectionStore.rows.set(id,
+      { identity: row.coreIdentity, state: row.state }); },
+    async update(id, update) { const row = fixture.projectionStore.rows.get(id);
+      const next = update({ coreIdentity: row.identity, state: row.state });
+      fixture.projectionStore.rows.set(id, { identity: next.coreIdentity,
+        state: next.state }); } }; }, async close() {} }; } });
   ports.set('hanaworldsAuthority', fixture.workshop.authority);
   ports.set('hanaworldsCapabilities', fixture.workshop.capabilities);
   ports.set('hanaworldsBrushV2', { compile() {} });
@@ -103,8 +193,10 @@ test('DSH client contributes a Workshop panel and only typed offered Shell choic
   });
   assert.equal(definition.id, 'hanaworlds-workshop');
   const client = definition.factory(name => {
+    if (name === 'dsh-tauri') return { invoke() {} };
     assert.equal(name, 'react');
-    return { createElement(type, props, ...children) { return { type, props, children }; } };
+    return { createElement(type, props, ...children) { return { type, props, children }; },
+      useState(value) { return [value, () => {}]; }, useEffect() {} };
   });
   const seats = [];
   client.apply({ slots: { inject(name, register) {
@@ -127,8 +219,15 @@ test('DSH client contributes a Workshop panel and only typed offered Shell choic
   assert.deepEqual(JSON.parse(JSON.stringify(offered)), [{ actionId: 'choose',
     input: { kind: 'SELECT_CHOICE', value: 'bob' } }]);
   assert.equal(view.children.at(-1).children[0], '也可以在游戏中选点。');
-  const panel = seats[1].component();
+  const panelSeat = seats[1].component();
+  assert.equal(panelSeat.type, client.WorkshopPanel);
+  const panel = client.WorkshopPanel({ flow: { snapshot: () => ({ ready: true,
+    busy: false, error: '', turns: [], reply: '', clarification: null,
+    sessions: [], selectedSessionRef: null, details: [],
+    legacyArchives: [], legacyArchive: null, legacyError: '' }),
+    subscribe() { return () => {}; }, open() {} } });
   assert.equal(panel.children[1].props.role, 'status');
+  assert.equal(panel.children.at(-1).type, 'form');
 });
 
 const sha = data => createHash('sha256').update(data).digest('hex');
@@ -167,6 +266,22 @@ test('passes selected text and verified image together through Core attachment a
   assert.equal(reads, 1);
 });
 
+test('rejects a DSH LLM error finish even after a text delta', async () => {
+  const { workshop, projectionStore } = setup({
+    modelRoute: { provider: 'fixed-stub', model: 'gpt-5.6-luna' },
+    llm: { async *stream() {
+      yield { type: 'text-delta', index: 0, text: '看似完整的回答' };
+      yield { type: 'finish', reason: { kind: 'error',
+        failure: { code: 'FIXTURE_FAILURE', message: 'failed' } } };
+    } },
+  });
+  const started = await workshop.call('StartOrResumeSession', start());
+  const response = await workshop.call('AppendMultimodalTurn',
+    append(started.result.context.sessionRevision));
+  assert.equal(response.error.code, 'MODEL_REQUEST_FAILED');
+  assert.equal(projectionStore.state().turns.length, 0);
+});
+
 test('rejects media scope before reading bytes and never degrades corrupt image to text-only model call', async () => {
   const bytes = Buffer.from('image bytes');
   let reads = 0, modelCalls = 0;
@@ -192,7 +307,7 @@ test('an answer to a clarification returns to the model, then requires explicit 
   const proposal = { kind: 'BUILD_STRUCTURE', text: '石屋', purpose: 'first building',
     dimensions: { width: 3, depth: 4, height: 5, unit: 'node' }, entrancePortalRefs: [] };
   const prompts = [];
-  const { workshop, sessions } = setup({
+  const { workshop, sessions, projectionStore } = setup({
     canvas: { contractHandshake: contractsV4.contractHandshake,
       async call(_operation, request) { return { contractVersion: 'canvas/v4',
         requestId: request.requestId, error: null,
@@ -209,6 +324,12 @@ test('an answer to a clarification returns to the model, then requires explicit 
     expectedRevision: first.result.context.sessionRevision, worldRef: 'world-a', selectionRevision: 'sel-1' });
   const turn = await workshop.call('AppendMultimodalTurn', append(switched.result.context.sessionRevision));
   assert.equal(turn.result.clarification.question, '屋子要多大？');
+  const read = { contractVersion: 'session/v2', actorRef: 'user',
+    sessionRef: 's1', requestId: 'read-1', authorizationRef: 'grant' };
+  const early = await workshop.call('ReadSessionTurnDetails', read);
+  assert.equal(early.error, null);
+  assert.equal(early.result.turns[0].resultText, '屋子要多大？');
+  assert.equal(early.result.turns[0].confirmedBrief, null);
   const current = await workshop.call('StartOrResumeSession', { ...start(), requestId: 'resume' });
   recordUserInput(sessions, 'followup', '宽3、深4、高5个节点');
   const followup = await workshop.call('AnswerClarification', { contractVersion: 'session/v2',
@@ -226,12 +347,27 @@ test('an answer to a clarification returns to the model, then requires explicit 
     clarificationId: followup.result.clarification.clarificationId, answer: '确认' });
   assert.equal(confirmed.error, null);
   assert.equal(confirmed.result.clarification, null);
+  const reopened = new WorkshopV1({ sessionPersistence: sessions, projectionStore,
+    authority: workshop.authority, capabilities: workshop.capabilities });
+  const details = await reopened.call('ReadSessionTurnDetails',
+    { ...read, requestId: 'read-after-reopen' });
+  assert.equal(details.error, null);
+  assert.equal(details.result.turns[0].userText, '请帮我建一个小屋');
+  assert.equal(details.result.turns[0].resultText, '已确认建造意图。');
+  assert.equal(details.result.turns[0].confirmedBrief.contractVersion, 'ReferenceBrief/v2');
+  assert.equal(details.result.turns[0].confirmedBrief.sessionRef, 's1');
+  assert.equal(details.result.turns[0].confirmedBrief.turnRevision,
+    details.result.turns[0].turnRevision);
+  reopened.authority = { async verify() { return { current: false }; } };
+  const revoked = await reopened.call('ReadSessionTurnDetails',
+    { ...read, requestId: 'read-revoked' });
+  assert.equal(revoked.error.code, 'AUTHORIZATION_REVOKED');
 });
 
 test('a user correction replaces the pending proposal before confirmation', async () => {
   const contracts = contractsV4;
   let modelCalls = 0;
-  const { workshop, sessions } = setup({
+  const { workshop, sessions, projectionStore } = setup({
     canvas: { contractHandshake: contracts.contractHandshake,
       async call(_operation, request) { return { contractVersion: 'canvas/v4',
         requestId: request.requestId, error: null,
@@ -265,7 +401,7 @@ test('a user correction replaces the pending proposal before confirmation', asyn
     turnRef: 'turn-1', expectedRevision: current2.result.context.sessionRevision,
     clarificationId: corrected.result.clarification.clarificationId, answer: '确认' });
   assert.equal(confirmed.error, null);
-  assert.equal(sessions.logs.get('s1').events.at(-1).data.confirmedIntents['turn-1']
+  assert.equal(projectionStore.state().confirmedIntents['turn-1']
     .intent.confirmedIntent.dimensions.width, 6);
 });
 
@@ -350,7 +486,7 @@ test('first confirmed structure sends DEFAULT_PLAYER and exact node footprint to
       error: null, unavailableSettings: null }; } };
   const proposal = { kind: 'BUILD_STRUCTURE', text: '小石屋', purpose: 'first building',
     dimensions: { width: 3, depth: 4, height: 5, unit: 'node' }, entrancePortalRefs: [] };
-  const { workshop, sessions } = setup({ canvas,
+  const { workshop, sessions, projectionStore } = setup({ canvas,
     authority: { async verify(request) { return { current: true,
       actorRef: request.actorRef, sessionRef: request.sessionRef,
       authorizationRef: request.authorizationRef, worldRef: 'world-a',
@@ -410,7 +546,7 @@ test('first confirmed structure sends DEFAULT_PLAYER and exact node footprint to
     authorizationRef: request.authorizationRef, worldRef: 'world-a',
     engineActorName: 'initiator', surface: 'LUANTI',
     allowedActions: ['INSPECT'] }; } };
-  const pending = sessions.logs.get('s1').events.at(-1).data.pendingPlacement;
+  const pending = projectionStore.state().pendingPlacement;
   const pick = pending.frame.actions.find(action => action.inputKinds.includes('PICK_WORLD_POINT'));
   const relay = { contractVersion: 'interaction-surface/v3', actorRef: 'user',
     sessionRef: 's1', requestId: 'relay-pick', invocationId: 'relay-pick',
@@ -436,7 +572,7 @@ test('first building rejects a different same-Session relay before Canvas', asyn
   const canvasCalls = [];
   const proposal = { kind: 'BUILD_STRUCTURE', text: '石屋', purpose: 'first building',
     dimensions: { width: 3, depth: 4, height: 5, unit: 'node' }, entrancePortalRefs: [] };
-  const { workshop, sessions } = setup({
+  const { workshop, sessions, projectionStore } = setup({
     canvas: { contractHandshake: contracts.contractHandshake,
       async call(operation, request) {
         if (operation === 'ListObjects') return { contractVersion: 'canvas/v4',
@@ -486,7 +622,7 @@ test('first building rejects a different same-Session relay before Canvas', asyn
     expectedRevision: current.result.context.sessionRevision,
     clarificationId: turn.result.clarification.clarificationId, answer: '确认' });
   assert.equal(confirmed.error, null);
-  const restarted = new WorkshopV1({ sessionPersistence: sessions,
+  const restarted = new WorkshopV1({ sessionPersistence: sessions, projectionStore,
     authority: workshop.authority, canvas: workshop.canvas });
   await assert.rejects(() => restarted.beginFirstBuilding({ actorRef: 'user',
     sessionRef: 's1', authorizationRef: 'grant', turnRef: 'turn-1',
@@ -501,7 +637,7 @@ test('first building rejects a different same-Session relay before Canvas', asyn
     { kind: 'DEFAULT_PLAYER', invocationId: 'relay-alice' });
 });
 
-test('passes the recorded RegionInspection unchanged into painter/v3 and rejects image-free structure planning', async () => {
+test('passes the recorded RegionInspection unchanged into painter/v3 and requires a separate text plan source', async () => {
   const fixtures = JSON.parse(readFileSync(new URL('../vendor/contracts/fixtures/v4/candidate/placement-region-chain-v4.json', import.meta.url)));
   const chain = fixtures.validCases[0].materializedChain;
   const contracts = contractsV4;
@@ -538,14 +674,6 @@ test('passes the recorded RegionInspection unchanged into painter/v3 and rejects
   const proposal = { kind: 'BUILD_STRUCTURE', text: '小石屋', purpose: 'first building',
     dimensions: { width: 1, depth: 1, height: 1, unit: 'node' }, entrancePortalRefs: [] };
   const base = { canvas, painter, brush,
-    applyAuthority: { async issue(binding) { return { contractVersion: 'world-adapter/v2',
-      authorizerRef: 'engine-authorizer', actorRef: binding.actorRef, grantEpoch: 'epoch-1',
-      bindingRef: 'verified-binding', worldRef: binding.worldRef, sessionRef: binding.sessionRef,
-      turnRevision: binding.turnRevision, intentDigest: binding.intentDigest,
-      surfaceActionDigest: 'b'.repeat(64), allowedAction: 'APPLY_RECOVERABLE',
-      transactionId: binding.transactionId, operationDigest: binding.operationDigest,
-      worldRevision: binding.worldRevision, selectionRevision: binding.selectionRevision,
-      analysisDigest: binding.analysisDigest, decisionRevision: null }; } },
     catalogue: { async read() { return chain.painterRequest.catalogue; } },
     safety: { async read() { return chain.painterRequest.safetyProfile; } },
     compilerConfig: { async read() { return { compilationConfig: chain.brushRequest.compilationConfig,
@@ -576,7 +704,7 @@ test('passes the recorded RegionInspection unchanged into painter/v3 and rejects
   }
   const withoutImage = await ready([]);
   await assert.rejects(() => withoutImage.createBuildPlan({ actorRef: 'user', sessionRef: 's1',
-    authorizationRef: 'grant', turnRef: 'turn-1', requestId: 'paint' }), { code: 'IMAGE_REQUIRED' });
+    authorizationRef: 'grant', turnRef: 'turn-1', requestId: 'paint' }), { code: 'CAPABILITY_UNAVAILABLE' });
   const media = [{ attachmentRef: 'img-1', storedBytesDigest: sha(bytes), projectionVariantId: null,
     projectionBytesDigest: null, mediaType: 'image/png', bytes: bytes.length, width: 1, height: 1 }];
   const withImage = await ready(media);
@@ -593,19 +721,12 @@ test('passes the recorded RegionInspection unchanged into painter/v3 and rejects
   const analysis = await withImage.analyzeCurrentBuild({ actorRef: 'user', sessionRef: 's1',
     authorizationRef: 'grant', turnRef: 'turn-1', requestId: 'analyze' });
   assert.deepEqual(JSON.parse(JSON.stringify(analysis.affectedObjectRefs)), []);
-  const applied = await withImage.applyCurrentBuild({ actorRef: 'user', sessionRef: 's1',
-    authorizationRef: 'grant', turnRef: 'turn-1', requestId: 'apply' });
-  assert.equal(applied.status, 'VERIFIED');
-  const applyRequest = canvasCalls.find(call => call.operation === 'ApplyRecoverableCommit').request;
-  assert.equal(applyRequest.regionInspectionBinding.inspectionId, chain.adapterInspectResponse.result.inspection.inspectionId);
-  assert.deepEqual(JSON.parse(JSON.stringify(applyRequest.regionInspectionBinding.build)), chain.painterResponse.result.build);
-  const current = await withImage.call('StartOrResumeSession', { ...start(), requestId: 'after-apply' });
-  const recorded = await withImage.call('RecordActionReceipt', { contractVersion: 'session/v2',
-    actorRef: 'user', sessionRef: 's1', requestId: 'record', authorizationRef: 'grant',
-    turnRef: 'turn-1', expectedRevision: current.result.context.sessionRevision,
-    actionId: 'confirmed-apply', domainReceiptDigest: contracts.digestValue('receipt', applied).sha256 });
-  assert.equal(recorded.error, null);
-  assert.equal(recorded.result.briefDigest, painterCalls[0].request.referenceBriefDigest);
+  // Applying without a durable public AdvanceCurrentBuild parent and the new
+  // Host issuance capability fails closed; full public flow is tested separately.
+  await assert.rejects(() => withImage.applyCurrentBuild({ actorRef: 'user', sessionRef: 's1',
+    authorizationRef: 'grant', turnRef: 'turn-1', requestId: 'apply' }));
+  assert.equal(canvasCalls.some(call => call.operation === 'ApplyRecoverableCommit'), false);
+
 });
 
 test('uses fresh Canvas inventory names for object selection and refuses an unoffered ref', async () => {
@@ -637,44 +758,17 @@ test('uses fresh Canvas inventory names for object selection and refuses an unof
   assert.equal(operations.filter(x => x === 'SetObjectSelection').length, 1);
 });
 
-test('an uncertain Apply reuses its durable Canvas request after Workshop restart', async () => {
-  const fixtures = JSON.parse(readFileSync(new URL('../vendor/contracts/fixtures/v4/candidate/placement-region-chain-v4.json', import.meta.url)));
-  const request = fixtures.validCases[0].materializedChain.applyRequest;
-  const contracts = contractsV4;
-  const calls = [];
-  const canvas = { contractHandshake: contracts.contractHandshake,
-    async call(operation, actual) {
-      assert.equal(operation, 'ApplyRecoverableCommit');
-      calls.push(structuredClone(actual));
-      if (calls.length === 1) throw Error('connection lost after possible effect');
-      return { contractVersion: 'canvas/v4', requestId: actual.requestId, error: null,
-        result: { contractVersion: 'canvas/v2', transactionId: actual.transactionId,
-          operationDigest: actual.operationDigest, transactionPayloadDigest: 'a'.repeat(64),
-          status: 'VERIFIED', previousWorldRevision: actual.expectedWorldRevision,
-          observedWorldRevision: 'world-after', readbackDigest: 'c'.repeat(64),
-          restoreStatus: 'NOT_REQUIRED', error: null } };
-    } };
-  const { workshop, sessions } = setup({ canvas });
-  await workshop.call('StartOrResumeSession', start(request.sessionRef));
-  const log = sessions.logs.get(request.sessionRef);
-  const state = structuredClone(log.events.at(-1).data);
-  state.pendingApply = { request, turnRef: 'turn-1', status: 'RESERVED' };
-  const handle = await sessions.open(request.sessionRef, 'write');
-  await handle.append([{ type: 'hanaworlds/workshop-state/v1',
-    seq: log.events.length, time: Date.now(), data: state, ignorable: true }]);
-  await handle.flush();
-  await handle.close();
-  const body = { actorRef: request.actorRef, sessionRef: request.sessionRef,
-    authorizationRef: request.authorizationRef, turnRef: 'turn-1', requestId: 'retry-1' };
-  await assert.rejects(() => workshop.applyCurrentBuild(body));
-  const restarted = new WorkshopV1({ sessionPersistence: sessions,
-    authority: workshop.authority, canvas });
-  const recovered = await restarted.applyCurrentBuild({ ...body, requestId: 'retry-2' });
-  assert.equal(recovered.status, 'VERIFIED');
-  assert.deepEqual(calls, [request, request]);
-  const cached = await restarted.applyCurrentBuild({ ...body, requestId: 'retry-3' });
-  assert.equal(cached.status, 'VERIFIED');
-  assert.equal(calls.length, 2);
+test('an unproven reserved Apply cannot bypass current Host authorization', async () => {
+  const { workshop, projectionStore } = setup();
+  await workshop.call('StartOrResumeSession', start());
+  projectionStore.state().pendingApply = { turnRef: 'turn-1', status: 'RESERVED',
+    request: { actorRef: 'user', authorizationRef: 'grant' } };
+  let calls = 0;
+  workshop.canvas = { contractHandshake: contractsV4.contractHandshake,
+    call() { calls++; throw Error('must not dispatch'); } };
+  await assert.rejects(() => workshop.applyCurrentBuild({ actorRef: 'user', sessionRef: 's1',
+    authorizationRef: 'grant', turnRef: 'turn-1', requestId: 'arbitrary-retry' }), { code: 'CAPABILITY_UNAVAILABLE' });
+  assert.equal(calls, 0);
 });
 
 test('fixed Core delete seam fails honestly and resource reopen does not depend on old Session log', async () => {

@@ -1,0 +1,8 @@
+{
+  "label": "private-tmp",
+  "chunk_id": "670352",
+  "wall_time_seconds": 5.292e-06,
+  "exit_code": 0,
+  "original_token_count": 218,
+  "output": "{\n  \"receiptPath\": \"/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/admission-codex-20261007/private-tmp-receipt.json\",\n  \"receipt\": {\n    \"card\": \"S1-WS-WRITE-TOOLS-01\",\n    \"stage\": \"ADMISSION_ONLY\",\n    \"workerThreadId\": \"01a11392-fae1-7862-8968-676841044b15\",\n    \"timestampUTC\": \"2026-10-06T23:37:00.429339+00:00\",\n    \"nativeTool\": \"exec_command\",\n    \"actualCwd\": \"/private/tmp\",\n    \"probeDirectory\": \"/private/tmp/.hw-ws-admission-14pax3kf\",\n    \"directoryMode\": \"0o700\",\n    \"fileMode\": \"0o600\",\n    \"bytes\": 32,\n    \"writeSHA256\": \"9e60f5b1551660a08c92640f3acb193c35b76ef80085b5b5dfc4a6b499bd9996\",\n    \"readSHA256\": \"9e60f5b1551660a08c92640f3acb193c35b76ef80085b5b5dfc4a6b499bd9996\",\n    \"shaMatch\": true,\n    \"fileDeleted\": true,\n    \"directoryDeleted\": true,\n    \"sudoUsed\": false,\n    \"sourceChanged\": false,\n    \"gatesRun\": false\n  }\n}\n"
+}

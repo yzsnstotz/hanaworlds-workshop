@@ -1,0 +1,146 @@
+{
+  "sourceSha": "200096ae4c8871daccaefa1977306d01effcdde4",
+  "tar": "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/gate-actual-044/hanaworlds-workshop-0.4.4.tgz",
+  "sha256": "d33b9561d889f6deb9f8f73dc643c92de0c3603f9c9d2649670baead0fa2daf2",
+  "bytes": 32686,
+  "published": [
+    {
+      "path": "GADGET.md",
+      "bytes": 16880,
+      "sha256": "e3deb48966691cc19516eeb90d9b684c25a657e75d7ee37857c0434cdf5b4b5f"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1081,
+      "sha256": "42fce829e7fe1fc4926ba886ac3e9e2bce7b13f7edba709064b35d3646945b6d"
+    },
+    {
+      "path": "NOTICE",
+      "bytes": 1850,
+      "sha256": "98bea106d002c34b802483793b836f79ddb4d7b5d7b1ce469314fc2606acdf64"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1789,
+      "sha256": "33196364b8351198aedfbde2cfc79f5af83292fd4d24f9ebefe13a562d731209"
+    },
+    {
+      "path": "client.cjs",
+      "bytes": 30697,
+      "sha256": "ce091297bf5d7c27be7296c76988fec0d25e408678bf8146bc1ec3c05ced3024"
+    },
+    {
+      "path": "cordis.patch.yml",
+      "bytes": 72,
+      "sha256": "f435f68bc4cfd7dd5fd2ac85e519f613d5cee4fba3cb3ae3cbc64d39bdddf211"
+    },
+    {
+      "path": "package.json",
+      "bytes": 2331,
+      "sha256": "9a1fb7e0fdd8a40c69a5cb41cc93ed4e16031d1714f651471b3b4bd3f7b2505b"
+    },
+    {
+      "path": "src/image-attachment.mjs",
+      "bytes": 4402,
+      "sha256": "002ffa3452bbbb005b706fde2a88a979761d6afb1bb4b5ee5b69862e06f4b3da"
+    },
+    {
+      "path": "src/index.mjs",
+      "bytes": 43408,
+      "sha256": "8fab13a492e1e6b6c091b5da092c8be216752a5c0605c230500c82e0f5075754"
+    },
+    {
+      "path": "src/projection-store.mjs",
+      "bytes": 3062,
+      "sha256": "b8d9a68dd24a9c139c53c1fb28e90a4d2371538b7d39a73a2ef4dc3fd7b1af27"
+    },
+    {
+      "path": "src/write-tools.mjs",
+      "bytes": 8412,
+      "sha256": "2293744e608e96427d2a7f0462bf332ffad4917940b55648b11e5618efb622be"
+    }
+  ],
+  "correlations": [
+    {
+      "runtime": "source",
+      "allTenPredicates": true,
+      "original": "build-61e3eabb-c78c-4634-a709-ab46376c14b6",
+      "undo": "undo-7a2dd1e3-1d17-46cd-ad51-e8de5bb99266",
+      "head": "undo-7a2dd1e3-1d17-46cd-ad51-e8de5bb99266",
+      "world": {
+        "records": [
+          {
+            "position": [
+              0,
+              0,
+              3
+            ],
+            "nodeName": "fixture:stone",
+            "param1": 0,
+            "param2": 0,
+            "metadata": {},
+            "inventory": {},
+            "timer": null
+          },
+          {
+            "position": [
+              0,
+              1,
+              3
+            ],
+            "nodeName": "air",
+            "param1": 0,
+            "param2": 0,
+            "metadata": {},
+            "inventory": {},
+            "timer": null
+          }
+        ],
+        "buildWrites": 1,
+        "undoWrites": 1,
+        "modelCalls": 0
+      }
+    },
+    {
+      "runtime": "packed",
+      "allTenPredicates": true,
+      "original": "build-737bc6b1-64b3-4ee1-a533-a6e7e11976c5",
+      "undo": "undo-623ee78e-d8a8-48eb-86a7-4eb8d77597cb",
+      "head": "undo-623ee78e-d8a8-48eb-86a7-4eb8d77597cb",
+      "world": {
+        "records": [
+          {
+            "position": [
+              0,
+              0,
+              3
+            ],
+            "nodeName": "fixture:stone",
+            "param1": 0,
+            "param2": 0,
+            "metadata": {},
+            "inventory": {},
+            "timer": null
+          },
+          {
+            "position": [
+              0,
+              1,
+              3
+            ],
+            "nodeName": "air",
+            "param1": 0,
+            "param2": 0,
+            "metadata": {},
+            "inventory": {},
+            "timer": null
+          }
+        ],
+        "buildWrites": 1,
+        "undoWrites": 1,
+        "modelCalls": 0
+      }
+    }
+  ],
+  "boundary": "actual Workshop/Painter/Brush/Canvas; Host/Adapter/world/public NativeFacts FIXTURE; model/Luanti/UI/product NOT_RUN"
+}

@@ -1,0 +1,14 @@
+{
+  "deleted": [
+    "public-peers-043/node_modules",
+    "public-peers-043/npm-cache"
+  ],
+  "kept": [
+    "public-peers-043/canvas-profile",
+    "source",
+    "all _evidence",
+    "protected fixed tar inputs"
+  ],
+  "noRunningProcess": true,
+  "noThirdAttempt": true
+}

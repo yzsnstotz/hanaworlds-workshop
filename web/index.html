@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Workshop · 图片链接</title><link rel="stylesheet" href="/style.css"></head>
+<body><main>
+ <header><a class="brand" href="/">HanaWorlds <span>Workshop</span></a><span class="local">本机开发网页</span></header>
+ <section class="intro"><p class="eyebrow">IMAGE → ATTACHMENT</p><h1>把图片链接，带进对话。</h1><p class="lead">下载真实图片，查看缩略图与尺寸，再读回它在示例对话中的附件状态。</p></section>
+ <aside class="fixture"><strong>示例对话 · FIXTURE</strong><p>此页使用独立示例会话与持久化桥，不是 HanaWorlds App 的当前对话。图片通过真实 HTTP 下载、解码和附件存储；不调用模型，不写世界。</p></aside>
+ <div class="workspace"><section class="input-card"><h2><span>01</span> 图片链接</h2><form id="form"><label for="url">HTTP / HTTPS 图片地址</label><input id="url" name="url" type="url" required spellcheck="false" autocomplete="off"><p class="hint">PNG、JPEG、WebP 或 GIF · 请输入直接图片链接</p><button id="download" disabled>下载并关联示例对话 <span>↗</span></button></form><button class="sample" id="sample">填入本机示例 PNG（FIXTURE，2 × 2）</button><p id="status" role="status">正在连接示例会话…</p><p id="error" role="alert" hidden></p><div class="session"><span>示例会话</span><code id="session">连接中</code></div></section>
+ <section class="result-card"><h2><span>02</span> 附件读回</h2><div id="empty"><div class="empty-icon">▧</div><p>图片会显示在这里</p><small>下载完成后，再读回同一会话、同一附件。</small></div><div id="result" hidden><div class="picture"><img id="image" alt="真实下载并读回的图片"></div><p class="attached">● 已关联示例对话 · FIXTURE</p><dl><div><dt>类型</dt><dd id="mime"></dd></div><div><dt>尺寸</dt><dd id="dimensions"></dd></div><div><dt>实际存储</dt><dd id="bytes"></dd></div></dl><button class="secondary" id="read">再次读回附件状态</button><details><summary>附件详情</summary><p>内容标识</p><code id="attachment"></code><p>来源消息</p><code id="message"></code><p>示例会话</p><code id="result-session"></code></details></div></section></div>
+ <footer>Workshop 图片链接开发入口 <span>真实图片 · 示例会话</span></footer>
+</main><script type="module" src="/app.mjs"></script></body></html>

@@ -1,0 +1,102 @@
+[
+  {
+    "adapter": "DiscoverConnections",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "unbound:discover",
+      "adapterId": "fixture-adapter"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "select:connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "DiscoverConnections",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "select:discover",
+      "adapterId": "fixture-adapter"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "read-context:placement:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "InspectRegion",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "read-context:placement:region",
+      "worldRef": "fixture-world",
+      "expectedWorldRevision": "world-0",
+      "inspectionId": "inspection-0e204505-c18f-4a49-a67d-16459f46014e",
+      "anchor": {
+        "kind": "CURRENT_VIEW",
+        "invocationId": "confirm"
+      },
+      "footprint": {
+        "widthCells": 1,
+        "depthCells": 1,
+        "heightCells": 1
+      },
+      "placementSettings": {
+        "frontGapCells": 2,
+        "forwardSearchCells": 16,
+        "lateralSearchCells": 8,
+        "verticalSearchCells": 4,
+        "settingsRevision": "placement-0"
+      },
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-377e9928-70cf-477d-9e3a-ae5b9fccf677"
+      }
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:objects:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:analysis:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:apply:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "native": "readScopedState",
+    "request": "local-connection"
+  }
+]

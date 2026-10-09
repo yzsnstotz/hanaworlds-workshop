@@ -1,0 +1,43 @@
+{
+  "card": "F-WS-IMAGE-LINK-01",
+  "status": "DELIVERED_WORKER",
+  "url": "http://127.0.0.1:47605/",
+  "webVersion": "0.1.0",
+  "webSourceCommit": "3a491e26bd90427ccc46ad3ad09534f7c6e6c44a",
+  "runtime": {
+    "event": "WORKSHOP_WEB_READY",
+    "pid": 75723,
+    "url": "http://127.0.0.1:47605/",
+    "sessionRef": "workshop-example-2509bf9b-8552-477b-838a-cb8d0dbe00e0",
+    "runtime": "/Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/runtime/web/session-3n9nLF",
+    "fixture": {
+      "kind": "FIXTURE",
+      "label": "示例对话（FIXTURE）",
+      "writer": "示例 Session 持久化桥；非正式 App Host",
+      "modelCalls": 0,
+      "worldWrites": 0
+    }
+  },
+  "ui": {
+    "firstStep": "step-1.jpg",
+    "readback": "readback-details.jpg",
+    "nonImage": "non-image.jpg",
+    "recovery": "recovery.jpg",
+    "image": {
+      "type": "image/png",
+      "width": 2,
+      "height": 2,
+      "bytes": 96,
+      "attachmentRef": "sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3"
+    }
+  },
+  "boundary": "Session business identity and writer lifecycle bridge FIXTURE; real HTTP/decoder/attachments/Core JSONL/projection/browser",
+  "checks": "new web-entry 1/1; syntax/diff exit0; old gates not rerun",
+  "old045Preserved": {
+    "artifact": "272b0afa586ffcc856badf4c77af01b2fcc82ef1",
+    "evidence": "e7ce7146800854687db4fb367779fa2f267011d8",
+    "tarSha256": "affddfc6b058015d94094c42046b30107fdd3492e93a879b52b2f7044d03c068",
+    "tarBytes": 38181
+  },
+  "cleanup": "removed own temporary npm-cache and empty web-check/first failed session dirs; kept active root node_modules/current runtime/source/sole historical045tar/allE"
+}

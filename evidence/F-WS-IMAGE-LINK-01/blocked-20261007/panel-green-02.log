@@ -1,0 +1,40 @@
+{"evidence":"PANEL_REAL_SESSION_HTTP_CORE_ATTACHMENTS","session":"s1","image":{"attachmentId":"sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3","mediaType":"image/png","bytes":96,"width":2,"height":2},"digest":"ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3","worldWrites":0,"modelCalls":0,"hostPersistenceLifecycle":"FIXTURE"}
+✔ panel link is downloaded as real bytes and read back as an image in the same real Session without model/world calls (1106.635292ms)
+✖ panel rejects a borrowed foreign Session and undecodable bytes, and cannot read an unassociated image (51.757458ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1245.620708
+
+✖ failing tests:
+
+test at test/image-attachment.test.mjs:122:1
+✖ panel rejects a borrowed foreign Session and undecodable bytes, and cannot read an unassociated image (51.757458ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /ATTACHMENT_REJECTED/. Input:
+  
+  'ContractError: SESSION_NOT_FOUND/validate/REQUIRED_FACT_UNKNOWN'
+  
+      at async file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/test/image-attachment.test.mjs:128:2
+      at async setup (file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/test/image-attachment.test.mjs:41:2)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:785:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: ContractError: SESSION_NOT_FOUND/validate/REQUIRED_FACT_UNKNOWN
+        at fail (file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/src/index.mjs:11:40)
+        at #load (file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/src/index.mjs:35:13)
+        at async WorkshopV3.readPanelImage (file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/src/index.mjs:142:22)
+        at async waitForActual (node:assert:646:5)
+        at async strict.rejects (node:assert:769:25)
+        at async file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/test/image-attachment.test.mjs:128:2
+        at async setup (file:///Users/yzliu/.cache/hanaworlds-runs/F-WS-IMAGE-LINK-01/source/test/image-attachment.test.mjs:41:2)
+        at async Test.run (node:internal/test_runner/test:1110:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:785:7),
+    expected: /ATTACHMENT_REJECTED/,
+    operator: 'rejects',
+    diff: 'simple'
+  }

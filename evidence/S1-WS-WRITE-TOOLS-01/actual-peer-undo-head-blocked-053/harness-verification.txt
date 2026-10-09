@@ -1,0 +1,7 @@
+harness source: 8fec81f
+node --check test/actual-peer-runtime.test.mjs: exit 0
+node --check scripts/analyse-actual-undo.mjs: exit 0
+bash -n scripts/probe-actual-peers.sh: exit 0
+git diff --check: exit 0
+read-only analyse-actual-undo.mjs: exit 0; only workshopExpectedAfterHead=false
+No new real Undo invocation after diagnosis.

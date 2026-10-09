@@ -1,0 +1,20 @@
+{
+  "card": "S1-WS-WRITE-TOOLS-01",
+  "stage": "ADMISSION_ONLY",
+  "workerThreadId": "01a11392-fae1-7862-8968-676841044b15",
+  "timestampUTC": "2026-10-06T23:37:00.429339+00:00",
+  "nativeTool": "exec_command",
+  "actualCwd": "/private/tmp",
+  "probeDirectory": "/private/tmp/.hw-ws-admission-14pax3kf",
+  "directoryMode": "0o700",
+  "fileMode": "0o600",
+  "bytes": 32,
+  "writeSHA256": "9e60f5b1551660a08c92640f3acb193c35b76ef80085b5b5dfc4a6b499bd9996",
+  "readSHA256": "9e60f5b1551660a08c92640f3acb193c35b76ef80085b5b5dfc4a6b499bd9996",
+  "shaMatch": true,
+  "fileDeleted": true,
+  "directoryDeleted": true,
+  "sudoUsed": false,
+  "sourceChanged": false,
+  "gatesRun": false
+}

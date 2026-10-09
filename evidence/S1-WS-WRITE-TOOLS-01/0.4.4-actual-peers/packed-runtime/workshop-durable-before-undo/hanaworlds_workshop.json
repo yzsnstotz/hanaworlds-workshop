@@ -1,0 +1,1642 @@
+{
+  "unit": {
+    "name": "hanaworlds_workshop",
+    "version": 1
+  },
+  "global": null,
+  "tables": {
+    "sessions": {
+      "s1": {
+        "coreIdentity": {
+          "id": "s1",
+          "version": 4,
+          "createdAt": 100,
+          "cwd": "/actual-peer-fixture"
+        },
+        "state": {
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "rev-a8367128-3db6-49de-8879-8bd63892dd4e",
+            "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204"
+            }
+          },
+          "turns": [
+            {
+              "turnRef": "image-turn",
+              "turnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+              "text": "图片中的石块",
+              "media": [
+                {
+                  "attachmentRef": "sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                  "storedBytesDigest": "ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                  "projectionVariantId": null,
+                  "projectionBytesDigest": null,
+                  "mediaType": "image/png",
+                  "bytes": 96,
+                  "width": 2,
+                  "height": 2
+                }
+              ],
+              "referenceBriefDigest": "e38d96ba9ce867e601b568638c28f4da6dfdb7ca98212462a1f1658304d7c27a",
+              "intentDigest": "cfe6ca81b1d10e61b21bc6e186ebae453b7e6fdf629ed3191c1dc69c8ac12820",
+              "actionReceiptDigest": "9ccfa5f01a3f90e063229cbf82f877b6ec1cc5036d785cd6d8ef24a51367484b"
+            }
+          ],
+          "details": {
+            "image-turn": {
+              "resultText": "建造已验证，且已读回当前世界与历史。",
+              "confirmedBrief": {
+                "contractVersion": "ReferenceBrief/v3",
+                "sessionRef": "s1",
+                "turnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+                "briefRevision": "rev-d7121901-a8c7-48bb-995c-f92aed7d383b",
+                "media": [
+                  {
+                    "attachmentRef": "sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                    "storedBytesDigest": "ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                    "projectionVariantId": null,
+                    "projectionBytesDigest": null,
+                    "mediaType": "image/png",
+                    "bytes": 96,
+                    "width": 2,
+                    "height": 2
+                  }
+                ],
+                "text": "图片中的石块",
+                "controls": {
+                  "purpose": "first building",
+                  "dimensions": {
+                    "width": 1,
+                    "depth": 1,
+                    "height": 1,
+                    "unit": "node"
+                  },
+                  "entrancePortalRefs": [],
+                  "styleText": null
+                }
+              }
+            }
+          },
+          "confirmed": {
+            "image-turn": {
+              "brief": {
+                "contractVersion": "ReferenceBrief/v3",
+                "sessionRef": "s1",
+                "turnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+                "briefRevision": "rev-d7121901-a8c7-48bb-995c-f92aed7d383b",
+                "media": [
+                  {
+                    "attachmentRef": "sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                    "storedBytesDigest": "ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                    "projectionVariantId": null,
+                    "projectionBytesDigest": null,
+                    "mediaType": "image/png",
+                    "bytes": 96,
+                    "width": 2,
+                    "height": 2
+                  }
+                ],
+                "text": "图片中的石块",
+                "controls": {
+                  "purpose": "first building",
+                  "dimensions": {
+                    "width": 1,
+                    "depth": 1,
+                    "height": 1,
+                    "unit": "node"
+                  },
+                  "entrancePortalRefs": [],
+                  "styleText": null
+                }
+              },
+              "intent": {
+                "contractVersion": "session/v3",
+                "referenceBriefDigest": "e38d96ba9ce867e601b568638c28f4da6dfdb7ca98212462a1f1658304d7c27a",
+                "confirmedIntent": {
+                  "kind": "BUILD_STRUCTURE",
+                  "text": "图片中的石块",
+                  "purpose": "first building",
+                  "dimensions": {
+                    "width": 1,
+                    "depth": 1,
+                    "height": 1,
+                    "unit": "node"
+                  },
+                  "entrancePortalRefs": [],
+                  "confirmedTurnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360"
+                },
+                "intendedWorldRef": "fixture-world",
+                "orderedTargetRefs": []
+              },
+              "confirmationInputId": "confirm",
+              "localContext": {
+                "connectionRef": "local-connection",
+                "connectionIncarnationRef": "socket-open-1",
+                "worldRef": "fixture-world",
+                "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204"
+              }
+            }
+          },
+          "pending": null,
+          "requests": {
+            "SwitchWorldContext:switch": {
+              "digest": "bbe435e1dcfb8bee1e42519aded6b17d8340614ab675324c590fcb69310245b6",
+              "response": {
+                "contractVersion": "session/v3",
+                "requestId": "switch",
+                "result": {
+                  "context": {
+                    "currentSession": "s1",
+                    "activeWorldRef": "fixture-world",
+                    "orderedSelectedObjectRefs": [],
+                    "sessionRevision": "rev-3e393733-e1e4-4805-841d-ead9318cc6d4",
+                    "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204",
+                    "localContext": {
+                      "connectionRef": "local-connection",
+                      "connectionIncarnationRef": "socket-open-1",
+                      "worldRef": "fixture-world",
+                      "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204"
+                    }
+                  },
+                  "turns": [],
+                  "capabilities": {
+                    "providerRef": "fixture-host",
+                    "capabilityRevision": "cap-1",
+                    "worldRef": "fixture-world",
+                    "engineBounds": {
+                      "min": [
+                        0,
+                        0,
+                        3
+                      ],
+                      "max": [
+                        0,
+                        1,
+                        3
+                      ]
+                    },
+                    "limits": [],
+                    "recoveryGuarantee": "RECOVERABLE_VERIFIED",
+                    "stateProfile": {
+                      "profileVersion": "state-profile/v2",
+                      "nodeFields": [
+                        "nodeName",
+                        "param1",
+                        "param2"
+                      ],
+                      "metadataMode": "exact",
+                      "inventoryMode": "exact",
+                      "timerMode": "exact",
+                      "derivedLightMode": "recompute-with-readback"
+                    },
+                    "sessionDeleteSupported": false,
+                    "imageMediaTypes": [
+                      "image/png"
+                    ],
+                    "model": null
+                  },
+                  "sessionDeleteSupported": false
+                },
+                "error": null
+              }
+            },
+            "AppendMultimodalTurn:input": {
+              "digest": "e6269b117e0d39844025ca2a1bc31cc6deaf0ee26825eb6d341f0063cc60624b",
+              "response": {
+                "contractVersion": "session/v3",
+                "requestId": "input",
+                "result": {
+                  "sessionRef": "s1",
+                  "turnRef": "image-turn",
+                  "turnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+                  "briefDigest": null,
+                  "model": "gpt-5.6-luna",
+                  "resultText": "请确认建造图片中的石块，尺寸1×1×1个节点。回复“确认”或修改。",
+                  "clarification": {
+                    "sessionRef": "s1",
+                    "turnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+                    "invocationId": "input",
+                    "clarificationId": "rev-cfd9b322-4f63-4d13-9215-e13937482271",
+                    "code": "AMBIGUOUS_INTENT",
+                    "question": "请确认建造图片中的石块，尺寸1×1×1个节点。回复“确认”或修改。"
+                  }
+                },
+                "error": null
+              }
+            },
+            "AnswerClarification:confirm": {
+              "digest": "8c4c41e741123f8c7602d295b5c427dfab00d665015436bfbc36e17bb177fc2a",
+              "response": {
+                "contractVersion": "session/v3",
+                "requestId": "confirm",
+                "result": {
+                  "sessionRef": "s1",
+                  "turnRef": "image-turn",
+                  "turnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+                  "briefDigest": "e38d96ba9ce867e601b568638c28f4da6dfdb7ca98212462a1f1658304d7c27a",
+                  "model": "gpt-5.6-luna",
+                  "resultText": "已确认建造意图。",
+                  "clarification": null
+                },
+                "error": null
+              }
+            },
+            "AdvanceCurrentBuild:advance": {
+              "digest": "e0f32877ebe14b7147abc681a0682af5800f329f647bdce5d3dd33d49ded1a9a",
+              "response": {
+                "contractVersion": "session/v3",
+                "requestId": "advance",
+                "result": {
+                  "sessionRef": "s1",
+                  "worldRef": "fixture-world",
+                  "turnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+                  "stage": "COMPLETE",
+                  "outcome": "VERIFIED",
+                  "receipt": {
+                    "contractVersion": "canvas/v5",
+                    "transactionId": "build-737bc6b1-64b3-4ee1-a533-a6e7e11976c5",
+                    "operationDigest": "06f0ee5a67a24e7a06d47b4edbf61e102a845a89f05628597ef6e6a9f24b00cf",
+                    "transactionPayloadDigest": "c21cef1f0f5c55c16016a37bc9a86a4cfa350fd691e94e1e30601159bba69e4e",
+                    "status": "VERIFIED",
+                    "previousWorldRevision": "world-0",
+                    "observedWorldRevision": "world-1",
+                    "readbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+                    "restoreStatus": "NOT_REQUIRED",
+                    "error": null,
+                    "localContext": {
+                      "connectionRef": "local-connection",
+                      "connectionIncarnationRef": "socket-open-1",
+                      "worldRef": "fixture-world",
+                      "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204"
+                    }
+                  }
+                },
+                "error": null
+              }
+            }
+          },
+          "contexts": {
+            "read-context": {
+              "invocationId": "proposal-b399280f-31f4-424d-b622-773fb0afaa98",
+              "inspection": {
+                "inspectionId": "inspection-23183248-e553-4a83-9df0-26d11f834907",
+                "anchorKind": "CURRENT_VIEW",
+                "targetFacts": {
+                  "profileVersion": "target-facts/v4",
+                  "source": "REGION_INSPECTED",
+                  "worldRef": "fixture-world",
+                  "objectRef": null,
+                  "worldRevision": "world-0",
+                  "objectRevision": null,
+                  "buildDigest": null,
+                  "planRevision": null,
+                  "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+                  "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+                  "sampledBounds": {
+                    "min": [
+                      0,
+                      0,
+                      3
+                    ],
+                    "max": [
+                      0,
+                      1,
+                      3
+                    ]
+                  },
+                  "coverageDigest": "45c2b1d28194a5818635bb08c5ecaf1bd3b96eec6083cf4f1fedaa5b90892585",
+                  "occupiedCells": [
+                    {
+                      "position": [
+                        0,
+                        0,
+                        3
+                      ],
+                      "nodeName": "fixture:stone",
+                      "param2": 0
+                    }
+                  ],
+                  "knownEmptyCells": [
+                    [
+                      0,
+                      1,
+                      3
+                    ]
+                  ],
+                  "unknownCells": [],
+                  "portals": [],
+                  "usableVolume": {
+                    "emptyCellCount": 1,
+                    "physicalVolume": null,
+                    "standingArea": null,
+                    "unit": "node"
+                  }
+                },
+                "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                "frame": {
+                  "profileVersion": "frame/v2",
+                  "frameId": "luanti-world-grid:fixture-world",
+                  "origin": [
+                    0,
+                    0,
+                    0
+                  ],
+                  "axes": [
+                    "+X",
+                    "+Y",
+                    "+Z"
+                  ],
+                  "handedness": "left",
+                  "gridUnit": {
+                    "name": "node",
+                    "metersPerGridUnit": null
+                  },
+                  "transformRevision": "fixture-adapter-exec-1"
+                },
+                "evidence": {
+                  "providerRef": "hanaworlds-adapter-luanti",
+                  "sourceRevision": "fixture-adapter-exec-1",
+                  "worldRef": "fixture-world",
+                  "worldRevision": "world-0"
+                },
+                "bodyOccupiedPositions": [],
+                "entranceFacing": "-Z",
+                "placementSettings": {
+                  "frontGapCells": 2,
+                  "forwardSearchCells": 16,
+                  "lateralSearchCells": 8,
+                  "verticalSearchCells": 4,
+                  "settingsRevision": "placement-0"
+                }
+              },
+              "context": {
+                "contractVersion": "painter/v4",
+                "sessionRef": "s1",
+                "worldRef": "fixture-world",
+                "turnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+                "painterId": "picture-blocks",
+                "invocationId": "proposal-b399280f-31f4-424d-b622-773fb0afaa98",
+                "intent": {
+                  "contractVersion": "session/v3",
+                  "referenceBriefDigest": "e38d96ba9ce867e601b568638c28f4da6dfdb7ca98212462a1f1658304d7c27a",
+                  "confirmedIntent": {
+                    "kind": "BUILD_STRUCTURE",
+                    "text": "图片中的石块",
+                    "purpose": "first building",
+                    "dimensions": {
+                      "width": 1,
+                      "depth": 1,
+                      "height": 1,
+                      "unit": "node"
+                    },
+                    "entrancePortalRefs": [],
+                    "confirmedTurnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360"
+                  },
+                  "intendedWorldRef": "fixture-world",
+                  "orderedTargetRefs": []
+                },
+                "intentDigest": "cfe6ca81b1d10e61b21bc6e186ebae453b7e6fdf629ed3191c1dc69c8ac12820",
+                "referenceBrief": {
+                  "contractVersion": "ReferenceBrief/v3",
+                  "sessionRef": "s1",
+                  "turnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+                  "briefRevision": "rev-d7121901-a8c7-48bb-995c-f92aed7d383b",
+                  "media": [
+                    {
+                      "attachmentRef": "sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                      "storedBytesDigest": "ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                      "projectionVariantId": null,
+                      "projectionBytesDigest": null,
+                      "mediaType": "image/png",
+                      "bytes": 96,
+                      "width": 2,
+                      "height": 2
+                    }
+                  ],
+                  "text": "图片中的石块",
+                  "controls": {
+                    "purpose": "first building",
+                    "dimensions": {
+                      "width": 1,
+                      "depth": 1,
+                      "height": 1,
+                      "unit": "node"
+                    },
+                    "entrancePortalRefs": [],
+                    "styleText": null
+                  }
+                },
+                "referenceBriefDigest": "e38d96ba9ce867e601b568638c28f4da6dfdb7ca98212462a1f1658304d7c27a",
+                "catalogue": {
+                  "profileVersion": "catalogue/v2",
+                  "engineProfile": "fixture-luanti-static",
+                  "gameId": "fixture-game",
+                  "gameRevision": "fixture-game-1",
+                  "modRevisions": {
+                    "fixture-mod": "fixture-mod-1"
+                  },
+                  "nodes": {
+                    "air": {
+                      "walkable": false,
+                      "collisionBoxes": [],
+                      "liquidType": "none",
+                      "damagePerSecond": 0,
+                      "lightSource": 0,
+                      "param2Type": "none",
+                      "allowedParam2": [
+                        0
+                      ],
+                      "hasCallbacks": false,
+                      "hasPersistentState": false,
+                      "definitionRevision": "fixture-def-1",
+                      "unknownFields": []
+                    },
+                    "fixture:stone": {
+                      "walkable": true,
+                      "collisionBoxes": [
+                        [
+                          -0.5,
+                          -0.5,
+                          -0.5,
+                          0.5,
+                          0.5,
+                          0.5
+                        ]
+                      ],
+                      "liquidType": "none",
+                      "damagePerSecond": 0,
+                      "lightSource": 0,
+                      "param2Type": "none",
+                      "allowedParam2": [
+                        0
+                      ],
+                      "hasCallbacks": false,
+                      "hasPersistentState": false,
+                      "definitionRevision": "fixture-def-1",
+                      "unknownFields": []
+                    }
+                  }
+                },
+                "targetFacts": {
+                  "profileVersion": "target-facts/v4",
+                  "source": "REGION_INSPECTED",
+                  "worldRef": "fixture-world",
+                  "objectRef": null,
+                  "worldRevision": "world-0",
+                  "objectRevision": null,
+                  "buildDigest": null,
+                  "planRevision": null,
+                  "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+                  "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+                  "sampledBounds": {
+                    "min": [
+                      0,
+                      0,
+                      3
+                    ],
+                    "max": [
+                      0,
+                      1,
+                      3
+                    ]
+                  },
+                  "coverageDigest": "45c2b1d28194a5818635bb08c5ecaf1bd3b96eec6083cf4f1fedaa5b90892585",
+                  "occupiedCells": [
+                    {
+                      "position": [
+                        0,
+                        0,
+                        3
+                      ],
+                      "nodeName": "fixture:stone",
+                      "param2": 0
+                    }
+                  ],
+                  "knownEmptyCells": [
+                    [
+                      0,
+                      1,
+                      3
+                    ]
+                  ],
+                  "unknownCells": [],
+                  "portals": [],
+                  "usableVolume": {
+                    "emptyCellCount": 1,
+                    "physicalVolume": null,
+                    "standingArea": null,
+                    "unit": "node"
+                  }
+                },
+                "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                "safetyProfile": {
+                  "profileVersion": "safety-profile/v3",
+                  "avatarDimensions": {
+                    "width": 1,
+                    "height": 2,
+                    "depth": 1,
+                    "unit": "node"
+                  },
+                  "connectivity": 6,
+                  "requireBodyClearance": true,
+                  "requireEntranceConnectivity": false,
+                  "hazardPolicy": {
+                    "forbidLiquid": true,
+                    "maximumDamagePerSecond": 0
+                  },
+                  "optionalLightRule": null
+                },
+                "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                "regionInspection": {
+                  "inspectionId": "inspection-23183248-e553-4a83-9df0-26d11f834907",
+                  "anchorKind": "CURRENT_VIEW",
+                  "targetFacts": {
+                    "profileVersion": "target-facts/v4",
+                    "source": "REGION_INSPECTED",
+                    "worldRef": "fixture-world",
+                    "objectRef": null,
+                    "worldRevision": "world-0",
+                    "objectRevision": null,
+                    "buildDigest": null,
+                    "planRevision": null,
+                    "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+                    "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+                    "sampledBounds": {
+                      "min": [
+                        0,
+                        0,
+                        3
+                      ],
+                      "max": [
+                        0,
+                        1,
+                        3
+                      ]
+                    },
+                    "coverageDigest": "45c2b1d28194a5818635bb08c5ecaf1bd3b96eec6083cf4f1fedaa5b90892585",
+                    "occupiedCells": [
+                      {
+                        "position": [
+                          0,
+                          0,
+                          3
+                        ],
+                        "nodeName": "fixture:stone",
+                        "param2": 0
+                      }
+                    ],
+                    "knownEmptyCells": [
+                      [
+                        0,
+                        1,
+                        3
+                      ]
+                    ],
+                    "unknownCells": [],
+                    "portals": [],
+                    "usableVolume": {
+                      "emptyCellCount": 1,
+                      "physicalVolume": null,
+                      "standingArea": null,
+                      "unit": "node"
+                    }
+                  },
+                  "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                  "frame": {
+                    "profileVersion": "frame/v2",
+                    "frameId": "luanti-world-grid:fixture-world",
+                    "origin": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "axes": [
+                      "+X",
+                      "+Y",
+                      "+Z"
+                    ],
+                    "handedness": "left",
+                    "gridUnit": {
+                      "name": "node",
+                      "metersPerGridUnit": null
+                    },
+                    "transformRevision": "fixture-adapter-exec-1"
+                  },
+                  "evidence": {
+                    "providerRef": "hanaworlds-adapter-luanti",
+                    "sourceRevision": "fixture-adapter-exec-1",
+                    "worldRef": "fixture-world",
+                    "worldRevision": "world-0"
+                  },
+                  "bodyOccupiedPositions": [],
+                  "entranceFacing": "-Z",
+                  "placementSettings": {
+                    "frontGapCells": 2,
+                    "forwardSearchCells": 16,
+                    "lateralSearchCells": 8,
+                    "verticalSearchCells": 4,
+                    "settingsRevision": "placement-0"
+                  }
+                },
+                "localContext": {
+                  "connectionRef": "local-connection",
+                  "connectionIncarnationRef": "socket-open-1",
+                  "worldRef": "fixture-world",
+                  "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204"
+                }
+              },
+              "request": {
+                "contractVersion": "painter/v4",
+                "sessionRef": "s1",
+                "worldRef": "fixture-world",
+                "turnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+                "painterId": "picture-blocks",
+                "invocationId": "proposal-b399280f-31f4-424d-b622-773fb0afaa98",
+                "intent": {
+                  "contractVersion": "session/v3",
+                  "referenceBriefDigest": "e38d96ba9ce867e601b568638c28f4da6dfdb7ca98212462a1f1658304d7c27a",
+                  "confirmedIntent": {
+                    "kind": "BUILD_STRUCTURE",
+                    "text": "图片中的石块",
+                    "purpose": "first building",
+                    "dimensions": {
+                      "width": 1,
+                      "depth": 1,
+                      "height": 1,
+                      "unit": "node"
+                    },
+                    "entrancePortalRefs": [],
+                    "confirmedTurnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360"
+                  },
+                  "intendedWorldRef": "fixture-world",
+                  "orderedTargetRefs": []
+                },
+                "intentDigest": "cfe6ca81b1d10e61b21bc6e186ebae453b7e6fdf629ed3191c1dc69c8ac12820",
+                "referenceBrief": {
+                  "contractVersion": "ReferenceBrief/v3",
+                  "sessionRef": "s1",
+                  "turnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+                  "briefRevision": "rev-d7121901-a8c7-48bb-995c-f92aed7d383b",
+                  "media": [
+                    {
+                      "attachmentRef": "sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                      "storedBytesDigest": "ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                      "projectionVariantId": null,
+                      "projectionBytesDigest": null,
+                      "mediaType": "image/png",
+                      "bytes": 96,
+                      "width": 2,
+                      "height": 2
+                    }
+                  ],
+                  "text": "图片中的石块",
+                  "controls": {
+                    "purpose": "first building",
+                    "dimensions": {
+                      "width": 1,
+                      "depth": 1,
+                      "height": 1,
+                      "unit": "node"
+                    },
+                    "entrancePortalRefs": [],
+                    "styleText": null
+                  }
+                },
+                "referenceBriefDigest": "e38d96ba9ce867e601b568638c28f4da6dfdb7ca98212462a1f1658304d7c27a",
+                "catalogue": {
+                  "profileVersion": "catalogue/v2",
+                  "engineProfile": "fixture-luanti-static",
+                  "gameId": "fixture-game",
+                  "gameRevision": "fixture-game-1",
+                  "modRevisions": {
+                    "fixture-mod": "fixture-mod-1"
+                  },
+                  "nodes": {
+                    "air": {
+                      "walkable": false,
+                      "collisionBoxes": [],
+                      "liquidType": "none",
+                      "damagePerSecond": 0,
+                      "lightSource": 0,
+                      "param2Type": "none",
+                      "allowedParam2": [
+                        0
+                      ],
+                      "hasCallbacks": false,
+                      "hasPersistentState": false,
+                      "definitionRevision": "fixture-def-1",
+                      "unknownFields": []
+                    },
+                    "fixture:stone": {
+                      "walkable": true,
+                      "collisionBoxes": [
+                        [
+                          -0.5,
+                          -0.5,
+                          -0.5,
+                          0.5,
+                          0.5,
+                          0.5
+                        ]
+                      ],
+                      "liquidType": "none",
+                      "damagePerSecond": 0,
+                      "lightSource": 0,
+                      "param2Type": "none",
+                      "allowedParam2": [
+                        0
+                      ],
+                      "hasCallbacks": false,
+                      "hasPersistentState": false,
+                      "definitionRevision": "fixture-def-1",
+                      "unknownFields": []
+                    }
+                  }
+                },
+                "targetFacts": {
+                  "profileVersion": "target-facts/v4",
+                  "source": "REGION_INSPECTED",
+                  "worldRef": "fixture-world",
+                  "objectRef": null,
+                  "worldRevision": "world-0",
+                  "objectRevision": null,
+                  "buildDigest": null,
+                  "planRevision": null,
+                  "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+                  "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+                  "sampledBounds": {
+                    "min": [
+                      0,
+                      0,
+                      3
+                    ],
+                    "max": [
+                      0,
+                      1,
+                      3
+                    ]
+                  },
+                  "coverageDigest": "45c2b1d28194a5818635bb08c5ecaf1bd3b96eec6083cf4f1fedaa5b90892585",
+                  "occupiedCells": [
+                    {
+                      "position": [
+                        0,
+                        0,
+                        3
+                      ],
+                      "nodeName": "fixture:stone",
+                      "param2": 0
+                    }
+                  ],
+                  "knownEmptyCells": [
+                    [
+                      0,
+                      1,
+                      3
+                    ]
+                  ],
+                  "unknownCells": [],
+                  "portals": [],
+                  "usableVolume": {
+                    "emptyCellCount": 1,
+                    "physicalVolume": null,
+                    "standingArea": null,
+                    "unit": "node"
+                  }
+                },
+                "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                "safetyProfile": {
+                  "profileVersion": "safety-profile/v3",
+                  "avatarDimensions": {
+                    "width": 1,
+                    "height": 2,
+                    "depth": 1,
+                    "unit": "node"
+                  },
+                  "connectivity": 6,
+                  "requireBodyClearance": true,
+                  "requireEntranceConnectivity": false,
+                  "hazardPolicy": {
+                    "forbidLiquid": true,
+                    "maximumDamagePerSecond": 0
+                  },
+                  "optionalLightRule": null
+                },
+                "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                "regionInspection": {
+                  "inspectionId": "inspection-23183248-e553-4a83-9df0-26d11f834907",
+                  "anchorKind": "CURRENT_VIEW",
+                  "targetFacts": {
+                    "profileVersion": "target-facts/v4",
+                    "source": "REGION_INSPECTED",
+                    "worldRef": "fixture-world",
+                    "objectRef": null,
+                    "worldRevision": "world-0",
+                    "objectRevision": null,
+                    "buildDigest": null,
+                    "planRevision": null,
+                    "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+                    "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+                    "sampledBounds": {
+                      "min": [
+                        0,
+                        0,
+                        3
+                      ],
+                      "max": [
+                        0,
+                        1,
+                        3
+                      ]
+                    },
+                    "coverageDigest": "45c2b1d28194a5818635bb08c5ecaf1bd3b96eec6083cf4f1fedaa5b90892585",
+                    "occupiedCells": [
+                      {
+                        "position": [
+                          0,
+                          0,
+                          3
+                        ],
+                        "nodeName": "fixture:stone",
+                        "param2": 0
+                      }
+                    ],
+                    "knownEmptyCells": [
+                      [
+                        0,
+                        1,
+                        3
+                      ]
+                    ],
+                    "unknownCells": [],
+                    "portals": [],
+                    "usableVolume": {
+                      "emptyCellCount": 1,
+                      "physicalVolume": null,
+                      "standingArea": null,
+                      "unit": "node"
+                    }
+                  },
+                  "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                  "frame": {
+                    "profileVersion": "frame/v2",
+                    "frameId": "luanti-world-grid:fixture-world",
+                    "origin": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "axes": [
+                      "+X",
+                      "+Y",
+                      "+Z"
+                    ],
+                    "handedness": "left",
+                    "gridUnit": {
+                      "name": "node",
+                      "metersPerGridUnit": null
+                    },
+                    "transformRevision": "fixture-adapter-exec-1"
+                  },
+                  "evidence": {
+                    "providerRef": "hanaworlds-adapter-luanti",
+                    "sourceRevision": "fixture-adapter-exec-1",
+                    "worldRef": "fixture-world",
+                    "worldRevision": "world-0"
+                  },
+                  "bodyOccupiedPositions": [],
+                  "entranceFacing": "-Z",
+                  "placementSettings": {
+                    "frontGapCells": 2,
+                    "forwardSearchCells": 16,
+                    "lateralSearchCells": 8,
+                    "verticalSearchCells": 4,
+                    "settingsRevision": "placement-0"
+                  }
+                },
+                "localContext": {
+                  "connectionRef": "local-connection",
+                  "connectionIncarnationRef": "socket-open-1",
+                  "worldRef": "fixture-world",
+                  "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204"
+                },
+                "requestId": "proposal",
+                "proposal": {
+                  "decision": "BUILD",
+                  "materials": {
+                    "stone": {
+                      "nodeName": "fixture:stone",
+                      "param2": 0
+                    }
+                  },
+                  "boxes": [
+                    {
+                      "min": [
+                        0,
+                        1,
+                        0
+                      ],
+                      "max": [
+                        0,
+                        1,
+                        0
+                      ],
+                      "materialRef": "stone"
+                    }
+                  ]
+                }
+              },
+              "response": {
+                "contractVersion": "painter/v4",
+                "requestId": "proposal",
+                "result": {
+                  "invocationId": "proposal-b399280f-31f4-424d-b622-773fb0afaa98",
+                  "build": {
+                    "contractVersion": "BUILD/V3",
+                    "documentId": "exterior-proposal-b399280f-31f4-424d-b622-773fb0afaa98",
+                    "coordinateFrame": {
+                      "profileVersion": "frame/v2",
+                      "frameId": "luanti-world-grid:fixture-world",
+                      "origin": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "axes": [
+                        "+X",
+                        "+Y",
+                        "+Z"
+                      ],
+                      "handedness": "left",
+                      "gridUnit": {
+                        "name": "node",
+                        "metersPerGridUnit": null
+                      },
+                      "transformRevision": "fixture-adapter-exec-1"
+                    },
+                    "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+                    "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                    "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                    "materials": {
+                      "stone": {
+                        "nodeName": "fixture:stone",
+                        "param2": 0
+                      }
+                    },
+                    "operations": [
+                      {
+                        "op": "set_box",
+                        "min": [
+                          0,
+                          1,
+                          3
+                        ],
+                        "max": [
+                          0,
+                          1,
+                          3
+                        ],
+                        "materialRef": "stone"
+                      }
+                    ],
+                    "declaredBounds": {
+                      "min": [
+                        0,
+                        1,
+                        3
+                      ],
+                      "max": [
+                        0,
+                        1,
+                        3
+                      ]
+                    },
+                    "witnesses": [
+                      {
+                        "witnessId": "w1",
+                        "predicate": "COVERAGE",
+                        "finalEffectsDigest": "9988c1f39190b23af3fa0c30c639c9b62ea27733cb7c44c47f7f351dec45c3e7",
+                        "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                        "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                        "facts": {
+                          "evidence": {
+                            "providerRef": "hanaworlds-adapter-luanti",
+                            "sourceRevision": "fixture-adapter-exec-1",
+                            "worldRef": "fixture-world",
+                            "worldRevision": "world-0"
+                          },
+                          "positions": [
+                            [
+                              0,
+                              1,
+                              3
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "witnessId": "w3",
+                        "predicate": "BODY_CLEARANCE",
+                        "finalEffectsDigest": "9988c1f39190b23af3fa0c30c639c9b62ea27733cb7c44c47f7f351dec45c3e7",
+                        "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                        "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                        "facts": {
+                          "evidence": {
+                            "providerRef": "hanaworlds-adapter-luanti",
+                            "sourceRevision": "fixture-adapter-exec-1",
+                            "worldRef": "fixture-world",
+                            "worldRevision": "world-0"
+                          },
+                          "positions": [
+                            [
+                              0,
+                              1,
+                              3
+                            ]
+                          ],
+                          "bodyOccupiedPositions": [],
+                          "avatarDimensions": {
+                            "width": 1,
+                            "height": 2,
+                            "depth": 1,
+                            "unit": "node"
+                          }
+                        }
+                      },
+                      {
+                        "witnessId": "w4",
+                        "predicate": "HAZARD",
+                        "finalEffectsDigest": "9988c1f39190b23af3fa0c30c639c9b62ea27733cb7c44c47f7f351dec45c3e7",
+                        "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                        "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                        "facts": {
+                          "evidence": {
+                            "providerRef": "hanaworlds-adapter-luanti",
+                            "sourceRevision": "fixture-adapter-exec-1",
+                            "worldRef": "fixture-world",
+                            "worldRevision": "world-0"
+                          },
+                          "positions": [
+                            [
+                              0,
+                              1,
+                              3
+                            ]
+                          ],
+                          "forbidLiquid": true,
+                          "maximumDamagePerSecond": 0
+                        }
+                      }
+                    ]
+                  },
+                  "buildDigest": "cfd2af7e99f29b462981c4aa90f5b9b1a779149a309bc65c058b7b0d92103809"
+                },
+                "error": null
+              }
+            }
+          },
+          "builds": {
+            "image-turn": {
+              "contextId": "read-context",
+              "method": "PER_CELL",
+              "plan": {
+                "invocationId": "proposal-b399280f-31f4-424d-b622-773fb0afaa98",
+                "build": {
+                  "contractVersion": "BUILD/V3",
+                  "documentId": "exterior-proposal-b399280f-31f4-424d-b622-773fb0afaa98",
+                  "coordinateFrame": {
+                    "profileVersion": "frame/v2",
+                    "frameId": "luanti-world-grid:fixture-world",
+                    "origin": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "axes": [
+                      "+X",
+                      "+Y",
+                      "+Z"
+                    ],
+                    "handedness": "left",
+                    "gridUnit": {
+                      "name": "node",
+                      "metersPerGridUnit": null
+                    },
+                    "transformRevision": "fixture-adapter-exec-1"
+                  },
+                  "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+                  "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                  "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                  "materials": {
+                    "stone": {
+                      "nodeName": "fixture:stone",
+                      "param2": 0
+                    }
+                  },
+                  "operations": [
+                    {
+                      "op": "set_box",
+                      "min": [
+                        0,
+                        1,
+                        3
+                      ],
+                      "max": [
+                        0,
+                        1,
+                        3
+                      ],
+                      "materialRef": "stone"
+                    }
+                  ],
+                  "declaredBounds": {
+                    "min": [
+                      0,
+                      1,
+                      3
+                    ],
+                    "max": [
+                      0,
+                      1,
+                      3
+                    ]
+                  },
+                  "witnesses": [
+                    {
+                      "witnessId": "w1",
+                      "predicate": "COVERAGE",
+                      "finalEffectsDigest": "9988c1f39190b23af3fa0c30c639c9b62ea27733cb7c44c47f7f351dec45c3e7",
+                      "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                      "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                      "facts": {
+                        "evidence": {
+                          "providerRef": "hanaworlds-adapter-luanti",
+                          "sourceRevision": "fixture-adapter-exec-1",
+                          "worldRef": "fixture-world",
+                          "worldRevision": "world-0"
+                        },
+                        "positions": [
+                          [
+                            0,
+                            1,
+                            3
+                          ]
+                        ]
+                      }
+                    },
+                    {
+                      "witnessId": "w3",
+                      "predicate": "BODY_CLEARANCE",
+                      "finalEffectsDigest": "9988c1f39190b23af3fa0c30c639c9b62ea27733cb7c44c47f7f351dec45c3e7",
+                      "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                      "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                      "facts": {
+                        "evidence": {
+                          "providerRef": "hanaworlds-adapter-luanti",
+                          "sourceRevision": "fixture-adapter-exec-1",
+                          "worldRef": "fixture-world",
+                          "worldRevision": "world-0"
+                        },
+                        "positions": [
+                          [
+                            0,
+                            1,
+                            3
+                          ]
+                        ],
+                        "bodyOccupiedPositions": [],
+                        "avatarDimensions": {
+                          "width": 1,
+                          "height": 2,
+                          "depth": 1,
+                          "unit": "node"
+                        }
+                      }
+                    },
+                    {
+                      "witnessId": "w4",
+                      "predicate": "HAZARD",
+                      "finalEffectsDigest": "9988c1f39190b23af3fa0c30c639c9b62ea27733cb7c44c47f7f351dec45c3e7",
+                      "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                      "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                      "facts": {
+                        "evidence": {
+                          "providerRef": "hanaworlds-adapter-luanti",
+                          "sourceRevision": "fixture-adapter-exec-1",
+                          "worldRef": "fixture-world",
+                          "worldRevision": "world-0"
+                        },
+                        "positions": [
+                          [
+                            0,
+                            1,
+                            3
+                          ]
+                        ],
+                        "forbidLiquid": true,
+                        "maximumDamagePerSecond": 0
+                      }
+                    }
+                  ]
+                },
+                "buildDigest": "cfd2af7e99f29b462981c4aa90f5b9b1a779149a309bc65c058b7b0d92103809"
+              },
+              "compiled": {
+                "projection": {
+                  "contractVersion": "operations/v3",
+                  "buildDigest": "cfd2af7e99f29b462981c4aa90f5b9b1a779149a309bc65c058b7b0d92103809",
+                  "compilerRevision": "fixture-compiler",
+                  "compilationConfigDigest": "2b6fdffff5cbcaa2b0a60cef7efe5321ab7eb67a6c37aa8b1c52160e509587dd",
+                  "worldRef": "fixture-world",
+                  "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+                  "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+                  "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                  "effects": [
+                    {
+                      "position": [
+                        0,
+                        1,
+                        3
+                      ],
+                      "nodeName": "fixture:stone",
+                      "param2": 0
+                    }
+                  ]
+                },
+                "operationDigest": "06f0ee5a67a24e7a06d47b4edbf61e102a845a89f05628597ef6e6a9f24b00cf",
+                "readBounds": {
+                  "min": [
+                    0,
+                    0,
+                    3
+                  ],
+                  "max": [
+                    0,
+                    1,
+                    3
+                  ]
+                },
+                "writeBounds": {
+                  "min": [
+                    0,
+                    1,
+                    3
+                  ],
+                  "max": [
+                    0,
+                    1,
+                    3
+                  ]
+                }
+              },
+              "submission": {
+                "parentRequest": {
+                  "contractVersion": "session/v3",
+                  "sessionRef": "s1",
+                  "requestId": "advance",
+                  "worldRef": "fixture-world",
+                  "expectedTurnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+                  "localContext": {
+                    "connectionRef": "local-connection",
+                    "connectionIncarnationRef": "socket-open-1",
+                    "worldRef": "fixture-world",
+                    "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204"
+                  }
+                },
+                "turnRef": "image-turn",
+                "confirmationInputId": "confirm",
+                "intent": {
+                  "contractVersion": "session/v3",
+                  "referenceBriefDigest": "e38d96ba9ce867e601b568638c28f4da6dfdb7ca98212462a1f1658304d7c27a",
+                  "confirmedIntent": {
+                    "kind": "BUILD_STRUCTURE",
+                    "text": "图片中的石块",
+                    "purpose": "first building",
+                    "dimensions": {
+                      "width": 1,
+                      "depth": 1,
+                      "height": 1,
+                      "unit": "node"
+                    },
+                    "entrancePortalRefs": [],
+                    "confirmedTurnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360"
+                  },
+                  "intendedWorldRef": "fixture-world",
+                  "orderedTargetRefs": []
+                },
+                "analysis": {
+                  "contractVersion": "canvas/v5",
+                  "worldRef": "fixture-world",
+                  "worldRevision": "world-0",
+                  "registryRevision": "registry-0",
+                  "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204",
+                  "operationDigest": "06f0ee5a67a24e7a06d47b4edbf61e102a845a89f05628597ef6e6a9f24b00cf",
+                  "orderedSelectedRefs": [],
+                  "affectedObjectRefs": []
+                },
+                "apply": {
+                  "contractVersion": "canvas/v5",
+                  "sessionRef": "s1",
+                  "requestId": "advance:apply",
+                  "worldRef": "fixture-world",
+                  "localContext": {
+                    "connectionRef": "local-connection",
+                    "connectionIncarnationRef": "socket-open-1",
+                    "worldRef": "fixture-world",
+                    "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204"
+                  },
+                  "transactionId": "build-737bc6b1-64b3-4ee1-a533-a6e7e11976c5",
+                  "operations": {
+                    "contractVersion": "operations/v3",
+                    "buildDigest": "cfd2af7e99f29b462981c4aa90f5b9b1a779149a309bc65c058b7b0d92103809",
+                    "compilerRevision": "fixture-compiler",
+                    "compilationConfigDigest": "2b6fdffff5cbcaa2b0a60cef7efe5321ab7eb67a6c37aa8b1c52160e509587dd",
+                    "worldRef": "fixture-world",
+                    "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+                    "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+                    "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                    "effects": [
+                      {
+                        "position": [
+                          0,
+                          1,
+                          3
+                        ],
+                        "nodeName": "fixture:stone",
+                        "param2": 0
+                      }
+                    ]
+                  },
+                  "operationDigest": "06f0ee5a67a24e7a06d47b4edbf61e102a845a89f05628597ef6e6a9f24b00cf",
+                  "analysisDigest": "943590c11162bded403217110d4ea8c9205860c54e61c99f053f33197e8b6b9e",
+                  "decisionRevision": null,
+                  "expectedWorldRevision": "world-0",
+                  "expectedObjectRevisions": {},
+                  "guarantee": "RECOVERABLE_VERIFIED",
+                  "regionInspectionBinding": {
+                    "inspectionId": "inspection-23183248-e553-4a83-9df0-26d11f834907",
+                    "build": {
+                      "contractVersion": "BUILD/V3",
+                      "documentId": "exterior-proposal-b399280f-31f4-424d-b622-773fb0afaa98",
+                      "coordinateFrame": {
+                        "profileVersion": "frame/v2",
+                        "frameId": "luanti-world-grid:fixture-world",
+                        "origin": [
+                          0,
+                          0,
+                          0
+                        ],
+                        "axes": [
+                          "+X",
+                          "+Y",
+                          "+Z"
+                        ],
+                        "handedness": "left",
+                        "gridUnit": {
+                          "name": "node",
+                          "metersPerGridUnit": null
+                        },
+                        "transformRevision": "fixture-adapter-exec-1"
+                      },
+                      "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+                      "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                      "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                      "materials": {
+                        "stone": {
+                          "nodeName": "fixture:stone",
+                          "param2": 0
+                        }
+                      },
+                      "operations": [
+                        {
+                          "op": "set_box",
+                          "min": [
+                            0,
+                            1,
+                            3
+                          ],
+                          "max": [
+                            0,
+                            1,
+                            3
+                          ],
+                          "materialRef": "stone"
+                        }
+                      ],
+                      "declaredBounds": {
+                        "min": [
+                          0,
+                          1,
+                          3
+                        ],
+                        "max": [
+                          0,
+                          1,
+                          3
+                        ]
+                      },
+                      "witnesses": [
+                        {
+                          "witnessId": "w1",
+                          "predicate": "COVERAGE",
+                          "finalEffectsDigest": "9988c1f39190b23af3fa0c30c639c9b62ea27733cb7c44c47f7f351dec45c3e7",
+                          "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                          "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                          "facts": {
+                            "evidence": {
+                              "providerRef": "hanaworlds-adapter-luanti",
+                              "sourceRevision": "fixture-adapter-exec-1",
+                              "worldRef": "fixture-world",
+                              "worldRevision": "world-0"
+                            },
+                            "positions": [
+                              [
+                                0,
+                                1,
+                                3
+                              ]
+                            ]
+                          }
+                        },
+                        {
+                          "witnessId": "w3",
+                          "predicate": "BODY_CLEARANCE",
+                          "finalEffectsDigest": "9988c1f39190b23af3fa0c30c639c9b62ea27733cb7c44c47f7f351dec45c3e7",
+                          "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                          "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                          "facts": {
+                            "evidence": {
+                              "providerRef": "hanaworlds-adapter-luanti",
+                              "sourceRevision": "fixture-adapter-exec-1",
+                              "worldRef": "fixture-world",
+                              "worldRevision": "world-0"
+                            },
+                            "positions": [
+                              [
+                                0,
+                                1,
+                                3
+                              ]
+                            ],
+                            "bodyOccupiedPositions": [],
+                            "avatarDimensions": {
+                              "width": 1,
+                              "height": 2,
+                              "depth": 1,
+                              "unit": "node"
+                            }
+                          }
+                        },
+                        {
+                          "witnessId": "w4",
+                          "predicate": "HAZARD",
+                          "finalEffectsDigest": "9988c1f39190b23af3fa0c30c639c9b62ea27733cb7c44c47f7f351dec45c3e7",
+                          "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+                          "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+                          "facts": {
+                            "evidence": {
+                              "providerRef": "hanaworlds-adapter-luanti",
+                              "sourceRevision": "fixture-adapter-exec-1",
+                              "worldRef": "fixture-world",
+                              "worldRevision": "world-0"
+                            },
+                            "positions": [
+                              [
+                                0,
+                                1,
+                                3
+                              ]
+                            ],
+                            "forbidLiquid": true,
+                            "maximumDamagePerSecond": 0
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "dispatched": true,
+              "outcome": {
+                "sessionRef": "s1",
+                "worldRef": "fixture-world",
+                "turnRevision": "rev-9b8434f1-827c-4bc6-96f7-f3e4b36e8360",
+                "stage": "COMPLETE",
+                "outcome": "VERIFIED",
+                "receipt": {
+                  "contractVersion": "canvas/v5",
+                  "transactionId": "build-737bc6b1-64b3-4ee1-a533-a6e7e11976c5",
+                  "operationDigest": "06f0ee5a67a24e7a06d47b4edbf61e102a845a89f05628597ef6e6a9f24b00cf",
+                  "transactionPayloadDigest": "c21cef1f0f5c55c16016a37bc9a86a4cfa350fd691e94e1e30601159bba69e4e",
+                  "status": "VERIFIED",
+                  "previousWorldRevision": "world-0",
+                  "observedWorldRevision": "world-1",
+                  "readbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+                  "restoreStatus": "NOT_REQUIRED",
+                  "error": null,
+                  "localContext": {
+                    "connectionRef": "local-connection",
+                    "connectionIncarnationRef": "socket-open-1",
+                    "worldRef": "fixture-world",
+                    "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204"
+                  }
+                }
+              },
+              "receipt": {
+                "contractVersion": "canvas/v5",
+                "transactionId": "build-737bc6b1-64b3-4ee1-a533-a6e7e11976c5",
+                "operationDigest": "06f0ee5a67a24e7a06d47b4edbf61e102a845a89f05628597ef6e6a9f24b00cf",
+                "transactionPayloadDigest": "c21cef1f0f5c55c16016a37bc9a86a4cfa350fd691e94e1e30601159bba69e4e",
+                "status": "VERIFIED",
+                "previousWorldRevision": "world-0",
+                "observedWorldRevision": "world-1",
+                "readbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+                "restoreStatus": "NOT_REQUIRED",
+                "error": null,
+                "localContext": {
+                  "connectionRef": "local-connection",
+                  "connectionIncarnationRef": "socket-open-1",
+                  "worldRef": "fixture-world",
+                  "selectionRevision": "selection-eab1a639-5a10-4eb4-8f04-ccc24ced6204"
+                }
+              },
+              "matches": [
+                {
+                  "object": {
+                    "worldRef": "fixture-world",
+                    "objectRef": "object-6aff0c80-83e2-4cd8-ba91-c892df7e3389",
+                    "objectRevision": "object-2c2e824f-eeb9-4dc0-b65f-867f6d5d34e0",
+                    "displayName": null,
+                    "nameRevision": null,
+                    "creationSequence": 0,
+                    "status": "READY"
+                  },
+                  "history": {
+                    "worldRef": "fixture-world",
+                    "objectRef": "object-6aff0c80-83e2-4cd8-ba91-c892df7e3389",
+                    "historyRevision": "history-ada7e75a-15d1-44fd-b53b-955c3f25e64e",
+                    "headTransactionId": "build-737bc6b1-64b3-4ee1-a533-a6e7e11976c5",
+                    "entries": [
+                      {
+                        "transactionId": "build-737bc6b1-64b3-4ee1-a533-a6e7e11976c5",
+                        "originTransactionId": null,
+                        "affectedObjectRefs": [
+                          "object-6aff0c80-83e2-4cd8-ba91-c892df7e3389"
+                        ],
+                        "operationDigest": "06f0ee5a67a24e7a06d47b4edbf61e102a845a89f05628597ef6e6a9f24b00cf",
+                        "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+                        "expectedAfterReadbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+                        "receiptDigest": "9ccfa5f01a3f90e063229cbf82f877b6ec1cc5036d785cd6d8ef24a51367484b",
+                        "historyRevision": "history-ada7e75a-15d1-44fd-b53b-955c3f25e64e",
+                        "status": "VERIFIED"
+                      }
+                    ],
+                    "undoAvailable": true,
+                    "redoAvailable": false
+                  },
+                  "entry": {
+                    "transactionId": "build-737bc6b1-64b3-4ee1-a533-a6e7e11976c5",
+                    "originTransactionId": null,
+                    "affectedObjectRefs": [
+                      "object-6aff0c80-83e2-4cd8-ba91-c892df7e3389"
+                    ],
+                    "operationDigest": "06f0ee5a67a24e7a06d47b4edbf61e102a845a89f05628597ef6e6a9f24b00cf",
+                    "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+                    "expectedAfterReadbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+                    "receiptDigest": "9ccfa5f01a3f90e063229cbf82f877b6ec1cc5036d785cd6d8ef24a51367484b",
+                    "historyRevision": "history-ada7e75a-15d1-44fd-b53b-955c3f25e64e",
+                    "status": "VERIFIED"
+                  }
+                }
+              ]
+            }
+          },
+          "undos": {},
+          "images": {
+            "sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3": {
+              "media": {
+                "attachmentRef": "sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                "storedBytesDigest": "ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+                "projectionVariantId": null,
+                "projectionBytesDigest": null,
+                "mediaType": "image/png",
+                "bytes": 96,
+                "width": 2,
+                "height": 2
+              },
+              "sourceMessageId": "user-image"
+            }
+          },
+          "currentContextId": "read-context"
+        }
+      }
+    }
+  }
+}

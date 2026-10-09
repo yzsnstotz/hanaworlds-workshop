@@ -1,21 +1,105 @@
 {
   "name": "hanaworlds-workshop",
-  "version": "0.1.0",
+  "version": "0.4.13",
   "private": true,
   "type": "module",
   "license": "MIT",
   "description": "HanaWorlds Stage 1 Workshop Session and orchestration gadget",
-  "repository": {"type": "git", "url": "https://github.com/yzsnstotz/hanaworlds-workshop.git"},
-  "engines": {"node": ">=24.13.1 <25"},
-  "exports": {".": "./src/index.mjs", "./client": "./client.cjs"},
-  "files": ["src/", "client.cjs", "vendor/contracts/", "cordis.patch.yml", "GADGET.md", "NOTICE", "LICENSE"],
-  "dsh": {"client": {"inject": ["@deepseek-ai/dsh-client-ui-layout", "@deepseek-ai/dsh-client-ui-sidebar"], "platform": "web"}, "bundle": {"patch": "./cordis.patch.yml"}},
-  "scripts": {"build": "node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs", "test": "node --test test/*.test.mjs"},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yzsnstotz/hanaworlds-workshop.git"
+  },
+  "engines": {
+    "node": ">=24.13.1 <25"
+  },
+  "exports": {
+    ".": "./src/index.mjs",
+    "./client": "./client.cjs",
+    "./panel-host": {
+      "types": "./panel/src/index.ts",
+      "default": "./lib/panel-host.mjs"
+    },
+    "./building-skill": "./src/building-skill.mjs"
+  },
+  "files": [
+    "src/index.mjs",
+    "src/building-skill.mjs",
+    "src/image-attachment.mjs",
+    "src/image-ask.mjs",
+    "src/write-tools.mjs",
+    "src/projection-store.mjs",
+    "client.cjs",
+    "cordis.patch.yml",
+    "GADGET.md",
+    "NOTICE",
+    "LICENSE",
+    "lib/panel-host.mjs",
+    "panel/src/index.ts"
+  ],
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-session",
+        "@deepseek-ai/dsh-client-connection"
+      ],
+      "external": [],
+      "platform": "web"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "test:session-metadata": "node --test test/session-metadata.test.mjs",
+    "build": "node scripts/verify-contracts.mjs && node --check src/index.mjs && node --check src/building-skill.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/image-ask.mjs && node --check src/write-tools.mjs && node scripts/build-image-panel.mjs",
+    "test": "node --test test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/image-panel-new-session.test.mjs test/image-ask.test.mjs test/write-tools.test.mjs",
+    "test:image": "node --test test/image-attachment.test.mjs test/image-panel-new-session.test.mjs",
+    "test:new-session": "node --test test/image-panel-new-session.test.mjs",
+    "test:ask": "node --test test/image-ask.test.mjs test/ask-web.test.mjs",
+    "test:text-normal": "node --test --test-name-pattern='local text proposal' test/local-world-runtime.test.mjs",
+    "test:write-tools": "node --test test/write-tools.test.mjs",
+    "build:panel": "node scripts/build-image-panel.mjs",
+    "test:panel": "node --test test/image-panel-client.test.mjs && node --test --test-name-pattern=\"panel \" test/image-attachment.test.mjs",
+    "prepack": "npm run build",
+    "test:src-gateway": "node --test --test-name-pattern=\"new SRC-only\" test/image-attachment.test.mjs",
+    "test:skill": "node --test test/building-skill.test.mjs",
+    "typecheck:skill": "node node_modules/typescript/bin/tsc --noEmit --allowJs --module NodeNext --moduleResolution NodeNext --target ES2022 --strict --skipLibCheck test/building-skill-consumer.mts",
+    "verify:contracts": "node scripts/verify-contracts.mjs",
+    "test:contracts-history-042": "node --test test/contracts-042-consumption.test.mjs",
+    "test:contracts": "node --test test/package-provenance.test.mjs test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/image-panel-new-session.test.mjs test/image-panel-client.test.mjs test/image-ask.test.mjs test/write-tools.test.mjs test/building-skill.test.mjs",
+    "typecheck:contracts": "node node_modules/typescript/bin/tsc --project test/types/tsconfig.json",
+    "test:session-world": "node --test test/session-world-candidate.test.mjs"
+  },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.4",
     "@deepseek-ai/dsh-invariants": "0.2.0-rc.2",
     "@deepseek-ai/dsh-scope": "0.2.0-rc.2",
     "@deepseek-ai/dsh-session": "0.2.0-rc.2",
-    "canonicalize": "5.1.0"
+    "@deepseek-ai/dsh-skill": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-storage-domain": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.2",
+    "canonicalize": "5.1.0",
+    "hanaworlds-contracts": "git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^0.5.6",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-agent-loop": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-api-gateway": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-attachment-local": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-authorization": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-credentials": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-credentials-local": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-llm-pi-ai": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-storage-json": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-tool-skill": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-typert-registry": "0.2.0-rc.2",
+    "typescript": "6.0.3"
   }
 }

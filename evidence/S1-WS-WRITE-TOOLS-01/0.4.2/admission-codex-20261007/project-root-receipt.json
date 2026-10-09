@@ -1,0 +1,20 @@
+{
+  "card": "S1-WS-WRITE-TOOLS-01",
+  "stage": "ADMISSION_ONLY",
+  "workerThreadId": "01a11392-fae1-7862-8968-676841044b15",
+  "timestampUTC": "2026-10-06T23:37:00.354384+00:00",
+  "nativeTool": "exec_command",
+  "actualCwd": "/Users/yzliu/work/projects/hana-world-mvp",
+  "probeDirectory": "/Users/yzliu/work/projects/hana-world-mvp/.hw-ws-admission-duhin0qe",
+  "directoryMode": "0o700",
+  "fileMode": "0o600",
+  "bytes": 32,
+  "writeSHA256": "242677b7c6841f95ca1c5b7e40e61cca00b78bfb6428dc2735385e8600f538f5",
+  "readSHA256": "242677b7c6841f95ca1c5b7e40e61cca00b78bfb6428dc2735385e8600f538f5",
+  "shaMatch": true,
+  "fileDeleted": true,
+  "directoryDeleted": true,
+  "sudoUsed": false,
+  "sourceChanged": false,
+  "gatesRun": false
+}

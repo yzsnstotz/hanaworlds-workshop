@@ -1,0 +1,42 @@
+objc[68184]: Class GNotificationCenterDelegate is implemented in both /Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-053/node_modules/hanaworlds-building-exterior-painter/node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.3.dylib (0x128825a50) and /Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-053/node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.7.dylib (0x130115a50). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+✖ ACTUAL three public peers: image proposal → real compile → durable Canvas readback → same-build Undo (587.019917ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 821.387833
+
+✖ failing tests:
+
+test at ../actual-peers-053/test/actual-peer-runtime.test.mjs:130:1
+✖ ACTUAL three public peers: image proposal → real compile → durable Canvas readback → same-build Undo (587.019917ms)
+  AssertionError [ERR_ASSERTION]: {"contractVersion":"session/v3","requestId":"undo","result":null,"error":{"code":"READBACK_FAILED","phase":"validate","retryability":"AFTER_NEW_FACTS","mutationState":"UNKNOWN","transactionRef":"undo-ec68ec38-1f0a-4386-9d23-d42056014024","causeCode":null,"reason":"REQUIRED_FACT_UNKNOWN"}}
+  + actual - expected
+  
+  + {
+  +   causeCode: null,
+  +   code: 'READBACK_FAILED',
+  +   mutationState: 'UNKNOWN',
+  +   phase: 'validate',
+  +   reason: 'REQUIRED_FACT_UNKNOWN',
+  +   retryability: 'AFTER_NEW_FACTS',
+  +   transactionRef: 'undo-ec68ec38-1f0a-4386-9d23-d42056014024'
+  + }
+  - null
+  
+      at call (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-053/test/actual-peer-runtime.test.mjs:109:81)
+      at async file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-053/test/actual-peer-runtime.test.mjs:142:14
+      at async withRuntime (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-053/test/actual-peer-runtime.test.mjs:102:3)
+      at async TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-053/test/actual-peer-runtime.test.mjs:131:27)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { code: 'READBACK_FAILED', phase: 'validate', retryability: 'AFTER_NEW_FACTS', mutationState: 'UNKNOWN', transactionRef: 'undo-ec68ec38-1f0a-4386-9d23-d42056014024', causeCode: null, reason: 'REQUIRED_FACT_UNKNOWN' },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

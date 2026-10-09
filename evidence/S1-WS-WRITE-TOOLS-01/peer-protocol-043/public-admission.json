@@ -1,0 +1,299 @@
+{
+  "evidence": "ACTUAL_PUBLIC_PACKAGE_PROTOCOL_ADMISSION",
+  "currentContracts": "hanaworlds-contracts@0.5.2",
+  "input": [
+    {
+      "path": "/Users/yzliu/.cache/hanaworlds-runs/S1-CONTRACT-REGION-V1-01/_evidence/final-052/hanaworlds-contracts-0.5.2.tgz",
+      "sha256": "e6c50766ffc821ca90e07c38f473456952ef650e8a321f676dc44ce7d7d72209",
+      "bytes": 145318,
+      "package": {
+        "name": "hanaworlds-contracts",
+        "version": "0.5.2",
+        "exports": {
+          ".": {
+            "types": "./types/local/index.d.ts",
+            "import": "./dist/local/index.mjs"
+          },
+          "./schema": "./schemas/local/contracts.schema.json",
+          "./profile": "./schemas/local/profile.json",
+          "./fixtures/*": "./fixtures/local/*.json",
+          "./package.json": "./package.json"
+        }
+      }
+    },
+    {
+      "path": "/Users/yzliu/.cache/hanaworlds-runs/S1-BRUSH-REGION-COMPILE-01/_evidence/final-11b5f14/hanaworlds-brush-0.5.0.tgz",
+      "sha256": "14a07d30f8cf93d6fa7dc5f2299184a68fa1fa9967480ff044cf14650660fda2",
+      "bytes": 150842,
+      "package": {
+        "name": "hanaworlds-brush",
+        "version": "0.5.0",
+        "exports": {
+          ".": {
+            "types": "./types/index.d.mts",
+            "import": "./src/index.mjs"
+          },
+          "./package.json": "./package.json"
+        }
+      }
+    },
+    {
+      "path": "/Users/yzliu/.cache/hanaworlds-runs/S1-PAINTER-REGION-VALIDATE-01/_evidence/contracts-0.5.0-20261007/package/hanaworlds-building-exterior-painter-0.4.0.tgz",
+      "sha256": "582441e75480c53b22980cddd8d645aa75347ad33985a152f6af00a4740e88c7",
+      "bytes": 177097,
+      "package": {
+        "name": "hanaworlds-building-exterior-painter",
+        "version": "0.4.0",
+        "exports": {
+          ".": "./src/index.mjs"
+        }
+      }
+    },
+    {
+      "path": "/Users/yzliu/.cache/hanaworlds-runs/S1-CANVAS-REGION-UNDO-01/_evidence/gate-c3069d4/hanaworlds-canvas-0.5.1.tgz",
+      "sha256": "694ae85a3b0b5c14acd6dcb86cd953c98f1120c28ff970e8d16b686f29144210",
+      "bytes": 21356,
+      "package": {
+        "name": "hanaworlds-canvas",
+        "version": "0.5.1",
+        "exports": {
+          ".": "./src/index.mjs"
+        }
+      }
+    },
+    {
+      "path": "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/final-042/hanaworlds-workshop-0.4.2.tgz",
+      "sha256": "ef07973dcf83a220cb2ecfb13baca0fc2dc26ee56c23b86405ceb15f58ccd680",
+      "bytes": 31873,
+      "package": {
+        "name": "hanaworlds-workshop",
+        "version": "0.4.2",
+        "exports": {
+          ".": "./src/index.mjs",
+          "./client": "./client.cjs"
+        }
+      }
+    }
+  ],
+  "brush": {
+    "source": "Actual BrushV3.protocolHandshake()",
+    "requirement": {
+      "protocol": "BUILD",
+      "major": 3,
+      "minMinor": 0,
+      "capabilities": [
+        "BUILD/V3:per-cell-compile"
+      ]
+    },
+    "advertised": {
+      "profileVersion": "protocol-handshake/v1",
+      "component": "hanaworlds-brush",
+      "protocols": [
+        {
+          "protocol": "BUILD",
+          "major": 3,
+          "minor": 0
+        },
+        {
+          "protocol": "region-build",
+          "major": 1,
+          "minor": 0
+        }
+      ],
+      "capabilities": [
+        "BUILD/V3:per-cell-compile",
+        "region-build/v1:compile-mapblock-chunks"
+      ],
+      "provenance": {
+        "packageName": "hanaworlds-brush",
+        "packageVersion": "0.5.0",
+        "sourceRevision": null,
+        "artifactDigest": null
+      }
+    },
+    "check": {
+      "admitted": true,
+      "result": {
+        "result": "PROTOCOL_COMPATIBLE",
+        "component": "hanaworlds-brush",
+        "matched": [
+          {
+            "protocol": "BUILD",
+            "major": 3,
+            "minor": 0,
+            "capabilities": [
+              "BUILD/V3:per-cell-compile"
+            ]
+          }
+        ],
+        "provenance": {
+          "packageName": "hanaworlds-brush",
+          "packageVersion": "0.5.0",
+          "sourceRevision": null,
+          "artifactDigest": null
+        }
+      }
+    }
+  },
+  "painter": {
+    "source": "Actual Cordis-provided Painter service protocolHandshake()",
+    "requirement": {
+      "protocol": "painter",
+      "major": 4,
+      "minMinor": 0,
+      "capabilities": []
+    },
+    "advertised": {
+      "profileVersion": "protocol-handshake/v1",
+      "component": "hanaworlds-building-exterior-painter",
+      "protocols": [
+        {
+          "protocol": "painter",
+          "major": 4,
+          "minor": 0
+        },
+        {
+          "protocol": "painter-region",
+          "major": 1,
+          "minor": 0
+        }
+      ],
+      "capabilities": [
+        "painter-region/v1:validate-region-proposal"
+      ],
+      "provenance": {
+        "packageName": "hanaworlds-building-exterior-painter",
+        "packageVersion": "0.4.0",
+        "sourceRevision": null,
+        "artifactDigest": null
+      }
+    },
+    "check": {
+      "admitted": true,
+      "result": {
+        "result": "PROTOCOL_COMPATIBLE",
+        "component": "hanaworlds-building-exterior-painter",
+        "matched": [
+          {
+            "protocol": "painter",
+            "major": 4,
+            "minor": 0,
+            "capabilities": []
+          }
+        ],
+        "provenance": {
+          "packageName": "hanaworlds-building-exterior-painter",
+          "packageVersion": "0.4.0",
+          "sourceRevision": null,
+          "artifactDigest": null
+        }
+      }
+    },
+    "note": "No painter/v4 per-cell capability id is defined in the supplied public Contracts/Painter package; no invented token is required."
+  },
+  "canvas": {
+    "source": "Actual Cordis-provided CanvasV5 service via Workshop public peerProtocolHandshake()",
+    "requirement": {
+      "protocol": "canvas",
+      "major": 5,
+      "minMinor": 0,
+      "capabilities": []
+    },
+    "advertised": null,
+    "check": {
+      "admitted": false,
+      "code": "UNSUPPORTED_VERSION",
+      "message": "UNSUPPORTED_VERSION/decode/VERSION_UNSUPPORTED"
+    },
+    "status": {
+      "component": "hanaworlds-canvas",
+      "version": "0.5.1",
+      "canvasContract": "canvas/v5",
+      "adapterContract": "world-adapter/v6",
+      "storage": "UNAVAILABLE",
+      "productReadiness": "UNPROVEN"
+    },
+    "regionRootHandshake": {
+      "profileVersion": "protocol-handshake/v1",
+      "component": "hanaworlds-canvas",
+      "protocols": [
+        {
+          "protocol": "canvas-region",
+          "major": 1,
+          "minor": 0
+        }
+      ],
+      "capabilities": [
+        "canvas-region/v1:compressed-before-snapshot",
+        "canvas-region/v1:rollback-on-failure",
+        "canvas-region/v1:single-logical-transaction",
+        "canvas-region/v1:whole-region-undo"
+      ],
+      "provenance": {
+        "packageName": "hanaworlds-canvas",
+        "packageVersion": "0.5.1",
+        "sourceRevision": null,
+        "artifactDigest": null
+      }
+    },
+    "regionRootAsPerCell": {
+      "admitted": false,
+      "code": "UNSUPPORTED_VERSION",
+      "message": "UNSUPPORTED_VERSION/decode/VERSION_UNSUPPORTED"
+    },
+    "publicCanvasV5Methods": [
+      "constructor",
+      "contractHandshake",
+      "status",
+      "current",
+      "readFootprints",
+      "readHistoryFacts",
+      "readWorldRevision",
+      "call"
+    ],
+    "publicCanvasRegionV1Methods": [
+      "constructor",
+      "protocolHandshake",
+      "describe",
+      "store",
+      "recoverPending",
+      "call"
+    ]
+  },
+  "region": {
+    "canvas": {
+      "admitted": true,
+      "result": {
+        "result": "PROTOCOL_COMPATIBLE",
+        "component": "hanaworlds-canvas",
+        "matched": [
+          {
+            "protocol": "canvas-region",
+            "major": 1,
+            "minor": 0,
+            "capabilities": [
+              "canvas-region/v1:compressed-before-snapshot",
+              "canvas-region/v1:rollback-on-failure",
+              "canvas-region/v1:single-logical-transaction",
+              "canvas-region/v1:whole-region-undo"
+            ]
+          }
+        ],
+        "provenance": {
+          "packageName": "hanaworlds-canvas",
+          "packageVersion": "0.5.1",
+          "sourceRevision": null,
+          "artifactDigest": null
+        }
+      }
+    }
+  },
+  "scope": {
+    "canvasInstanceConstructed": true,
+    "privatePeerImplementationRead": false,
+    "peerSourceChanged": false,
+    "worldOrModelOrUIRun": false,
+    "proposalAdvanceUndoRun": false,
+    "workshopChanged": false
+  }
+}

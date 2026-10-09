@@ -1,0 +1,37 @@
+[
+  {
+    "name": "@deepseek-ai/dsh-typert-protocol",
+    "version": "0.2.0-rc.2",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/",
+    "usage": "Official SRC markers/runtime, build compiler or public SDK component check. See source NOTICE."
+  },
+  {
+    "name": "typescript",
+    "version": "6.0.3",
+    "license": "Apache-2.0",
+    "source": "https://registry.npmjs.org/",
+    "usage": "Official SRC markers/runtime, build compiler or public SDK component check. See source NOTICE."
+  },
+  {
+    "name": "@deepseek-ai/dsh-api-gateway",
+    "version": "0.2.0-rc.2",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/",
+    "usage": "Official SRC markers/runtime, build compiler or public SDK component check. See source NOTICE."
+  },
+  {
+    "name": "@deepseek-ai/dsh-typert-registry",
+    "version": "0.2.0-rc.2",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/",
+    "usage": "Official SRC markers/runtime, build compiler or public SDK component check. See source NOTICE."
+  },
+  {
+    "name": "@deepseek-ai/dsh-client-connection",
+    "version": "0.2.0-rc.2",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/",
+    "usage": "Official SRC markers/runtime, build compiler or public SDK component check. See source NOTICE."
+  }
+]

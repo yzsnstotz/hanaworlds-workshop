@@ -1,0 +1,44 @@
+{
+  "stage": "DELIVERED_FIXTURE",
+  "source": {
+    "commit": "5e77997e93e0deee0ff7b29bc82aef6e3e427855",
+    "tests": 15,
+    "pass": 15,
+    "fail": 0,
+    "skipped": 0
+  },
+  "gateExit": 0,
+  "nativeGateCompletion": {
+    "session": 83277,
+    "chunk": "432a4a",
+    "exit": 0
+  },
+  "packed": {
+    "version": "0.4.3",
+    "tests": 15,
+    "pass": 15,
+    "fail": 0,
+    "skipped": 0
+  },
+  "baseline": {
+    "version": "0.4.2",
+    "exit": 1,
+    "error": "UNSUPPORTED_VERSION",
+    "sameContracts": "0.5.2",
+    "peers": "synthetic Painter4/Canvas5 cross-patch method handshakes; matching Brush fixture"
+  },
+  "boundary": {
+    "actual": "Workshop/Cordis/Core JSONL/domain storage/attachment/Tools/HTTP and Contracts0.5.2",
+    "fixture": "Painter/Canvas/Brush/Host/world ports",
+    "notRun": [
+      "new real Canvas public package",
+      "normal three real peers",
+      "Desktop/UI/model/Luanti/clean-machine/product acceptance"
+    ]
+  },
+  "development": {
+    "red": "5 failing new checks on old production",
+    "firstGreen": "4 pass, Painter submission generic error failure",
+    "green2": "5 pass after named error correction"
+  }
+}

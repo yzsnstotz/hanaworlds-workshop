@@ -1,0 +1,52 @@
+{
+  "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "42fce829e7fe1fc4926ba886ac3e9e2bce7b13f7edba709064b35d3646945b6d"
+    },
+    {
+      "path": "NOTICE",
+      "sha256": "98bea106d002c34b802483793b836f79ddb4d7b5d7b1ce469314fc2606acdf64"
+    },
+    {
+      "path": "client.cjs",
+      "sha256": "ce091297bf5d7c27be7296c76988fec0d25e408678bf8146bc1ec3c05ced3024"
+    },
+    {
+      "path": "package.json",
+      "sha256": "21e64b8b33d1f917bb16168810761656f3e26fc8c8861383cf2b8c2df15e190c"
+    },
+    {
+      "path": "GADGET.md",
+      "sha256": "4a837e0099afd7712025939ab7488f175425c5f6e1e8b92ab4a755cde525c605"
+    },
+    {
+      "path": "README.md",
+      "sha256": "f707f628a5ab9f1fc1a2a358ae6c7a60b5ce5c6d0d2eb26780966820e839604d"
+    },
+    {
+      "path": "src/image-attachment.mjs",
+      "sha256": "002ffa3452bbbb005b706fde2a88a979761d6afb1bb4b5ee5b69862e06f4b3da"
+    },
+    {
+      "path": "src/index.mjs",
+      "sha256": "53da08e7c886c16d04a471bcaeb27738ebffafdf47efa63818cd5e26767532ab"
+    },
+    {
+      "path": "src/projection-store.mjs",
+      "sha256": "b8d9a68dd24a9c139c53c1fb28e90a4d2371538b7d39a73a2ef4dc3fd7b1af27"
+    },
+    {
+      "path": "src/write-tools.mjs",
+      "sha256": "2293744e608e96427d2a7f0462bf332ffad4917940b55648b11e5618efb622be"
+    },
+    {
+      "path": "cordis.patch.yml",
+      "sha256": "f435f68bc4cfd7dd5fd2ac85e519f613d5cee4fba3cb3ae3cbc64d39bdddf211"
+    }
+  ],
+  "productionChanged": false,
+  "artifactSource": "5e77997e93e0deee0ff7b29bc82aef6e3e427855",
+  "harnessSource": "8fec81f",
+  "note": "byte identity only; formal source/packed normal gate NOT_RUN"
+}

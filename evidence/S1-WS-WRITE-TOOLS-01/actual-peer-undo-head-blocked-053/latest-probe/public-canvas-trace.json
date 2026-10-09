@@ -1,0 +1,2147 @@
+[
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "unbound",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "unbound",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "UNBOUND",
+          "sessionRef": "s1",
+          "sessionRevision": "session-0"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "SelectWorldConnection",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "select",
+      "worldRef": "fixture-world",
+      "connectionRef": "local-connection",
+      "connectionIncarnationRef": "socket-open-1",
+      "expectedRevision": "session-0",
+      "expectedContext": null
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "select",
+      "result": {
+        "currentSession": "s1",
+        "activeWorldRef": "fixture-world",
+        "orderedSelectedObjectRefs": [],
+        "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+        "localContext": {
+          "connectionRef": "local-connection",
+          "connectionIncarnationRef": "socket-open-1",
+          "worldRef": "fixture-world",
+          "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "switch:current:49f37c90-b4b3-4c76-b017-05743c41248e",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "switch:current:49f37c90-b4b3-4c76-b017-05743c41248e",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "switch:current:390e453b-7765-4f9f-9786-6f4d006f9eea",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "switch:current:390e453b-7765-4f9f-9786-6f4d006f9eea",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "input:current:7d2a1c81-6140-453f-a4f4-9e1fed4124fb",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "input:current:7d2a1c81-6140-453f-a4f4-9e1fed4124fb",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "confirm:current:7d249529-47ec-42bc-ba05-83fd1700bbdf",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "confirm:current:7d249529-47ec-42bc-ba05-83fd1700bbdf",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "read-context:current:9221a7cf-3a06-416a-888b-754be62023ec",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "read-context:current:9221a7cf-3a06-416a-888b-754be62023ec",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "InspectPlacementRegion",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "read-context:placement",
+      "worldRef": "fixture-world",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      },
+      "anchor": {
+        "kind": "CURRENT_VIEW",
+        "invocationId": "confirm"
+      },
+      "footprint": {
+        "widthCells": 1,
+        "depthCells": 1,
+        "heightCells": 1
+      }
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "read-context:placement",
+      "result": {
+        "outcome": "REGION_INSPECTED",
+        "inspection": {
+          "inspectionId": "inspection-4b3151f6-fa1d-45be-bfee-49b4f20bd412",
+          "anchorKind": "CURRENT_VIEW",
+          "targetFacts": {
+            "profileVersion": "target-facts/v4",
+            "source": "REGION_INSPECTED",
+            "worldRef": "fixture-world",
+            "objectRef": null,
+            "worldRevision": "world-0",
+            "objectRevision": null,
+            "buildDigest": null,
+            "planRevision": null,
+            "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+            "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+            "sampledBounds": {
+              "min": [
+                0,
+                0,
+                3
+              ],
+              "max": [
+                0,
+                1,
+                3
+              ]
+            },
+            "coverageDigest": "45c2b1d28194a5818635bb08c5ecaf1bd3b96eec6083cf4f1fedaa5b90892585",
+            "occupiedCells": [
+              {
+                "position": [
+                  0,
+                  0,
+                  3
+                ],
+                "nodeName": "fixture:stone",
+                "param2": 0
+              }
+            ],
+            "knownEmptyCells": [
+              [
+                0,
+                1,
+                3
+              ]
+            ],
+            "unknownCells": [],
+            "portals": [],
+            "usableVolume": {
+              "emptyCellCount": 1,
+              "physicalVolume": null,
+              "standingArea": null,
+              "unit": "node"
+            }
+          },
+          "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+          "frame": {
+            "profileVersion": "frame/v2",
+            "frameId": "luanti-world-grid:fixture-world",
+            "origin": [
+              0,
+              0,
+              0
+            ],
+            "axes": [
+              "+X",
+              "+Y",
+              "+Z"
+            ],
+            "handedness": "left",
+            "gridUnit": {
+              "name": "node",
+              "metersPerGridUnit": null
+            },
+            "transformRevision": "fixture-adapter-exec-1"
+          },
+          "evidence": {
+            "providerRef": "hanaworlds-adapter-luanti",
+            "sourceRevision": "fixture-adapter-exec-1",
+            "worldRef": "fixture-world",
+            "worldRevision": "world-0"
+          },
+          "bodyOccupiedPositions": [],
+          "entranceFacing": "-Z",
+          "placementSettings": {
+            "frontGapCells": 2,
+            "forwardSearchCells": 16,
+            "lateralSearchCells": 8,
+            "verticalSearchCells": 4,
+            "settingsRevision": "placement-0"
+          }
+        }
+      },
+      "error": null,
+      "unavailableSettings": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "read-context:current:fd83b743-57be-47f4-812a-09e7ab0b8a58",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "read-context:current:fd83b743-57be-47f4-812a-09e7ab0b8a58",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "read-context:current:8369b7f1-bc95-45a2-8cfe-ed28c3a2350b",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "read-context:current:8369b7f1-bc95-45a2-8cfe-ed28c3a2350b",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "proposal:current:6ac5f9e3-5fe6-4662-9943-abd19e26dee4",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "proposal:current:6ac5f9e3-5fe6-4662-9943-abd19e26dee4",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "proposal:current:5d981858-1a07-40b3-a470-925cf9e73ae0",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "proposal:current:5d981858-1a07-40b3-a470-925cf9e73ae0",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "proposal:current:17b63bc3-fedc-4a3e-9907-7952290a885a",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "proposal:current:17b63bc3-fedc-4a3e-9907-7952290a885a",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "proposal:current:df5fedc9-602b-4ab7-9c61-48eb13d480f0",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "proposal:current:df5fedc9-602b-4ab7-9c61-48eb13d480f0",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "proposal:current:2fbf4dab-8905-4fa0-b333-90ee11174075",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "proposal:current:2fbf4dab-8905-4fa0-b333-90ee11174075",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "proposal:current:30327a01-dc13-425b-b307-6e11e504466e",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "proposal:current:30327a01-dc13-425b-b307-6e11e504466e",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "proposal:current:ed4d595b-2bcb-4843-9a4a-d151879bea13",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "proposal:current:ed4d595b-2bcb-4843-9a4a-d151879bea13",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "proposal:current:c3cd022b-3dde-4ddf-a194-2d8693ba197c",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "proposal:current:c3cd022b-3dde-4ddf-a194-2d8693ba197c",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "advance:current:2dd04aed-576b-44af-8589-9d1d3b3549df",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "advance:current:2dd04aed-576b-44af-8589-9d1d3b3549df",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "proposal:current:bf7f1366-ae98-4719-9d50-0b68142005ed",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "proposal:current:bf7f1366-ae98-4719-9d50-0b68142005ed",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "proposal:current:20970378-0b2f-4292-961d-e87f65883078",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "proposal:current:20970378-0b2f-4292-961d-e87f65883078",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "advance:current:88c0156d-f161-4e46-8b3a-c0d6580c30c5",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "advance:current:88c0156d-f161-4e46-8b3a-c0d6580c30c5",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ListObjects",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "advance:objects",
+      "worldRef": "fixture-world",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      },
+      "expectedRevision": null
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "advance:objects",
+      "result": {
+        "worldRef": "fixture-world",
+        "registryRevision": "registry-0",
+        "objects": []
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "AnalyzeAffectedObjects",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "advance:analysis",
+      "worldRef": "fixture-world",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      },
+      "transactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+      "operations": {
+        "contractVersion": "operations/v3",
+        "buildDigest": "aa3a0bf584dc7be79bd47e1643dc47b50a232fc02230e0ba16d59dbb9efbfb38",
+        "compilerRevision": "fixture-compiler",
+        "compilationConfigDigest": "2b6fdffff5cbcaa2b0a60cef7efe5321ab7eb67a6c37aa8b1c52160e509587dd",
+        "worldRef": "fixture-world",
+        "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+        "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+        "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+        "effects": [
+          {
+            "position": [
+              0,
+              1,
+              3
+            ],
+            "nodeName": "fixture:stone",
+            "param2": 0
+          }
+        ]
+      },
+      "operationDigest": "9de34c13392112526f35d35a532f9b47ba425ababd764457a597615f2681d942",
+      "expectedRevision": "world-0",
+      "expectedRegistryRevision": "registry-0",
+      "expectedSelectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "advance:analysis",
+      "result": {
+        "contractVersion": "canvas/v5",
+        "worldRef": "fixture-world",
+        "worldRevision": "world-0",
+        "registryRevision": "registry-0",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+        "operationDigest": "9de34c13392112526f35d35a532f9b47ba425ababd764457a597615f2681d942",
+        "orderedSelectedRefs": [],
+        "affectedObjectRefs": []
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "advance:current:64f26298-902d-4254-b716-21f0796bcc70",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "advance:current:64f26298-902d-4254-b716-21f0796bcc70",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "advance:current:a1de4614-8f53-4064-9131-35920e808c96",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "advance:current:a1de4614-8f53-4064-9131-35920e808c96",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ApplyRecoverableCommit",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "advance:apply",
+      "worldRef": "fixture-world",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      },
+      "transactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+      "operations": {
+        "contractVersion": "operations/v3",
+        "buildDigest": "aa3a0bf584dc7be79bd47e1643dc47b50a232fc02230e0ba16d59dbb9efbfb38",
+        "compilerRevision": "fixture-compiler",
+        "compilationConfigDigest": "2b6fdffff5cbcaa2b0a60cef7efe5321ab7eb67a6c37aa8b1c52160e509587dd",
+        "worldRef": "fixture-world",
+        "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+        "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+        "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+        "effects": [
+          {
+            "position": [
+              0,
+              1,
+              3
+            ],
+            "nodeName": "fixture:stone",
+            "param2": 0
+          }
+        ]
+      },
+      "operationDigest": "9de34c13392112526f35d35a532f9b47ba425ababd764457a597615f2681d942",
+      "analysisDigest": "a0cb9cb71c4d96344ba7e7c9ac3e948fc82ca6238052fae9c817752cd36807fa",
+      "decisionRevision": null,
+      "expectedWorldRevision": "world-0",
+      "expectedObjectRevisions": {},
+      "guarantee": "RECOVERABLE_VERIFIED",
+      "regionInspectionBinding": {
+        "inspectionId": "inspection-4b3151f6-fa1d-45be-bfee-49b4f20bd412",
+        "build": {
+          "contractVersion": "BUILD/V3",
+          "documentId": "exterior-proposal-24e687b0-2ebb-44d9-9b97-fe03cc8b3c7c",
+          "coordinateFrame": {
+            "profileVersion": "frame/v2",
+            "frameId": "luanti-world-grid:fixture-world",
+            "origin": [
+              0,
+              0,
+              0
+            ],
+            "axes": [
+              "+X",
+              "+Y",
+              "+Z"
+            ],
+            "handedness": "left",
+            "gridUnit": {
+              "name": "node",
+              "metersPerGridUnit": null
+            },
+            "transformRevision": "fixture-adapter-exec-1"
+          },
+          "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+          "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+          "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+          "materials": {
+            "stone": {
+              "nodeName": "fixture:stone",
+              "param2": 0
+            }
+          },
+          "operations": [
+            {
+              "op": "set_box",
+              "min": [
+                0,
+                1,
+                3
+              ],
+              "max": [
+                0,
+                1,
+                3
+              ],
+              "materialRef": "stone"
+            }
+          ],
+          "declaredBounds": {
+            "min": [
+              0,
+              1,
+              3
+            ],
+            "max": [
+              0,
+              1,
+              3
+            ]
+          },
+          "witnesses": [
+            {
+              "witnessId": "w1",
+              "predicate": "COVERAGE",
+              "finalEffectsDigest": "9988c1f39190b23af3fa0c30c639c9b62ea27733cb7c44c47f7f351dec45c3e7",
+              "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+              "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+              "facts": {
+                "evidence": {
+                  "providerRef": "hanaworlds-adapter-luanti",
+                  "sourceRevision": "fixture-adapter-exec-1",
+                  "worldRef": "fixture-world",
+                  "worldRevision": "world-0"
+                },
+                "positions": [
+                  [
+                    0,
+                    1,
+                    3
+                  ]
+                ]
+              }
+            },
+            {
+              "witnessId": "w3",
+              "predicate": "BODY_CLEARANCE",
+              "finalEffectsDigest": "9988c1f39190b23af3fa0c30c639c9b62ea27733cb7c44c47f7f351dec45c3e7",
+              "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+              "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+              "facts": {
+                "evidence": {
+                  "providerRef": "hanaworlds-adapter-luanti",
+                  "sourceRevision": "fixture-adapter-exec-1",
+                  "worldRef": "fixture-world",
+                  "worldRevision": "world-0"
+                },
+                "positions": [
+                  [
+                    0,
+                    1,
+                    3
+                  ]
+                ],
+                "bodyOccupiedPositions": [],
+                "avatarDimensions": {
+                  "width": 1,
+                  "height": 2,
+                  "depth": 1,
+                  "unit": "node"
+                }
+              }
+            },
+            {
+              "witnessId": "w4",
+              "predicate": "HAZARD",
+              "finalEffectsDigest": "9988c1f39190b23af3fa0c30c639c9b62ea27733cb7c44c47f7f351dec45c3e7",
+              "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+              "safetyProfileDigest": "a408433a86a949f3f8839c918c20fc92347335040347f5affc2b6b6e9787bda1",
+              "facts": {
+                "evidence": {
+                  "providerRef": "hanaworlds-adapter-luanti",
+                  "sourceRevision": "fixture-adapter-exec-1",
+                  "worldRef": "fixture-world",
+                  "worldRevision": "world-0"
+                },
+                "positions": [
+                  [
+                    0,
+                    1,
+                    3
+                  ]
+                ],
+                "forbidLiquid": true,
+                "maximumDamagePerSecond": 0
+              }
+            }
+          ]
+        }
+      }
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "advance:apply",
+      "result": {
+        "contractVersion": "canvas/v5",
+        "transactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+        "operationDigest": "9de34c13392112526f35d35a532f9b47ba425ababd764457a597615f2681d942",
+        "transactionPayloadDigest": "7cf47424fdfa0a44a99e4d79f4c46a00c178703935f9f0672e480855bf635729",
+        "status": "VERIFIED",
+        "previousWorldRevision": "world-0",
+        "observedWorldRevision": "world-1",
+        "readbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+        "restoreStatus": "NOT_REQUIRED",
+        "error": null,
+        "localContext": {
+          "connectionRef": "local-connection",
+          "connectionIncarnationRef": "socket-open-1",
+          "worldRef": "fixture-world",
+          "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "Readback",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "advance:readback",
+      "worldRef": "fixture-world",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      },
+      "transactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+      "commitRevision": "world-1",
+      "expectedOperations": {
+        "contractVersion": "operations/v3",
+        "buildDigest": "aa3a0bf584dc7be79bd47e1643dc47b50a232fc02230e0ba16d59dbb9efbfb38",
+        "compilerRevision": "fixture-compiler",
+        "compilationConfigDigest": "2b6fdffff5cbcaa2b0a60cef7efe5321ab7eb67a6c37aa8b1c52160e509587dd",
+        "worldRef": "fixture-world",
+        "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+        "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+        "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+        "effects": [
+          {
+            "position": [
+              0,
+              1,
+              3
+            ],
+            "nodeName": "fixture:stone",
+            "param2": 0
+          }
+        ]
+      },
+      "transactionPayloadDigest": "7cf47424fdfa0a44a99e4d79f4c46a00c178703935f9f0672e480855bf635729"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "advance:readback",
+      "result": {
+        "contractVersion": "canvas/v5",
+        "transactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+        "operationDigest": "9de34c13392112526f35d35a532f9b47ba425ababd764457a597615f2681d942",
+        "transactionPayloadDigest": "7cf47424fdfa0a44a99e4d79f4c46a00c178703935f9f0672e480855bf635729",
+        "status": "VERIFIED",
+        "previousWorldRevision": "world-0",
+        "observedWorldRevision": "world-1",
+        "readbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+        "restoreStatus": "NOT_REQUIRED",
+        "error": null,
+        "localContext": {
+          "connectionRef": "local-connection",
+          "connectionIncarnationRef": "socket-open-1",
+          "worldRef": "fixture-world",
+          "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ListObjects",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "advance:linked-objects",
+      "worldRef": "fixture-world",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      },
+      "expectedRevision": null
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "advance:linked-objects",
+      "result": {
+        "worldRef": "fixture-world",
+        "registryRevision": "registry-7737d1a0-c8bc-4db8-9969-118c13a752ce",
+        "objects": [
+          {
+            "worldRef": "fixture-world",
+            "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+            "objectRevision": "object-1cd07830-5ce8-4c53-b27e-168a58d2ffe3",
+            "displayName": null,
+            "nameRevision": null,
+            "creationSequence": 0,
+            "status": "READY"
+          }
+        ]
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "HistoryQuery",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "advance:history:object-e69b82da-2800-40f3-a509-50585652fe17",
+      "worldRef": "fixture-world",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      },
+      "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+      "expectedHistoryRevision": null
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "advance:history:object-e69b82da-2800-40f3-a509-50585652fe17",
+      "result": {
+        "worldRef": "fixture-world",
+        "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+        "historyRevision": "history-b3b66230-9e3c-42f5-841c-b9688f72c450",
+        "headTransactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+        "entries": [
+          {
+            "transactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+            "originTransactionId": null,
+            "affectedObjectRefs": [
+              "object-e69b82da-2800-40f3-a509-50585652fe17"
+            ],
+            "operationDigest": "9de34c13392112526f35d35a532f9b47ba425ababd764457a597615f2681d942",
+            "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+            "expectedAfterReadbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+            "receiptDigest": "60ac526fae15bf1b3f621dd7b91e1dfea1666e12f1cc92f1a778cb704cf277b9",
+            "historyRevision": "history-b3b66230-9e3c-42f5-841c-b9688f72c450",
+            "status": "VERIFIED"
+          }
+        ],
+        "undoAvailable": true,
+        "redoAvailable": false
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "advance:current:c857fbbb-ce81-4969-834a-c75ecac23f3f",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "advance:current:c857fbbb-ce81-4969-834a-c75ecac23f3f",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ListObjects",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "objects",
+      "worldRef": "fixture-world",
+      "expectedRevision": null,
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      }
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "objects",
+      "result": {
+        "worldRef": "fixture-world",
+        "registryRevision": "registry-7737d1a0-c8bc-4db8-9969-118c13a752ce",
+        "objects": [
+          {
+            "worldRef": "fixture-world",
+            "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+            "objectRevision": "object-1cd07830-5ce8-4c53-b27e-168a58d2ffe3",
+            "displayName": null,
+            "nameRevision": null,
+            "creationSequence": 0,
+            "status": "READY"
+          }
+        ]
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "HistoryQuery",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "history",
+      "worldRef": "fixture-world",
+      "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+      "expectedHistoryRevision": null,
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      }
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "history",
+      "result": {
+        "worldRef": "fixture-world",
+        "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+        "historyRevision": "history-b3b66230-9e3c-42f5-841c-b9688f72c450",
+        "headTransactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+        "entries": [
+          {
+            "transactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+            "originTransactionId": null,
+            "affectedObjectRefs": [
+              "object-e69b82da-2800-40f3-a509-50585652fe17"
+            ],
+            "operationDigest": "9de34c13392112526f35d35a532f9b47ba425ababd764457a597615f2681d942",
+            "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+            "expectedAfterReadbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+            "receiptDigest": "60ac526fae15bf1b3f621dd7b91e1dfea1666e12f1cc92f1a778cb704cf277b9",
+            "historyRevision": "history-b3b66230-9e3c-42f5-841c-b9688f72c450",
+            "status": "VERIFIED"
+          }
+        ],
+        "undoAvailable": true,
+        "redoAvailable": false
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "undo:current:eefb1c1d-fec2-4184-b979-8f84b0b5953a",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "undo:current:eefb1c1d-fec2-4184-b979-8f84b0b5953a",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "HistoryQuery",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "undo:undo-head:object-e69b82da-2800-40f3-a509-50585652fe17",
+      "worldRef": "fixture-world",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      },
+      "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+      "expectedHistoryRevision": null
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "undo:undo-head:object-e69b82da-2800-40f3-a509-50585652fe17",
+      "result": {
+        "worldRef": "fixture-world",
+        "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+        "historyRevision": "history-b3b66230-9e3c-42f5-841c-b9688f72c450",
+        "headTransactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+        "entries": [
+          {
+            "transactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+            "originTransactionId": null,
+            "affectedObjectRefs": [
+              "object-e69b82da-2800-40f3-a509-50585652fe17"
+            ],
+            "operationDigest": "9de34c13392112526f35d35a532f9b47ba425ababd764457a597615f2681d942",
+            "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+            "expectedAfterReadbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+            "receiptDigest": "60ac526fae15bf1b3f621dd7b91e1dfea1666e12f1cc92f1a778cb704cf277b9",
+            "historyRevision": "history-b3b66230-9e3c-42f5-841c-b9688f72c450",
+            "status": "VERIFIED"
+          }
+        ],
+        "undoAvailable": true,
+        "redoAvailable": false
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "InspectObject",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "undo:undo-inspect:object-e69b82da-2800-40f3-a509-50585652fe17",
+      "worldRef": "fixture-world",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      },
+      "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+      "expectedRevision": "object-1cd07830-5ce8-4c53-b27e-168a58d2ffe3",
+      "sampledBounds": {
+        "min": [
+          0,
+          0,
+          3
+        ],
+        "max": [
+          0,
+          1,
+          3
+        ]
+      }
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "undo:undo-inspect:object-e69b82da-2800-40f3-a509-50585652fe17",
+      "result": {
+        "profileVersion": "target-facts/v4",
+        "source": "INSPECTED",
+        "worldRef": "fixture-world",
+        "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+        "worldRevision": "world-1",
+        "objectRevision": "object-1cd07830-5ce8-4c53-b27e-168a58d2ffe3",
+        "buildDigest": null,
+        "planRevision": null,
+        "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+        "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+        "sampledBounds": {
+          "min": [
+            0,
+            0,
+            3
+          ],
+          "max": [
+            0,
+            1,
+            3
+          ]
+        },
+        "coverageDigest": "45c2b1d28194a5818635bb08c5ecaf1bd3b96eec6083cf4f1fedaa5b90892585",
+        "occupiedCells": [
+          {
+            "position": [
+              0,
+              0,
+              3
+            ],
+            "nodeName": "fixture:stone",
+            "param2": 0
+          },
+          {
+            "position": [
+              0,
+              1,
+              3
+            ],
+            "nodeName": "fixture:stone",
+            "param2": 0
+          }
+        ],
+        "knownEmptyCells": [],
+        "unknownCells": [],
+        "portals": [],
+        "usableVolume": {
+          "emptyCellCount": 1,
+          "physicalVolume": null,
+          "standingArea": null,
+          "unit": "node"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "ReadWorldSelectionContext",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "undo:current:73936c21-86a3-4235-8049-f70b3c75842b",
+      "worldRef": "fixture-world"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "undo:current:73936c21-86a3-4235-8049-f70b3c75842b",
+      "result": {
+        "sessionRef": "s1",
+        "worldRef": "fixture-world",
+        "inventory": {
+          "capabilityRevision": "cap-1",
+          "connections": [
+            {
+              "adapterId": "fixture-adapter",
+              "connectionRef": "local-connection",
+              "worldRef": "fixture-world",
+              "displayName": "Fixture world",
+              "capabilityRevision": "cap-1",
+              "payloadVersion": "world-adapter/v6",
+              "readiness": "READY",
+              "connectionIncarnationRef": "socket-open-1"
+            }
+          ]
+        },
+        "selection": {
+          "status": "BOUND",
+          "context": {
+            "currentSession": "s1",
+            "activeWorldRef": "fixture-world",
+            "orderedSelectedObjectRefs": [],
+            "sessionRevision": "session-741df4f0-015f-4209-bd25-a8e614a74165",
+            "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03",
+            "localContext": {
+              "connectionRef": "local-connection",
+              "connectionIncarnationRef": "socket-open-1",
+              "worldRef": "fixture-world",
+              "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+            }
+          },
+          "connectionRef": "local-connection"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "Undo",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "undo:undo",
+      "worldRef": "fixture-world",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      },
+      "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+      "transactionId": "undo-ec68ec38-1f0a-4386-9d23-d42056014024",
+      "historyTransactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+      "expectedHistoryRevision": "history-b3b66230-9e3c-42f5-841c-b9688f72c450",
+      "expectedWorldRevision": "world-1",
+      "expectedObjectRevisions": {
+        "object-e69b82da-2800-40f3-a509-50585652fe17": "object-1cd07830-5ce8-4c53-b27e-168a58d2ffe3"
+      },
+      "intentDigest": "d4c289662121fbe7426558e19ec99e0054a8fa7a0088b645c01b4a1fc7f5ab81",
+      "surfaceActionDigest": "2cc5cb91629bb08a983bbb93a2c0434034ce55e26192d42ce55e378c871f2842"
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "undo:undo",
+      "result": {
+        "contractVersion": "canvas/v5",
+        "transactionId": "undo-ec68ec38-1f0a-4386-9d23-d42056014024",
+        "operationDigest": "b51e1be950db8555ecdf702235afa1189d84af81b773451fff7973932d8d0c63",
+        "transactionPayloadDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "status": "VERIFIED",
+        "previousWorldRevision": "world-1",
+        "observedWorldRevision": "world-2",
+        "readbackDigest": "640d018ec730cb3f7544a9ad7def39fc37b216935b36d926cb2597776b65c0fb",
+        "restoreStatus": "NOT_REQUIRED",
+        "error": null,
+        "localContext": {
+          "connectionRef": "local-connection",
+          "connectionIncarnationRef": "socket-open-1",
+          "worldRef": "fixture-world",
+          "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+        }
+      },
+      "error": null
+    }
+  },
+  {
+    "operation": "HistoryQuery",
+    "request": {
+      "contractVersion": "canvas/v5",
+      "sessionRef": "s1",
+      "requestId": "undo:undo-after:object-e69b82da-2800-40f3-a509-50585652fe17",
+      "worldRef": "fixture-world",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+      },
+      "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+      "expectedHistoryRevision": null
+    },
+    "response": {
+      "contractVersion": "canvas/v5",
+      "requestId": "undo:undo-after:object-e69b82da-2800-40f3-a509-50585652fe17",
+      "result": {
+        "worldRef": "fixture-world",
+        "objectRef": "object-e69b82da-2800-40f3-a509-50585652fe17",
+        "historyRevision": "history-f1c50e7e-d959-4ae6-be8f-dda6a4a59922",
+        "headTransactionId": "undo-ec68ec38-1f0a-4386-9d23-d42056014024",
+        "entries": [
+          {
+            "transactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+            "originTransactionId": null,
+            "affectedObjectRefs": [
+              "object-e69b82da-2800-40f3-a509-50585652fe17"
+            ],
+            "operationDigest": "9de34c13392112526f35d35a532f9b47ba425ababd764457a597615f2681d942",
+            "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+            "expectedAfterReadbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+            "receiptDigest": "60ac526fae15bf1b3f621dd7b91e1dfea1666e12f1cc92f1a778cb704cf277b9",
+            "historyRevision": "history-b3b66230-9e3c-42f5-841c-b9688f72c450",
+            "status": "VERIFIED"
+          },
+          {
+            "transactionId": "undo-ec68ec38-1f0a-4386-9d23-d42056014024",
+            "originTransactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+            "affectedObjectRefs": [
+              "object-e69b82da-2800-40f3-a509-50585652fe17"
+            ],
+            "operationDigest": "b51e1be950db8555ecdf702235afa1189d84af81b773451fff7973932d8d0c63",
+            "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+            "expectedAfterReadbackDigest": "640d018ec730cb3f7544a9ad7def39fc37b216935b36d926cb2597776b65c0fb",
+            "receiptDigest": "6d405e7f544713d25ff5017a695f4906a6a7b82a26903d37169cb68d68b1004b",
+            "historyRevision": "history-f1c50e7e-d959-4ae6-be8f-dda6a4a59922",
+            "status": "VERIFIED"
+          }
+        ],
+        "undoAvailable": false,
+        "redoAvailable": true
+      },
+      "error": null
+    }
+  }
+]

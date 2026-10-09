@@ -1,0 +1,704 @@
+[
+  {
+    "adapter": "DiscoverConnections",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "unbound:discover",
+      "adapterId": "fixture-adapter"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "select:connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "DiscoverConnections",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "select:discover",
+      "adapterId": "fixture-adapter"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "read-context:placement:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "InspectRegion",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "read-context:placement:region",
+      "worldRef": "fixture-world",
+      "expectedWorldRevision": "world-0",
+      "inspectionId": "inspection-2d5435c3-aa8a-479f-98e8-b17246247c00",
+      "anchor": {
+        "kind": "CURRENT_VIEW",
+        "invocationId": "confirm"
+      },
+      "footprint": {
+        "widthCells": 1,
+        "depthCells": 1,
+        "heightCells": 1
+      },
+      "placementSettings": {
+        "frontGapCells": 2,
+        "forwardSearchCells": 16,
+        "lateralSearchCells": 8,
+        "verticalSearchCells": 4,
+        "settingsRevision": "placement-0"
+      },
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+      }
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:objects:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:analysis:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:apply:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "native": "readScopedState",
+    "connectionRef": "local-connection",
+    "positions": [
+      [
+        0,
+        1,
+        3
+      ]
+    ],
+    "rawReturn": {
+      "worldRef": "fixture-world",
+      "stateProfile": {
+        "profileVersion": "state-profile/v2",
+        "nodeFields": [
+          "nodeName",
+          "param1",
+          "param2"
+        ],
+        "metadataMode": "exact",
+        "inventoryMode": "exact",
+        "timerMode": "exact",
+        "derivedLightMode": "recompute-with-readback"
+      },
+      "cells": [
+        {
+          "position": [
+            0,
+            1,
+            3
+          ],
+          "availability": "KNOWN",
+          "stateDigest": "322555c1f2cabbaf00730bc0eddc0b5c25650ad1db5eee60a87b950621dc327b"
+        }
+      ]
+    },
+    "source": "Canvas0.5.3 public fixed fixture"
+  },
+  {
+    "adapter": "PrepareRecoverableTransaction",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:apply:prepare",
+      "worldRef": "fixture-world",
+      "transactionId": "build-29170c1f-e343-4f7e-9c98-8ac94f69f7d9",
+      "operationDigest": "df342067a5eeaa79ad9ec08e6f3711d830b6831793a9d5d955673ed1885f023f",
+      "operations": {
+        "contractVersion": "operations/v3",
+        "buildDigest": "c7016038edb18e559180863fd6a7861b57659e80cfa4decfd67339ddefe5ea81",
+        "compilerRevision": "fixture-compiler",
+        "compilationConfigDigest": "2b6fdffff5cbcaa2b0a60cef7efe5321ab7eb67a6c37aa8b1c52160e509587dd",
+        "worldRef": "fixture-world",
+        "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+        "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+        "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+        "effects": [
+          {
+            "position": [
+              0,
+              1,
+              3
+            ],
+            "nodeName": "fixture:stone",
+            "param2": 0
+          }
+        ]
+      },
+      "scope": {
+        "transactionId": "build-29170c1f-e343-4f7e-9c98-8ac94f69f7d9",
+        "worldRef": "fixture-world",
+        "operationDigest": "df342067a5eeaa79ad9ec08e6f3711d830b6831793a9d5d955673ed1885f023f",
+        "stateProfile": {
+          "profileVersion": "state-profile/v2",
+          "nodeFields": [
+            "nodeName",
+            "param1",
+            "param2"
+          ],
+          "metadataMode": "exact",
+          "inventoryMode": "exact",
+          "timerMode": "exact",
+          "derivedLightMode": "recompute-with-readback"
+        },
+        "checkedPositions": [
+          [
+            0,
+            1,
+            3
+          ]
+        ],
+        "objects": [],
+        "cells": [
+          {
+            "position": [
+              0,
+              1,
+              3
+            ],
+            "availability": "KNOWN",
+            "stateDigest": "322555c1f2cabbaf00730bc0eddc0b5c25650ad1db5eee60a87b950621dc327b"
+          }
+        ],
+        "localContext": {
+          "connectionRef": "local-connection",
+          "connectionIncarnationRef": "socket-open-1",
+          "worldRef": "fixture-world",
+          "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+        }
+      },
+      "scopeDigest": "bc69f101bbfc935afda2603635646f8badb299fcbaa429574796985f7d42da61",
+      "guarantee": "RECOVERABLE_VERIFIED",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+      }
+    }
+  },
+  {
+    "adapter": "Readback",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:apply:before",
+      "worldRef": "fixture-world",
+      "transactionId": "build-29170c1f-e343-4f7e-9c98-8ac94f69f7d9",
+      "coveredPositions": [
+        [
+          0,
+          1,
+          3
+        ]
+      ],
+      "stateProfile": {
+        "profileVersion": "state-profile/v2",
+        "nodeFields": [
+          "nodeName",
+          "param1",
+          "param2"
+        ],
+        "metadataMode": "exact",
+        "inventoryMode": "exact",
+        "timerMode": "exact",
+        "derivedLightMode": "recompute-with-readback"
+      },
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+      }
+    }
+  },
+  {
+    "adapter": "ApplyCompiledTransaction",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:apply:apply",
+      "worldRef": "fixture-world",
+      "transactionId": "build-29170c1f-e343-4f7e-9c98-8ac94f69f7d9",
+      "operationDigest": "df342067a5eeaa79ad9ec08e6f3711d830b6831793a9d5d955673ed1885f023f",
+      "operations": {
+        "contractVersion": "operations/v3",
+        "buildDigest": "c7016038edb18e559180863fd6a7861b57659e80cfa4decfd67339ddefe5ea81",
+        "compilerRevision": "fixture-compiler",
+        "compilationConfigDigest": "2b6fdffff5cbcaa2b0a60cef7efe5321ab7eb67a6c37aa8b1c52160e509587dd",
+        "worldRef": "fixture-world",
+        "frameDigest": "d17042f1f5e4d592a350737b929a0497d9efa758eefdfd6699c5edeaf9718baa",
+        "catalogueDigest": "e3492942a2dd2855fc880f41be6b55a02eacd1a4a43be45318ca0436bf57b817",
+        "targetFactsDigest": "e74d1742a779f8c9cb86f0e37778c50e68775bc6b5e45c8e3f304a0a0b8c22ac",
+        "effects": [
+          {
+            "position": [
+              0,
+              1,
+              3
+            ],
+            "nodeName": "fixture:stone",
+            "param2": 0
+          }
+        ]
+      },
+      "scope": {
+        "transactionId": "build-29170c1f-e343-4f7e-9c98-8ac94f69f7d9",
+        "worldRef": "fixture-world",
+        "operationDigest": "df342067a5eeaa79ad9ec08e6f3711d830b6831793a9d5d955673ed1885f023f",
+        "stateProfile": {
+          "profileVersion": "state-profile/v2",
+          "nodeFields": [
+            "nodeName",
+            "param1",
+            "param2"
+          ],
+          "metadataMode": "exact",
+          "inventoryMode": "exact",
+          "timerMode": "exact",
+          "derivedLightMode": "recompute-with-readback"
+        },
+        "checkedPositions": [
+          [
+            0,
+            1,
+            3
+          ]
+        ],
+        "objects": [],
+        "cells": [
+          {
+            "position": [
+              0,
+              1,
+              3
+            ],
+            "availability": "KNOWN",
+            "stateDigest": "322555c1f2cabbaf00730bc0eddc0b5c25650ad1db5eee60a87b950621dc327b"
+          }
+        ],
+        "localContext": {
+          "connectionRef": "local-connection",
+          "connectionIncarnationRef": "socket-open-1",
+          "worldRef": "fixture-world",
+          "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+        }
+      },
+      "scopeDigest": "bc69f101bbfc935afda2603635646f8badb299fcbaa429574796985f7d42da61",
+      "preparedTransaction": {
+        "payload": {
+          "contractVersion": "world-adapter/v6",
+          "transactionId": "build-29170c1f-e343-4f7e-9c98-8ac94f69f7d9",
+          "worldRef": "fixture-world",
+          "operationDigest": "df342067a5eeaa79ad9ec08e6f3711d830b6831793a9d5d955673ed1885f023f",
+          "scopeDigest": "bc69f101bbfc935afda2603635646f8badb299fcbaa429574796985f7d42da61",
+          "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+          "localContext": {
+            "connectionRef": "local-connection",
+            "connectionIncarnationRef": "socket-open-1",
+            "worldRef": "fixture-world",
+            "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+          }
+        },
+        "transactionPayloadDigest": "00eaf51bde53c025d214e2094edc99eda95752f8fe216e4191b08fd22d9c965d",
+        "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+        "scopeDigest": "bc69f101bbfc935afda2603635646f8badb299fcbaa429574796985f7d42da61",
+        "guarantee": "RECOVERABLE_VERIFIED",
+        "stateProfile": {
+          "profileVersion": "state-profile/v2",
+          "nodeFields": [
+            "nodeName",
+            "param1",
+            "param2"
+          ],
+          "metadataMode": "exact",
+          "inventoryMode": "exact",
+          "timerMode": "exact",
+          "derivedLightMode": "recompute-with-readback"
+        },
+        "adapterExecutionRevision": "fixture-execution-1"
+      },
+      "guarantee": "RECOVERABLE_VERIFIED",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+      }
+    }
+  },
+  {
+    "adapter": "Readback",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:apply:after",
+      "worldRef": "fixture-world",
+      "transactionId": "build-29170c1f-e343-4f7e-9c98-8ac94f69f7d9",
+      "coveredPositions": [
+        [
+          0,
+          1,
+          3
+        ]
+      ],
+      "stateProfile": {
+        "profileVersion": "state-profile/v2",
+        "nodeFields": [
+          "nodeName",
+          "param1",
+          "param2"
+        ],
+        "metadataMode": "exact",
+        "inventoryMode": "exact",
+        "timerMode": "exact",
+        "derivedLightMode": "recompute-with-readback"
+      },
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+      }
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:readback:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "Readback",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:readback:public-readback",
+      "worldRef": "fixture-world",
+      "transactionId": "build-29170c1f-e343-4f7e-9c98-8ac94f69f7d9",
+      "coveredPositions": [
+        [
+          0,
+          1,
+          3
+        ]
+      ],
+      "stateProfile": {
+        "profileVersion": "state-profile/v2",
+        "nodeFields": [
+          "nodeName",
+          "param1",
+          "param2"
+        ],
+        "metadataMode": "exact",
+        "inventoryMode": "exact",
+        "timerMode": "exact",
+        "derivedLightMode": "recompute-with-readback"
+      },
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+      }
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:linked-objects:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "advance:history:object-fd9bfa8f-b5bc-4744-a008-25b57ce86591:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "objects:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "history:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "undo:undo-head:object-fd9bfa8f-b5bc-4744-a008-25b57ce86591:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "undo:undo-inspect:object-fd9bfa8f-b5bc-4744-a008-25b57ce86591:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "InspectWorld",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "undo:undo-inspect:object-fd9bfa8f-b5bc-4744-a008-25b57ce86591:inspect",
+      "worldRef": "fixture-world",
+      "expectedWorldRevision": "world-1",
+      "sampledBounds": {
+        "min": [
+          0,
+          0,
+          3
+        ],
+        "max": [
+          0,
+          1,
+          3
+        ]
+      },
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+      }
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "undo:undo:current-connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "Readback",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "undo:undo:before-undo",
+      "worldRef": "fixture-world",
+      "transactionId": "build-29170c1f-e343-4f7e-9c98-8ac94f69f7d9",
+      "coveredPositions": [
+        [
+          0,
+          1,
+          3
+        ]
+      ],
+      "stateProfile": {
+        "profileVersion": "state-profile/v2",
+        "nodeFields": [
+          "nodeName",
+          "param1",
+          "param2"
+        ],
+        "metadataMode": "exact",
+        "inventoryMode": "exact",
+        "timerMode": "exact",
+        "derivedLightMode": "recompute-with-readback"
+      },
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+      }
+    }
+  },
+  {
+    "adapter": "PrepareHistoryTransaction",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "worldRef": "fixture-world",
+      "originTransactionId": "build-29170c1f-e343-4f7e-9c98-8ac94f69f7d9",
+      "transactionId": "undo-84f2ce5c-70bd-42c5-b8d7-9004bd4baccb",
+      "direction": "UNDO",
+      "affectedObjectRefs": [
+        "object-fd9bfa8f-b5bc-4744-a008-25b57ce86591"
+      ],
+      "originVerifiedReceiptDigest": "636da54425add798bc889574a4ce0c960f4f4eb1fa082ba73a96d24def9897cc",
+      "originBeforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+      "originBeforeStateReadbackDigest": "640d018ec730cb3f7544a9ad7def39fc37b216935b36d926cb2597776b65c0fb",
+      "originAfterReadbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+      "expectedCurrentStateDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+      "targetStateDigest": "640d018ec730cb3f7544a9ad7def39fc37b216935b36d926cb2597776b65c0fb",
+      "expectedHistoryRevision": "history-1454a9ae-5376-454b-849f-01b175e1e617",
+      "expectedWorldRevision": "world-1",
+      "expectedObjectRevisions": {
+        "object-fd9bfa8f-b5bc-4744-a008-25b57ce86591": "object-299d40cd-c257-47b6-9a88-fcbe8a792ef3"
+      },
+      "guarantee": "RECOVERABLE_VERIFIED",
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+      },
+      "sessionRef": "s1",
+      "requestId": "undo:undo:prepare-history",
+      "historyOperationDigest": "445c4aab6028f8f9166f91e968277618f7ca982d1de2ab22f82357f94227c471"
+    }
+  },
+  {
+    "adapter": "ApplyHistoryTransaction",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "undo:undo:apply-history",
+      "worldRef": "fixture-world",
+      "originTransactionId": "build-29170c1f-e343-4f7e-9c98-8ac94f69f7d9",
+      "transactionId": "undo-84f2ce5c-70bd-42c5-b8d7-9004bd4baccb",
+      "direction": "UNDO",
+      "historyOperationDigest": "445c4aab6028f8f9166f91e968277618f7ca982d1de2ab22f82357f94227c471",
+      "expectedWorldRevision": "world-1",
+      "expectedObjectRevisions": {
+        "object-fd9bfa8f-b5bc-4744-a008-25b57ce86591": "object-299d40cd-c257-47b6-9a88-fcbe8a792ef3"
+      },
+      "preparedHistoryTransaction": {
+        "originTransactionId": "build-29170c1f-e343-4f7e-9c98-8ac94f69f7d9",
+        "transactionId": "undo-84f2ce5c-70bd-42c5-b8d7-9004bd4baccb",
+        "direction": "UNDO",
+        "historyOperationDigest": "445c4aab6028f8f9166f91e968277618f7ca982d1de2ab22f82357f94227c471",
+        "transactionPayloadDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "beforeImageDigest": "2b0b80ffa3d34eb4d489cd07bcf78dbfb554d7d4d16cf18b0a05e21d621a7bd1",
+        "targetStateDigest": "640d018ec730cb3f7544a9ad7def39fc37b216935b36d926cb2597776b65c0fb",
+        "stateProfile": {
+          "profileVersion": "state-profile/v2",
+          "nodeFields": [
+            "nodeName",
+            "param1",
+            "param2"
+          ],
+          "metadataMode": "exact",
+          "inventoryMode": "exact",
+          "timerMode": "exact",
+          "derivedLightMode": "recompute-with-readback"
+        },
+        "adapterExecutionRevision": "fixture-execution-2",
+        "guarantee": "RECOVERABLE_VERIFIED",
+        "status": "PREPARED",
+        "localContext": {
+          "connectionRef": "local-connection",
+          "connectionIncarnationRef": "socket-open-1",
+          "worldRef": "fixture-world",
+          "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+        }
+      },
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+      }
+    }
+  },
+  {
+    "adapter": "Readback",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "undo:undo:after-undo",
+      "worldRef": "fixture-world",
+      "transactionId": "undo-84f2ce5c-70bd-42c5-b8d7-9004bd4baccb",
+      "coveredPositions": [
+        [
+          0,
+          1,
+          3
+        ]
+      ],
+      "stateProfile": {
+        "profileVersion": "state-profile/v2",
+        "nodeFields": [
+          "nodeName",
+          "param1",
+          "param2"
+        ],
+        "metadataMode": "exact",
+        "inventoryMode": "exact",
+        "timerMode": "exact",
+        "derivedLightMode": "recompute-with-readback"
+      },
+      "localContext": {
+        "connectionRef": "local-connection",
+        "connectionIncarnationRef": "socket-open-1",
+        "worldRef": "fixture-world",
+        "selectionRevision": "selection-547b4f0e-6430-4307-a7f2-e34e61468101"
+      }
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "undo:undo-after:object-fd9bfa8f-b5bc-4744-a008-25b57ce86591:current-connection",
+      "connectionRef": "local-connection"
+    }
+  }
+]

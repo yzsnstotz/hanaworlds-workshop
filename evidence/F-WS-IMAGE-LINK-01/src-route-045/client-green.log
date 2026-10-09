@@ -1,0 +1,11 @@
+✔ image link panel publishes success only after a separate same-Session readback (0.441833ms)
+✔ image link panel refuses missing Session and discards an old Session reply after selection changes (0.138791ms)
+✔ image link panel keeps a decode/association failure visible and does not publish an image (0.103083ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 79.81575

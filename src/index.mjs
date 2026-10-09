@@ -1,883 +1,595 @@
-import { randomUUID, createHash } from 'node:crypto';
-import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
-import {
-  admitRequest, validateRequest, validateBoundRequest, validateResponse,
-  ContractError, contractHandshake, checkContractHandshake, digestValue, validateType,
-  validateChoiceSelection, validateRegionInspection,
-} from '../vendor/contracts/dist/v4/index.mjs';
+import { WorkshopImageLinkPanelService } from '../lib/panel-host.mjs';
+import { createHash, randomUUID } from 'node:crypto';
+import { symbols } from '@deepseek-ai/cordis';
+import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
+import * as C from 'hanaworlds-contracts';
+import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, uploadedImageBytes, mediaBinding, imageRef, imageDigest } from './image-attachment.mjs';
+import { prepareImageAsk } from './image-ask.mjs';
+export { prepareImageAsk, IMAGE_ASK_ALLOWED_TOOLS } from './image-ask.mjs';
+import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
+export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
+const VERSION = 'session/v3', CANVAS = 'canvas/v5';
+const copy = structuredClone, revision = () => `rev-${randomUUID()}`;
+const same = (a,b) => C.canonicalJSON(a) === C.canonicalJSON(b);
+// Cordis supplies a new caller-context proxy per get; compare its public origin.
+const sameProvider = (a,b) => (a?.[symbols.original]??a)===(b?.[symbols.original]??b);
+const digest = (kind,value) => C.digestValue(kind,value).sha256;
+const fail = (code,details) => { throw new C.ContractError(code,'validate','REQUIRED_FACT_UNKNOWN',details); };
+const packet = (wire,id,result,error=null) => ({contractVersion:wire,requestId:id,result,error});
+const pub = error => error?.publicError ?? C.publicError(error);
+const peerFail = response => {const error=new Error(response.error.code);error.publicError=response.error;throw error;};
+const withoutRequest = ({requestId:_r,proposal:_p,...rest}) => rest;
+// Workshop owns this initial revision, including before a projection is created.
+// It is derived from the trusted lifecycle identity, never Core's storage revision.
+const initialRevision = identity => `rev-core-${createHash('sha256').update(C.canonicalJSON(identity)).digest('hex')}`;
+const initial = (id,identity) => ({context:{currentSession:id,activeWorldRef:null,orderedSelectedObjectRefs:[],sessionRevision:initialRevision(identity),selectionRevision:'0',localContext:null},turns:[],details:{},confirmed:{},pending:null,requests:{},contexts:{},builds:{},undos:{}});
 
-const VERSION = 'session/v2';
-const ACTION_VERSION = 'interaction-surface/v3';
-const revision = () => `rev-${randomUUID()}`;
-const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-const copy = value => structuredClone(value);
-
-function failure(code, phase, reason) { throw new ContractError(code, phase, reason); }
-function packet(version, requestId, result, error = null) {
-  return { contractVersion: version, requestId, result, error };
+/** Current fresh-install runtime. Peer ports are Host-owned in-process services;
+ * no model JSON can select a peer or call Canvas/Adapter mutators directly. */
+export class WorkshopV3 {
+ constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;
+  this.protocolHandshake=C.validateType('ProtocolHandshake',{profileVersion:'protocol-handshake/v1',component:'hanaworlds-workshop',
+   protocols:[{protocol:'session',major:3,minor:1}],capabilities:[],
+   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.4.13',sourceRevision:null,artifactDigest:null}});
+  this.locks=new Map(); }
+ /** Trusted composition-only metadata preparation for G-S. Returns the official
+  * SessionPersistence snapshot verbatim; this is not a session/v3 wire operation.
+  * No World selection, Workshop projection, full log read or Session creation. */
+ async readSessionMetadata(sessionRef) {
+  const port=this.sessionPersistence;
+  if(typeof port?.stat!=='function')fail('CAPABILITY_UNAVAILABLE');
+  const snapshot=await port.stat(sessionRef);
+  if(!snapshot)fail('SESSION_NOT_FOUND');
+  coreIdentity(snapshot.header,sessionRef);
+  if(!sameProvider(port,this.sessionPersistence))fail('SESSION_NOT_FOUND');
+  return copy(snapshot);
+ }
+ /** Enumerate authoritative official stored metadata without manufacturing
+  * Session existence from a reference, local projection or world binding. */
+ async listSessionMetadata() {
+  const port=this.sessionPersistence;
+  if(typeof port?.list!=='function')fail('CAPABILITY_UNAVAILABLE');
+  const snapshots=await port.list();
+  for(const snapshot of snapshots)coreIdentity(snapshot.header,snapshot.header?.id);
+  if(!sameProvider(port,this.sessionPersistence))fail('SESSION_NOT_FOUND');
+  return copy(snapshots);
+ }
+ async #sessionIdentity(snapshot) {
+  const identity=coreIdentity(snapshot.header,snapshot.header.id);
+  const state=await this.projectionStore.get(identity.id,identity);
+  return C.validateType('SessionIdentity',{sessionRef:identity.id,
+   sessionRevision:state?.context.sessionRevision??initialRevision(identity)});
+ }
+ #publicCapabilities() {
+  return this.capabilities==null?null:{...copy(this.capabilities),sessionDeleteSupported:false};
+ }
+ async #lock(id,run) {
+  const previous=this.locks.get(id)??Promise.resolve();let release;
+  const next=new Promise(r=>{release=r;});this.locks.set(id,next);
+  await previous;try{return await run();}finally{release();if(this.locks.get(id)===next)this.locks.delete(id);}
+ }
+ async #core(id) {
+  if(!this.sessionPersistence?.open)fail('SESSION_NOT_FOUND');
+  const handle=await this.sessionPersistence.open(id,'read');
+  try {const log=await handle.read();return {identity:coreIdentity(handle.header,id),events:log.events};}finally{await handle.close();}
+ }
+ async #load(id,create=false) {
+  const core=await this.#core(id);let state=await this.projectionStore.get(id,core.identity);
+  if(!state&&create){state=initial(id,core.identity);await this.projectionStore.create(id,core.identity,state);}
+  if(!state)fail('SESSION_NOT_FOUND');return {core,state};
+ }
+ async #save(id,core,state,nextRevision=revision()) {
+  const live=await this.#core(id);if(!same(live.identity,core.identity))fail('SESSION_NOT_FOUND');
+  const prior=state.context.sessionRevision;state.context.sessionRevision=nextRevision;
+  await this.projectionStore.replace(id,core.identity,prior,state);
+ }
+ /** K3 peers: actual public ProtocolHandshake, required wire major/minor and capabilities. */
+ #protocolPeer(port,{wire,capabilities,minMinor=0}) {if(!port)fail('CAPABILITY_UNAVAILABLE');C.checkProtocolCompatibility(peerProtocolHandshake(port)??null,[C.protocolRequirement(wire,capabilities,minMinor)]);return port;}
+ async #canvas(op,request) {
+  const port=this.#protocolPeer(this.canvas,PER_CELL_CANVAS);C.validateBoundRequest(CANVAS,op,request);
+  const response=C.validateBoundResponse(CANVAS,op,request,await port.call(op,copy(request)));
+  if(port!==this.canvas)fail('CURRENT_WORLD_MISMATCH');
+  if(response.error){const error=new Error(response.error.code);error.publicError=response.error;throw error;}
+  return copy(response.result);
+ }
+ #child(body,step,fields={}) {return {contractVersion:CANVAS,sessionRef:body.sessionRef,requestId:`${body.requestId}:${step}`,worldRef:body.localContext.worldRef,localContext:copy(body.localContext),...fields};}
+ async #selection(body) {
+  const result=await this.#canvas('ReadWorldSelectionContext',{contractVersion:CANVAS,sessionRef:body.sessionRef,requestId:`${body.requestId}:current:${randomUUID()}`,worldRef:body.localContext.worldRef});
+  const selected=result.selection;
+  if(selected.status!=='BOUND'||selected.context.currentSession!==body.sessionRef||
+    selected.connectionRef!==body.localContext.connectionRef||!same(selected.context.localContext,body.localContext)||
+    selected.context.activeWorldRef!==body.localContext.worldRef)fail('CURRENT_WORLD_MISMATCH');
+  return selected.context;
+ }
+ async #facts(body,state,record=null,{switching=false}={}) {
+  let currentContext=null;
+  if(body.localContext){const selected=await this.#selection(body);currentContext=selected.localContext;
+   if(!switching&&!same(state.context.localContext,currentContext))fail('CURRENT_WORLD_MISMATCH');}
+  const current=state.turns.at(-1);
+  return C.validateType('LocalRequestFacts',{currentContext,sessionRef:state.context.currentSession,currentTurnRevision:current?.turnRevision??null,currentBriefDigest:current?.referenceBriefDigest??null,
+   requestState:record?.response?'COMPLETED':'ACTIVE',replay:record?.response?'EXACT_REPLAY':'NEW',priorRequestDigest:record?.response?record.digest:null});
+ }
+ async #current(body,state) {await this.#facts(body,state);await this.#core(body.sessionRef);}
+ #turn(state) {
+  const turn=state.turns.at(-1), saved=turn&&state.confirmed[turn.turnRef];
+  if(!saved||state.pending||!same(saved.localContext,state.context.localContext))fail('INTENT_UNCONFIRMED');
+  return {turn,saved};
+ }
+ async call(operation,raw) {
+  let body;
+  try {
+   body=copy(typeof raw==='string'||raw instanceof Uint8Array?C.admitRequest(VERSION,operation,raw):C.validateBoundRequest(VERSION,operation,raw));
+   // Canvas may query this port while a Workshop mutation holds the Session lock.
+   // Domain reads return a committed snapshot and must not enter that mutation lock.
+   if(operation==='ReadSessionIdentity'){
+    const port=this.sessionPersistence,result=await this.#sessionIdentity(await this.readSessionMetadata(body.sessionRef));
+    if(!sameProvider(port,this.sessionPersistence))fail('SESSION_NOT_FOUND');
+    return packet(VERSION,body.requestId,result);
+   }
+   if(operation==='ListSessions'){
+    const port=this.sessionPersistence;
+    const sessions=await Promise.all((await this.listSessionMetadata()).map(s=>this.#sessionIdentity(s)));
+    if(!sameProvider(port,this.sessionPersistence))fail('SESSION_NOT_FOUND');
+    sessions.sort((a,b)=>a.sessionRef<b.sessionRef?-1:a.sessionRef>b.sessionRef?1:0);
+    const directoryRevision=`dir-${createHash('sha256').update(C.canonicalJSON(sessions)).digest('hex')}`;
+    return packet(VERSION,body.requestId,C.validateType('SessionDirectory',{directoryRevision,sessions}));
+   }
+   // Fixed DSH 0.2.0-rc.2 cannot delete persisted Sessions. No request journal,
+   // projection initialization or Canvas retirement may happen on this branch.
+   if(operation==='DeleteSession'){
+    await this.readSessionMetadata(body.sessionRef);
+    const capabilities=this.#publicCapabilities();
+    if(capabilities)C.requireSessionDeleteSupported(capabilities);
+    throw new C.ContractError('SESSION_DELETE_UNSUPPORTED','validate','DELETE_SEAM_ABSENT');
+   }
+   return await this.#lock(body.sessionRef,async()=>{
+    const {core,state}=await this.#load(body.sessionRef,operation==='StartOrResumeSession');
+    if(operation==='StartOrResumeSession')return packet(VERSION,body.requestId,C.validateType('SessionSnapshot',{context:state.context,turns:state.turns,capabilities:this.#publicCapabilities(),sessionDeleteSupported:false}));
+    const key=`${operation}:${body.requestId}`,record=state.requests[key];
+    const facts=await this.#facts(body,state,record,{switching:operation==='SwitchWorldContext'});
+    const admitted=C.validateCurrentRequest(VERSION,operation,body,facts);
+    if(admitted.disposition==='RETURN_STORED')return copy(record.response);
+    if(record)fail('REQUEST_NOT_ACTIVE');
+    if(body.expectedRevision!==undefined&&body.expectedRevision!==state.context.sessionRevision)fail('STALE_REVISION');
+    const readOnly=['ReadCurrentUndoStatus','ReadSessionTurnDetails'].includes(operation);
+    if(!readOnly){state.requests[key]={digest:admitted.requestDigest,response:null};await this.#save(body.sessionRef,core,state);}
+    let response;
+    try {const result=await this.#dispatch(operation,body,core,state);response=C.validateResponse(VERSION,operation,packet(VERSION,body.requestId,result));}
+    catch(error){response=packet(VERSION,body.requestId,null,C.publicError(error));}
+    if(!readOnly){const next=revision();response=copy(response);if(response.result?.context)response.result.context.sessionRevision=next;state.requests[key].response=copy(response);await this.#save(body.sessionRef,core,state,next);}
+    return copy(response);
+   });
+  }catch(error){return packet(VERSION,body?.requestId??raw?.requestId??null,null,C.publicError(error));}
+ }
+ /** Native tool execution supplies the live Core Session; model args contain only the URL. */
+ async downloadImage(rawURL,exec) {
+  const signal=exec?.signal; if(!signal?.throwIfAborted)throw Error('CANCELLATION_REQUIRED');signal.throwIfAborted();
+  const id=exec?.agent?.session?.header?.id;if(!id)throw Error('SESSION_NOT_FOUND');
+  const url=imageURL(rawURL);
+  return this.#lock(id,async()=>{
+   const {core,state}=await this.#load(id,true);
+   if(!same(core.identity,coreIdentity(exec.agent.session.header,id)))throw Error('SESSION_MISMATCH');
+   const source=core.events.findLast(e=>e.type==='user/message'&&e.surfaceOp==='append'&&userProvidedURL(e.data,url));
+   if(!source?.data?.id)throw Error('USER_IMAGE_URL_REQUIRED');
+   return this.#bindImage(id,core,state,await downloadImageBytes(url,this.#media$(),signal),source.data.id,signal,live=>live.events.some(e=>e.type==='user/message'&&e.data?.id===source.data.id&&userProvidedURL(e.data,url)));
+  });
+ }
+ #media$() {const attachments=this.attachments;if(!attachments?.saveImage||!attachments?.readImage)throw Error('MEDIA_UNAVAILABLE');return attachments;}
+ /** Store and bind one image (downloaded or uploaded bytes) to the Session journal. `sourced(live)` re-checks the user provenance against the fresh Core log. */
+ async #bindImage(id,core,state,input,sourceMessageId,signal,sourced) {
+  const attachments=this.#media$();signal.throwIfAborted();
+  // saveImage fully decodes and checks the MIME. Store and decoder are the existing Host capability.
+  const ref=await attachments.saveImage(input);signal.throwIfAborted();
+  const stored=await attachments.readImage(ref,signal);signal.throwIfAborted();
+  if(!same(stored.ref,ref))throw Error('MEDIA_DIGEST_MISMATCH');
+  const media=mediaBinding(ref,stored.data),live=await this.#core(id);signal.throwIfAborted();
+  const currentMedia=await this.attachments?.readImage(ref,signal);signal.throwIfAborted();
+  if(!currentMedia||!same(mediaBinding(currentMedia.ref,currentMedia.data),media)||!same(live.identity,core.identity)||!sourced(live))throw Error('SESSION_MISMATCH');
+  state.images??={};state.images[ref.attachmentId]={media,sourceMessageId};
+  await this.#save(id,core,state);signal.throwIfAborted();
+  return {sessionRef:id,sourceMessageId,downloadSha256:imageDigest(input.data),downloadBytes:input.data.byteLength,media,image:imageRef(media)};
+ }
+ /** Core reserves surface node 0 for the native Loop's system prompt; until it exists the conversation has not started. */
+ #started(session) {const head=session.surface.nodes[0];return head!==undefined&&session.snapshotEvents(head,head+1)[0]?.type==='system/message';}
+ /** Public operator panel path. Session is resolved by the Host's registered
+  * Session lookup; the UI supplies user text, never ToolExecution or headers. */
+ async downloadImageForPanel(session,rawURL,signal) {
+  signal.throwIfAborted();
+  const id=session?.header?.id;
+  if(!id||this.sessions?.get(id)!==session)throw Error('SESSION_MISMATCH');
+  const url=imageURL(rawURL);
+  if(!this.#started(session))return this.#queuePanelImage(session,id,signal,()=>downloadImageBytes(url,this.#media$(),signal),[{type:'text',text:url}]);
+  session.append('user/message',{id:`workshop-link-${randomUUID()}`,role:'user',source:{kind:'user'},content:[{type:'text',text:url}]},{surfaceOp:'append'});
+  await this.sessions.flush(session);signal.throwIfAborted();
+  const result=await this.downloadImage(url,{agent:{session},signal});
+  if(this.sessions.get(id)!==session)throw Error('SESSION_MISMATCH');
+  signal.throwIfAborted();
+  session.append('user/message',{id:`workshop-image-${randomUUID()}`,role:'user',source:{kind:'user'},content:[{type:'image',attachment:result.image}]},{surfaceOp:'append'});
+  await this.sessions.flush(session);signal.throwIfAborted();
+  return this.readPanelImage(session,result.image.attachmentId,signal);
+ }
+ /** New conversation: user input before the first turn must enter through the
+  * public Agent inbox, so the Loop commits its system head before it. Nothing
+  * wakes the driver; the next turn (the user's own prompt) carries the image. */
+ async #queuePanelImage(session,id,signal,obtain,leading) {
+  const agent=this.agents?.get(id);
+  if(!agent||agent.session!==session)throw Error('CONVERSATION_AGENT_REQUIRED');
+  const sourceMessageId=`workshop-link-${randomUUID()}`;
+  const result=await this.#lock(id,async()=>{
+   const {core,state}=await this.#load(id,true);
+   if(!same(core.identity,coreIdentity(session.header,id)))throw Error('SESSION_MISMATCH');
+   return this.#bindImage(id,core,state,await obtain(),sourceMessageId,signal,()=>true);
+  });
+  if(this.sessions.get(id)!==session||this.agents.get(id)!==agent)throw Error('SESSION_MISMATCH');
+  signal.throwIfAborted();
+  agent.inject({id:sourceMessageId,role:'user',source:{kind:'user'},content:[...leading,{type:'image',attachment:result.image}]});
+  await this.sessions.flush(session);signal.throwIfAborted();
+  return this.readPanelImage(session,result.image.attachmentId,signal);
+ }
+ /** Public operator panel path for a local image the user picked. Same Session
+  * check, store, bind and new/started conversation semantics as a link; the
+  * bytes come from the user instead of HTTP. */
+ async attachImageForPanel(session,upload,signal) {
+  signal.throwIfAborted();
+  const id=session?.header?.id;
+  if(!id||this.sessions?.get(id)!==session)throw Error('SESSION_MISMATCH');
+  const input=uploadedImageBytes(upload,this.#media$());
+  if(!this.#started(session))return this.#queuePanelImage(session,id,signal,()=>input,[]);
+  const sourceMessageId=`workshop-image-${randomUUID()}`;
+  const result=await this.#lock(id,async()=>{
+   const {core,state}=await this.#load(id,true);
+   if(!same(core.identity,coreIdentity(session.header,id)))throw Error('SESSION_MISMATCH');
+   return this.#bindImage(id,core,state,input,sourceMessageId,signal,()=>true);
+  });
+  if(this.sessions.get(id)!==session)throw Error('SESSION_MISMATCH');
+  signal.throwIfAborted();
+  session.append('user/message',{id:sourceMessageId,role:'user',source:{kind:'user'},content:[{type:'image',attachment:result.image}]},{surfaceOp:'append'});
+  await this.sessions.flush(session);signal.throwIfAborted();
+  return this.readPanelImage(session,result.image.attachmentId,signal);
+ }
+ /** Building skill image step for one conversation's agent (prompt section +
+  * read-only tool set). Returns the disposer; see image-ask.mjs. */
+ prepareImageAsk(agent) {return prepareImageAsk(agent);}
+ async readPanelImage(session,attachmentId,signal) {
+  signal.throwIfAborted();
+  const id=session?.header?.id;
+  if(!id||this.sessions?.get(id)!==session)throw Error('SESSION_MISMATCH');
+  const {core,state}=await this.#load(id);
+  if(!same(core.identity,coreIdentity(session.header,id)))throw Error('SESSION_MISMATCH');
+  const record=state.images?.[attachmentId];
+  if(!record)throw Error('ATTACHMENT_REJECTED');
+  const ref=imageRef(record.media);
+  const linked=core.events.some(e=>e.type==='user/message'&&e.surfaceOp==='append'&&e.data?.role==='user'&&e.data?.source?.kind==='user'&&e.data.content?.some(p=>p.type==='image'&&same(p.attachment,ref)));
+  const inbox=!linked&&this.agents?.get(id)?.inbox;
+  const queued=!!inbox&&[...inbox.nextStep,...inbox.nextTurn].some(m=>m.id===record.sourceMessageId&&m.role==='user'&&m.source?.kind==='user'&&m.content?.some(p=>p.type==='image'&&same(p.attachment,ref)));
+  if(!linked&&!queued)throw Error('ATTACHMENT_NOT_IN_SESSION');
+  const stored=await this.attachments.readImage(ref,signal);signal.throwIfAborted();
+  if(!same(mediaBinding(stored.ref,stored.data),record.media))throw Error('MEDIA_DIGEST_MISMATCH');
+  if(this.sessions.get(id)!==session)throw Error('SESSION_MISMATCH');
+  return {sessionRef:id,status:linked?'ATTACHED':'QUEUED_FOR_NEXT_TURN',sourceMessageId:record.sourceMessageId,media:copy(record.media),image:ref,data:Buffer.from(stored.data).toString('base64')};
+ }
+ async #media(items,core,state) {
+  if(!items.length)return [];
+  if(!this.attachments?.readImage)fail('CAPABILITY_UNAVAILABLE');
+  const accepted=[];
+  for(const item of items){
+   const ref=imageRef(item);
+   const fromDownload=state.images?.[item.attachmentRef];
+   const fromUser=core.events.some(e=>e.type==='user/message'&&e.surfaceOp==='append'&&e.data?.role==='user'&&e.data?.source?.kind==='user'&&e.data.content?.some(p=>p.type==='image'&&p.attachment?.attachmentId===ref.attachmentId&&p.attachment.mediaType===ref.mediaType&&p.attachment.bytes===ref.bytes&&p.attachment.width===ref.width&&p.attachment.height===ref.height));
+   if(!fromDownload&&!fromUser)fail('ATTACHMENT_REJECTED');
+   if(fromDownload&&!same(fromDownload.media,item))fail('MEDIA_DIGEST_MISMATCH');
+   if(!this.capabilities?.imageMediaTypes?.includes(item.mediaType))fail('CAPABILITY_UNAVAILABLE');
+   const stored=await this.attachments.readImage(ref);
+   const actual=mediaBinding(stored.ref,stored.data);
+   if(!same(actual,item))fail('MEDIA_DIGEST_MISMATCH');
+   accepted.push(copy(actual));
+  }
+  return accepted;
+ }
+ async #dispatch(operation,body,core,state) {
+  if(operation==='SwitchWorldContext'){
+   if(Object.values(state.builds).some(b=>b.dispatched&&!b.outcome&&!b.terminal))fail('RECOVERY_PENDING');
+   const context=await this.#selection(body);if(body.selectionRevision!==context.selectionRevision)fail('CURRENT_WORLD_MISMATCH');
+   state.context={...copy(context),sessionRevision:state.context.sessionRevision};state.pending=null;
+   return {context:copy(state.context),turns:state.turns,capabilities:this.#publicCapabilities(),sessionDeleteSupported:false};
+  }
+  if(operation==='AppendMultimodalTurn'){
+   const media=await this.#media(body.media,core,state);
+   if(state.turns.some(t=>t.turnRef===body.turnRef))fail('REPLAY_MISMATCH');
+   const dims=body.controls.dimensions;
+   const complete=body.text.trim()&&body.controls.purpose?.trim()&&dims?.unit==='node'&&['width','height','depth'].every(k=>Number.isSafeInteger(dims[k])&&dims[k]>0);
+   const turn={turnRef:body.turnRef,turnRevision:revision(),text:body.text,media,referenceBriefDigest:null,intentDigest:null,actionReceiptDigest:null};state.turns.push(turn);
+   const question=complete?`请确认建造${body.text}，尺寸${dims.width}×${dims.depth}×${dims.height}个节点。回复“确认”或修改。`:'请由当前skill补齐用途和节点尺寸后重新提交。';
+   state.pending={sessionRef:body.sessionRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,invocationId:body.requestId,clarificationId:revision(),question,complete:!!complete,controls:body.controls,afterSeq:core.events.length-1};
+   state.details[turn.turnRef]={resultText:question,confirmedBrief:null};
+   return this.#turnReceipt(body,state,turn,question,this.#clarification(state.pending));
+  }
+  if(operation==='AnswerClarification'){
+   const pending=state.pending,turn=state.turns.at(-1);
+   if(!pending||pending.turnRef!==body.turnRef||pending.clarificationId!==body.clarificationId||turn.turnRef!==body.turnRef)fail('TURN_REVISION_MISMATCH');
+   const inputs=core.events.slice(pending.afterSeq+1).filter(e=>e.type==='user/message');
+   const e=inputs[0],message=e?.data;
+   if(inputs.length!==1||e.surfaceOp!=='append'||message?.role!=='user'||message?.source?.kind!=='user'||message.id!==body.requestId||message.content?.length!==1||message.content[0].type!=='text'||message.content[0].text!==body.answer)fail('INTENT_UNCONFIRMED');
+   if(!pending.complete||!['确认','yes','YES'].includes(body.answer.trim())){
+    pending.complete=false;pending.afterSeq=core.events.length-1;pending.clarificationId=revision();pending.question='请更新建造参数并重新提交，之后再确认。';
+    return this.#turnReceipt(body,state,turn,pending.question,this.#clarification(pending));
+   }
+   const brief=C.validateType('BriefProjection',{contractVersion:'ReferenceBrief/v3',sessionRef:body.sessionRef,turnRevision:turn.turnRevision,briefRevision:revision(),media:await this.#media(turn.media,core,state),text:turn.text,controls:pending.controls});
+   const briefDigest=digest('reference-brief',brief);
+   const intent=C.validateType('IntentProjection',{contractVersion:VERSION,referenceBriefDigest:briefDigest,confirmedIntent:{kind:'BUILD_STRUCTURE',text:turn.text,purpose:pending.controls.purpose,dimensions:pending.controls.dimensions,entrancePortalRefs:pending.controls.entrancePortalRefs,confirmedTurnRevision:turn.turnRevision},intendedWorldRef:body.localContext.worldRef,orderedTargetRefs:[]});
+   turn.referenceBriefDigest=briefDigest;turn.intentDigest=digest('intent',intent);
+   state.confirmed[turn.turnRef]={brief,intent,confirmationInputId:message.id,localContext:copy(body.localContext)};state.pending=null;
+   state.details[turn.turnRef]={resultText:'已确认建造意图。',confirmedBrief:brief};return this.#turnReceipt(body,state,turn,'已确认建造意图。',null);
+  }
+  if(operation==='ReadSessionTurnDetails')return {sessionRef:body.sessionRef,sessionRevision:state.context.sessionRevision,turns:state.turns.map(t=>({turnRef:t.turnRef,turnRevision:t.turnRevision,userText:t.text,...state.details[t.turnRef]}))};
+  if(operation==='AdvanceCurrentBuild')return this.#advance(body,core,state);
+  if(operation==='ReadCurrentUndoStatus')return (await this.#undoStatus(body,state)).status;
+  if(operation==='UndoCurrentBuild')return this.#undo(body,core,state);
+  fail('CAPABILITY_UNAVAILABLE');
+ }
+ #clarification(p){return {sessionRef:p.sessionRef,turnRevision:p.turnRevision,invocationId:p.invocationId,clarificationId:p.clarificationId,code:'AMBIGUOUS_INTENT',question:p.question};}
+ #turnReceipt(body,state,turn,text,clarification){return {sessionRef:body.sessionRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,briefDigest:turn.referenceBriefDigest,model:'gpt-5.6-luna',resultText:text,clarification};}
+ async #context(body,state,stored) {
+  const {turn,saved}=this.#turn(state);await this.#current(body,state);
+  if(body.expectedTurnRevision&&body.expectedTurnRevision!==turn.turnRevision)fail('TURN_REVISION_MISMATCH');
+  const catalogue=C.validateType('Catalogue',await this.catalogue.read(body.localContext.worldRef));
+  const safetyProfile=C.validateType('SafetyProfile',await this.safety.read(body.localContext.worldRef));
+  const region=C.validateRegionInspection(stored.inspection);
+  return copy(C.validateType('BuildProposalContext',{contractVersion:'painter/v4',sessionRef:body.sessionRef,worldRef:body.localContext.worldRef,turnRevision:turn.turnRevision,painterId:'picture-blocks',invocationId:stored.invocationId,intent:saved.intent,intentDigest:turn.intentDigest,referenceBrief:saved.brief,referenceBriefDigest:turn.referenceBriefDigest,catalogue,targetFacts:region.targetFacts,targetFactsDigest:region.targetFactsDigest,safetyProfile,safetyProfileDigest:digest('safety-profile',safetyProfile),regionInspection:region,localContext:body.localContext}));
+ }
+ async readBuildProposalContext(raw) {
+  const body=copy(C.validateBoundRequest(VERSION,'AdvanceCurrentBuild',raw));
+  return this.#lock(body.sessionRef,async()=>{
+   const {core,state}=await this.#load(body.sessionRef);C.validateCurrentRequest(VERSION,'AdvanceCurrentBuild',body,await this.#facts(body,state));
+   const {turn,saved}=this.#turn(state);let stored=state.contexts[body.requestId];
+   if(!stored){
+    if(state.builds[turn.turnRef]?.dispatched)fail('TRANSACTION_CONFLICT');
+    const dims=saved.intent.confirmedIntent.dimensions;
+    const placement=await this.#canvas('InspectPlacementRegion',this.#child(body,'placement',{anchor:{kind:'CURRENT_VIEW',invocationId:saved.confirmationInputId},footprint:{widthCells:dims.width,depthCells:dims.depth,heightCells:dims.height}}));
+    if(placement.outcome!=='REGION_INSPECTED')fail('TARGET_REQUIRED');
+    stored={invocationId:`proposal-${randomUUID()}`,inspection:placement.inspection,context:null,request:null,response:null};
+    stored.context=await this.#context(body,state,stored);state.contexts[body.requestId]=stored;state.currentContextId=body.requestId;await this.#save(body.sessionRef,core,state);
+   }
+   const current=await this.#context(body,state,stored);if(!same(current,stored.context))fail('TARGET_FACTS_STALE');return copy(stored.context);
+  });
+ }
+ async #proposalFacts(request,state,stored) {
+  if(!stored||state.contexts[state.currentContextId]!==stored)fail('TARGET_FACTS_STALE');
+  const currentContext=await this.#context(request,state,stored);
+  const record=stored.response?{response:stored.response,digest:C.requestDigest('painter/v4','ValidateBuildProposal',stored.request)}:null;
+  const requestFacts=await this.#facts(request,state,record);
+  return C.validateType('BuildProposalProviderFacts',{sourceContext:stored.context,currentContext,requestFacts});
+ }
+ /** Host-only read port for Painter local facts. It deliberately does not take
+  * the mutation lock: Painter calls back while submitBuildProposal holds it.
+  * Only already-reserved exact public requests can read these own facts. */
+ async readBuildProposalProviderFacts(raw) {
+  const request=copy(C.validateBuildProposalRequest(raw));
+  const {state}=await this.#load(request.sessionRef);
+  const stored=Object.values(state.contexts).find(x=>x.invocationId===request.invocationId);
+  if(!stored?.request||!same(stored.request,request))fail('TRANSACTION_CONFLICT');
+  const facts=await this.#proposalFacts(request,state,stored);
+  C.validateBuildProposalContext(request,facts);
+  return copy(facts);
+ }
+ /** Existing proposal entry: the PER_CELL write method. */
+ async submitBuildProposal(raw) {return (await this.#submit(raw,'PER_CELL')).response;}
+ /** Same skill, either self-described write method. Returns a Workshop business
+  * envelope around the exact painter/v4 or painter-region/v1 response; unmet needs
+  * are explained and nothing is sent to Painter. No method switch, truncation or
+  * target rewrite. */
+ async submitWriteProposal(method,raw) {const {availability,response}=await this.#submit(raw,method);return {method,availability,response};}
+ #writeFacts() {return {ports:{painter:this.painter,brush:this.brush,canvas:this.canvas,painterRegion:this.painterRegion,brushRegion:this.brushRegion,canvasRegion:this.canvasRegion}};}
+ #gate(method) {const availability=evaluateWriteMethod(method,this.#writeFacts());if(!availability.available)fail('CAPABILITY_UNAVAILABLE');return availability;}
+ /** Contract WriteMethodDescriptors plus current availability; read-only. */
+ async describeWriteTools(sessionRef=null) {
+  const facts=this.#writeFacts();let current=null;
+  if(sessionRef!==null){
+   let state=null;try{state=(await this.#load(sessionRef)).state;}catch(error){if(error?.code!=='SESSION_NOT_FOUND'&&error?.name!=='SessionPersistenceNotFoundError')throw error;}
+   facts.session={found:!!state};
+   if(state){let confirmed=true;try{this.#turn(state);}catch(error){if(error?.code!=='INTENT_UNCONFIRMED')throw error;confirmed=false;}
+    facts.session.worldBound=!!state.context.localContext&&state.context.activeWorldRef===state.context.localContext.worldRef;facts.session.intentConfirmed=confirmed;
+    const turn=state.turns.at(-1),build=turn&&state.builds[turn.turnRef];
+    if(build){const r=build.region;
+     current={turnRef:turn.turnRef,method:build.method??'PER_CELL',outcome:r?(r.result?.status??(r.dispatched?'PENDING':'VALIDATED')):(build.outcome?.outcome??(build.terminal??(build.dispatched?'PENDING':'VALIDATED'))),undo:r?.undo?.result?.status??null};}}
+  }
+  return copy({skillGuidance:writeToolSkillGuidance,tools:WRITE_METHODS.map(method=>describeWriteMethod(method,facts)),currentBuild:current});
+ }
+ /** PER_CELL delegates to readBuildProposalContext. REGION captures the current
+  * confirmed brief (with verified media), intent and catalogue for painter-region/v1;
+  * the region itself is in world node coordinates, so no placement inspection. */
+ async readWriteProposalContext(method,raw) {
+  if(method==='PER_CELL')return this.readBuildProposalContext(raw);
+  if(method!=='REGION')fail('CAPABILITY_UNAVAILABLE');
+  const body=copy(C.validateBoundRequest(VERSION,'AdvanceCurrentBuild',raw));
+  return this.#lock(body.sessionRef,async()=>{
+   const {core,state}=await this.#load(body.sessionRef);C.validateCurrentRequest(VERSION,'AdvanceCurrentBuild',body,await this.#facts(body,state));
+   const {turn}=this.#turn(state);if(body.expectedTurnRevision!==turn.turnRevision)fail('TURN_REVISION_MISMATCH');
+   let stored=state.contexts[body.requestId];
+   if(!stored){
+    if(state.builds[turn.turnRef]?.dispatched||state.builds[turn.turnRef]?.region?.dispatched)fail('TRANSACTION_CONFLICT');
+    stored={method:'REGION',invocationId:`region-proposal-${randomUUID()}`,context:null,request:null,response:null};
+    stored.context=await this.#regionContext(body,state,stored);state.contexts[body.requestId]=stored;state.currentContextId=body.requestId;await this.#save(body.sessionRef,core,state);
+   }
+   if(stored.method!=='REGION')fail('REPLAY_MISMATCH');
+   if(!same(await this.#regionContext(body,state,stored),stored.context))fail('TARGET_FACTS_STALE');return copy(stored.context);
+  });
+ }
+ async #regionContext(body,state,stored) {
+  const {turn,saved}=this.#turn(state);await this.#current(body,state);
+  const catalogue=C.validateType('Catalogue',await this.catalogue.read(body.localContext.worldRef));
+  return copy({contractVersion:'painter-region/v1',sessionRef:body.sessionRef,worldRef:body.localContext.worldRef,turnRevision:turn.turnRevision,invocationId:stored.invocationId,intent:saved.intent,intentDigest:turn.intentDigest,referenceBrief:saved.brief,referenceBriefDigest:turn.referenceBriefDigest,catalogue,catalogueDigest:digest('catalogue',catalogue),localContext:copy(body.localContext)});
+ }
+ async #submit(raw,method) {
+  let request,availability=null;const region=method==='REGION';
+  try {
+   if(!WRITE_METHODS.includes(method)){availability=evaluateWriteMethod(method,this.#writeFacts());fail('CAPABILITY_UNAVAILABLE');}
+   request=copy(region?C.validateRegionProposalRequest(raw):C.validateBuildProposalRequest(raw));return await this.#lock(request.sessionRef,async()=>{
+   availability=evaluateWriteMethod(method,this.#writeFacts());if(!availability.available)fail(!region&&availability.unmet.some(u=>u.code==='UNSUPPORTED_VERSION')?'UNSUPPORTED_VERSION':'CAPABILITY_UNAVAILABLE');
+   const {core,state}=await this.#load(request.sessionRef);const stored=Object.values(state.contexts).find(x=>x.invocationId===request.invocationId);
+   if(!stored||(stored.method??'PER_CELL')!==method||state.contexts[state.currentContextId]!==stored)fail(stored&&(stored.method??'PER_CELL')!==method?'REPLAY_MISMATCH':'TARGET_FACTS_STALE');
+   if(region){
+    if(!same(withoutRequest(request),stored.context))fail('TRANSACTION_CONFLICT');
+    if(!same(await this.#regionContext(request,state,stored),stored.context))fail('TARGET_FACTS_STALE');
+   }else{const facts=await this.#proposalFacts(request,state,stored);C.validateBuildProposalContext(request,facts);}
+   if(stored.response)return {availability,response:copy(stored.response)};
+   if(stored.request&&!same(stored.request,request))fail('REPLAY_MISMATCH');
+   const {turn}=this.#turn(state);if(state.builds[turn.turnRef]?.dispatched||state.builds[turn.turnRef]?.region?.dispatched)fail('TRANSACTION_CONFLICT');
+   const painter=region?this.painterRegion:this.#protocolPeer(this.painter,PER_CELL_PAINTER);stored.request=copy(request);await this.#save(request.sessionRef,core,state);
+   const response=region?C.validateRegionProposalResponse(request,await painter.call('ValidateRegionProposal',copy(request))):C.validateBuildProposalResponse(request,await painter.call('ValidateBuildProposal',copy(request)));
+   if(region){if(!same(await this.#regionContext(request,state,stored),stored.context))fail('TARGET_FACTS_STALE');}
+   else C.validateBuildProposalContext(request,await this.#proposalFacts(request,state,stored));
+   if(painter!==(region?this.painterRegion:this.painter))fail('CURRENT_WORLD_MISMATCH');
+   if(!response.error){stored.response=copy(response);state.builds[turn.turnRef]={contextId:state.currentContextId,method,plan:response.result,compiled:null,submission:null,dispatched:false,outcome:null,...(region?{region:{compiled:null,commitRequest:null,dispatched:false,result:null,undo:null}}:{})};await this.#save(request.sessionRef,core,state);}
+   return {availability,response:copy(response)};
+  });}catch(error){return {availability,response:packet(region?'painter-region/v1':'painter/v4',request?.requestId??raw?.requestId??null,null,pub(error))};}
+ }
+ /** REGION Advance: validated plan → Brush CompileRegionBuild → Canvas
+  * ApplyRegionCommit (one logical transaction). Request is persisted before
+  * dispatch; a dispatched commit without result stays PENDING, never re-sent. */
+ async advanceRegionBuild(raw) {
+  let body;
+  try {body=copy(C.validateBoundRequest(VERSION,'AdvanceCurrentBuild',raw));return await this.#lock(body.sessionRef,async()=>{
+   const {core,state}=await this.#load(body.sessionRef);C.validateCurrentRequest(VERSION,'AdvanceCurrentBuild',body,await this.#facts(body,state));
+   const {turn}=this.#turn(state),build=state.builds[turn.turnRef];
+   if(body.expectedTurnRevision!==turn.turnRevision)fail('TURN_REVISION_MISMATCH');
+   if(build?.method!=='REGION')fail('TARGET_REQUIRED');const r=build.region;
+   const out=(result,outcome)=>({method:'REGION',sessionRef:body.sessionRef,worldRef:body.worldRef,turnRevision:turn.turnRevision,outcome,result,error:null});
+   if(r.result)return out(copy(r.result),r.result.status);
+   if(r.dispatched)return out(null,'PENDING');
+   this.#gate('REGION');
+   const ctx=state.contexts[build.contextId].context,settings=await this.compilerConfig.read(body.worldRef);
+   const compile={contractVersion:'region-build/v1',sessionRef:body.sessionRef,requestId:`${body.requestId}:region-compile`,worldRef:body.worldRef,build:build.plan.build,buildDigest:build.plan.buildDigest,catalogue:ctx.catalogue,catalogueDigest:ctx.catalogueDigest,compilerRevision:settings.compilerRevision,localContext:body.localContext};
+   const brush=this.brushRegion,compiled=C.validateCompiledRegionSet(compile,await brush.call('CompileRegionBuild',copy(compile)));
+   if(compiled.error)peerFail(compiled);if(brush!==this.brushRegion)fail('CURRENT_WORLD_MISMATCH');
+   await this.#current(body,state);r.compiled=compiled.result;
+   const apply={contractVersion:'canvas-region/v1',sessionRef:body.sessionRef,requestId:`${body.requestId}:region-apply`,worldRef:body.worldRef,transactionId:`region-${randomUUID()}`,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,guarantee:'RECOVERABLE_VERIFIED',localContext:body.localContext};
+   r.commitRequest=apply;r.dispatched=true;await this.#save(body.sessionRef,core,state);
+   let response;try{response=await this.canvasRegion.call('ApplyRegionCommit',copy(apply));}catch{return out(null,'PENDING');}
+   response=C.validateRegionCommit(apply,response);
+   if(response.error){if(response.error.mutationState==='NONE'){r.dispatched=false;await this.#save(body.sessionRef,core,state);}peerFail(response);}
+   const result=response.result;
+   if(result.status==='VERIFIED'&&!same(result.actualSummary,result.expectedAfterSummary))fail('READBACK_MISMATCH',{mutationState:'UNKNOWN',transactionRef:apply.transactionId});
+   r.result=copy(result);if(result.status==='VERIFIED')turn.actionReceiptDigest=digest('region-summary',result.actualSummary);
+   state.details[turn.turnRef].resultText=result.status==='VERIFIED'?'区域写入已验证，整片读回一致。':'区域写入失败，已整体回滚。';await this.#save(body.sessionRef,core,state);
+   if(result.status==='ROLLED_BACK')fail('APPLY_FAILED',{mutationState:'ROLLED_BACK',transactionRef:apply.transactionId});
+   return out(copy(result),'VERIFIED');
+  });}catch(error){return {method:'REGION',sessionRef:body?.sessionRef??raw?.sessionRef??null,outcome:null,result:null,error:pub(error)};}
+ }
+ /** Whole-region Undo of the latest VERIFIED region build: same transaction, Canvas decides. */
+ async undoRegionBuild(raw) {
+  let body;
+  try {body=copy(C.validateBoundRequest(VERSION,'UndoCurrentBuild',raw));return await this.#lock(body.sessionRef,async()=>{
+   const {core,state}=await this.#load(body.sessionRef);await this.#current(body,state);
+   const turn=state.turns.findLast(t=>state.builds[t.turnRef]?.region?.result?.status==='VERIFIED'),r=turn&&state.builds[turn.turnRef].region;
+   if(!r||body.expectedTurnRevision!==turn.turnRevision||body.expectedHistoryRevision!==r.result.historyRevision)fail('UNDO_CONFLICT');
+   const out=(result,outcome)=>({method:'REGION',sessionRef:body.sessionRef,worldRef:body.worldRef,turnRevision:turn.turnRevision,outcome,result,error:null});
+   if(r.undo?.result)return out(copy(r.undo.result),r.undo.result.status);
+   if(r.undo)return out(null,'PENDING');
+   this.#gate('REGION');
+   const request={contractVersion:'canvas-region/v1',sessionRef:body.sessionRef,requestId:`${body.requestId}:region-undo`,worldRef:body.worldRef,originTransactionId:r.result.transactionId,undoTransactionId:`region-undo-${randomUUID()}`,expectedHistoryRevision:r.result.historyRevision,localContext:body.localContext};
+   r.undo={request,result:null};await this.#save(body.sessionRef,core,state);
+   let response;try{response=await this.canvasRegion.call('UndoRegionCommit',copy(request));}catch{return out(null,'PENDING');}
+   response=C.validateRegionUndo(request,response,r.result);
+   if(response.error){if(response.error.mutationState==='NONE'){r.undo=null;await this.#save(body.sessionRef,core,state);}peerFail(response);}
+   r.undo.result=copy(response.result);await this.#save(body.sessionRef,core,state);
+   if(response.result.status!=='VERIFIED')fail('APPLY_FAILED',{mutationState:'ROLLED_BACK',transactionRef:request.undoTransactionId});
+   return out(copy(response.result),'VERIFIED');
+  });}catch(error){return {method:'REGION',sessionRef:body?.sessionRef??raw?.sessionRef??null,outcome:null,result:null,error:pub(error)};}
+ }
+ async #advance(body,core,state) {
+  const {turn,saved}=this.#turn(state),build=state.builds[turn.turnRef];if(!build)fail('TARGET_REQUIRED');
+  if(build.method==='REGION')fail('UNSUPPORTED_OPERATION');
+  if(state.undos[turn.turnRef]?.result)fail('UNDO_CONFLICT');
+  if(build.outcome)return copy(build.outcome);
+  const pending=()=>({sessionRef:body.sessionRef,worldRef:body.worldRef,turnRevision:turn.turnRevision,stage:'APPLY',outcome:'PENDING'});
+  if(build.dispatched)return pending();
+  const stored=state.contexts[build.contextId];C.validateBuildProposalContext(stored.request,await this.#proposalFacts(stored.request,state,stored));
+  const ctx=stored.context,settings=await this.compilerConfig.read(body.worldRef);
+  const compile={contractVersion:'BUILD/V3',sessionRef:body.sessionRef,requestId:`${body.requestId}:compile`,worldRef:body.worldRef,localContext:body.localContext,build:build.plan.build,buildDigest:build.plan.buildDigest,catalogue:ctx.catalogue,catalogueDigest:digest('catalogue',ctx.catalogue),targetFacts:ctx.targetFacts,targetFactsDigest:ctx.targetFactsDigest,safetyProfile:ctx.safetyProfile,safetyProfileDigest:ctx.safetyProfileDigest,compilationConfig:settings.compilationConfig,compilationConfigDigest:digest('compilation-config',settings.compilationConfig),compilerRevision:settings.compilerRevision};
+  const brush=this.#protocolPeer(this.brush,PER_CELL_BRUSH);C.validateBoundRequest('BUILD/V3','BuildDocument',compile);
+  const compiled=C.validateBoundResponse('BUILD/V3','BuildDocument',compile,await brush.compile(copy(compile)));
+  if(compiled.error){const e=new Error(compiled.error.code);e.publicError=compiled.error;throw e;}
+  await this.#current(body,state);build.compiled=compiled.result;
+  const objects=await this.#canvas('ListObjects',this.#child(body,'objects',{expectedRevision:null}));
+  const tx=`build-${randomUUID()}`;
+  const analysis=await this.#canvas('AnalyzeAffectedObjects',this.#child(body,'analysis',{transactionId:tx,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,expectedRevision:ctx.targetFacts.worldRevision,expectedRegistryRevision:objects.registryRevision,expectedSelectionRevision:body.localContext.selectionRevision}));
+  const apply=this.#child(body,'apply',{transactionId:tx,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,analysisDigest:digest('affected-analysis',analysis),decisionRevision:null,expectedWorldRevision:analysis.worldRevision,expectedObjectRevisions:{},guarantee:'RECOVERABLE_VERIFIED',regionInspectionBinding:{inspectionId:ctx.regionInspection.inspectionId,build:build.plan.build}});
+  const submission={parentRequest:body,turnRef:turn.turnRef,confirmationInputId:saved.confirmationInputId,intent:saved.intent,analysis,apply};
+  C.validateCurrentBuildSubmission(submission,await this.#facts(body,state));build.submission=submission;await this.#save(body.sessionRef,core,state);
+  C.validateCurrentBuildSubmission(submission,await this.#facts(body,state));
+  build.dispatched=true;await this.#save(body.sessionRef,core,state);
+  let receipt;
+  try {receipt=await this.#canvas('ApplyRecoverableCommit',apply);}catch(error){
+   if(['NONE','ROLLED_BACK'].includes(error.publicError?.mutationState))throw error;
+   return pending();
+  }
+  build.receipt=receipt;await this.#save(body.sessionRef,core,state);
+  if(receipt.status==='ROLLED_BACK'){build.terminal='ROLLED_BACK';await this.#save(body.sessionRef,core,state);fail('APPLY_FAILED',{mutationState:'ROLLED_BACK',transactionRef:tx});}
+  if(receipt.status!=='VERIFIED')return pending();
+  try {
+   const readback=await this.#canvas('Readback',this.#child(body,'readback',{transactionId:tx,commitRevision:receipt.observedWorldRevision,expectedOperations:compiled.result.projection,transactionPayloadDigest:receipt.transactionPayloadDigest}));
+   if(!same(readback,receipt))fail('READBACK_MISMATCH');
+   const matches=await this.#linkedHistory(body,receipt);
+   await this.#current(body,state);build.matches=matches;
+  }catch(error){fail(error.publicError?.code??'READBACK_FAILED',{mutationState:'UNKNOWN',transactionRef:tx});}
+  const outcome={sessionRef:body.sessionRef,worldRef:body.worldRef,turnRevision:turn.turnRevision,stage:'COMPLETE',outcome:'VERIFIED',receipt};
+  build.outcome=outcome;turn.actionReceiptDigest=digest('receipt',receipt);state.details[turn.turnRef].resultText='建造已验证，且已读回当前世界与历史。';await this.#save(body.sessionRef,core,state);return outcome;
+ }
+ async #linkedHistory(body,receipt) {
+  const inventory=await this.#canvas('ListObjects',this.#child(body,'linked-objects',{expectedRevision:null})),matches=[];
+  for(const object of inventory.objects){const history=await this.#canvas('HistoryQuery',this.#child(body,`history:${object.objectRef}`,{objectRef:object.objectRef,expectedHistoryRevision:null}));
+   const entry=history.entries.find(e=>e.transactionId===receipt.transactionId&&e.status==='VERIFIED'&&e.operationDigest===receipt.operationDigest&&e.expectedAfterReadbackDigest===receipt.readbackDigest&&e.receiptDigest===digest('receipt',receipt)&&e.affectedObjectRefs.includes(object.objectRef));
+   if(entry)matches.push({object,history,entry});}
+  if(!matches.length||matches.length!==matches[0].entry.affectedObjectRefs.length||!matches[0].entry.affectedObjectRefs.every(ref=>matches.some(m=>m.object.objectRef===ref&&same(m.entry,matches[0].entry)&&m.history.historyRevision===matches[0].history.historyRevision&&m.history.headTransactionId===receipt.transactionId)))fail('READBACK_FAILED');
+  return matches;
+ }
+ async #undoStatus(body,state) {
+  const turn=state.turns.findLast(t=>state.builds[t.turnRef]?.outcome?.outcome==='VERIFIED'),build=turn&&state.builds[turn.turnRef];
+  const status={sessionRef:body.sessionRef,worldRef:body.worldRef,turnRef:turn?.turnRef??null,turnRevision:turn?.turnRevision??null,availability:'NO_VERIFIED_BUILD',head:null};
+  if(!build||!same(build.receipt.localContext,body.localContext))return {status};
+  const matches=[];
+  for(const original of build.matches){const history=await this.#canvas('HistoryQuery',this.#child(body,`undo-head:${original.object.objectRef}`,{objectRef:original.object.objectRef,expectedHistoryRevision:null}));if(!history.entries.some(e=>same(e,original.entry)))fail('READBACK_FAILED');matches.push({...original,history});}
+  const history=matches[0].history;
+  if(!matches.every(m=>m.history.historyRevision===history.historyRevision&&m.history.headTransactionId===history.headTransactionId))fail('UNDO_CONFLICT');
+  status.head={historyRevision:history.historyRevision,headTransactionId:history.headTransactionId};
+  status.availability=history.undoAvailable&&history.headTransactionId===build.receipt.transactionId?'AVAILABLE':'NO_UNDO_AT_HEAD';return {status,turn,build,matches};
+ }
+ async #undo(body,core,state) {
+  const current=await this.#undoStatus(body,state),{turn,build,matches,status}=current;
+  if(status.availability!=='AVAILABLE'||body.expectedTurnRevision!==turn.turnRevision||body.expectedHistoryRevision!==status.head.historyRevision)fail('UNDO_CONFLICT');
+  if(state.undos[turn.turnRef])fail('RECOVERY_PENDING');
+  const objectRevisions={},worldRevisions=[];
+  for(const m of matches){const inspected=await this.#canvas('InspectObject',this.#child(body,`undo-inspect:${m.object.objectRef}`,{objectRef:m.object.objectRef,expectedRevision:m.object.objectRevision,sampledBounds:state.contexts[build.contextId].inspection.targetFacts.sampledBounds}));
+   if(inspected.objectRef!==m.object.objectRef||inspected.objectRevision!==m.object.objectRevision)fail('UNDO_CONFLICT');objectRevisions[m.object.objectRef]=inspected.objectRevision;worldRevisions.push(inspected.worldRevision);}
+  if(worldRevisions.some(v=>v!==worldRevisions[0]))fail('UNDO_CONFLICT');
+  const intentDigest=turn.intentDigest;
+  // Durable descriptor of this actual Undo invocation; no permission or grant.
+  const action=C.validateType('ActionProjection',{contractVersion:'interaction-surface/v2',sessionRef:body.sessionRef,turnRevision:turn.turnRevision,frameRef:`undo:${body.requestId}`,frameRevision:status.head.historyRevision,actionId:body.requestId,orderedTargetRefs:matches.map(m=>m.object.objectRef),intentDigest,operationDigest:build.receipt.operationDigest,analysisDigest:build.submission.apply.analysisDigest,decisionRevision:null});
+  const request=this.#child(body,'undo',{objectRef:matches[0].object.objectRef,transactionId:`undo-${randomUUID()}`,historyTransactionId:build.receipt.transactionId,expectedHistoryRevision:body.expectedHistoryRevision,expectedWorldRevision:worldRevisions[0],expectedObjectRevisions:objectRevisions,intentDigest,surfaceActionDigest:digest('surface-action',action)});
+  state.undos[turn.turnRef]={request,action,result:null};await this.#save(body.sessionRef,core,state);await this.#current(body,state);
+  const receipt=await this.#canvas('Undo',request);if(receipt.status!=='VERIFIED')fail('RECOVERY_PENDING',{mutationState:'UNKNOWN',transactionRef:request.transactionId});
+  // Canvas appends the verified Undo transaction to durable history.
+  const expectedAfterHead=receipt.transactionId;
+  const after=[];
+  for(const m of matches){const history=await this.#canvas('HistoryQuery',this.#child(body,`undo-after:${m.object.objectRef}`,{objectRef:m.object.objectRef,expectedHistoryRevision:null}));
+   const row=history.entries.find(e=>e.transactionId===receipt.transactionId&&e.originTransactionId===build.receipt.transactionId&&e.status==='VERIFIED'&&e.receiptDigest===digest('receipt',receipt)&&e.expectedAfterReadbackDigest===receipt.readbackDigest&&e.operationDigest===receipt.operationDigest&&e.historyRevision===history.historyRevision&&same(e.affectedObjectRefs,m.entry.affectedObjectRefs));
+   if(!row||history.historyRevision===status.head.historyRevision||history.headTransactionId!==expectedAfterHead)fail('READBACK_FAILED',{mutationState:'UNKNOWN',transactionRef:request.transactionId});after.push(history);}
+  if(!after.every(h=>h.historyRevision===after[0].historyRevision&&h.headTransactionId===after[0].headTransactionId))fail('READBACK_FAILED');
+  await this.#current(body,state);
+  const result={sessionRef:body.sessionRef,worldRef:body.worldRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,status:'VERIFIED',beforeHead:status.head,afterHead:{historyRevision:after[0].historyRevision,headTransactionId:after[0].headTransactionId}};
+  state.undos[turn.turnRef].result=result;await this.#save(body.sessionRef,core,state);return result;
+ }
 }
-function toPublic(error) {
-  return error?.publicError ?? new ContractError('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE').publicError;
-}
-function requirePeer(port, requirement) {
-  if (!port) failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-  const advertised = port.contractHandshake ?? port.handshake?.() ??
-    port.status?.().contractHandshake;
-  if (!advertised) failure('UNSUPPORTED_VERSION', 'decode', 'VERSION_UNSUPPORTED');
-  return checkContractHandshake(advertised, requirement);
-}
-function initialState(sessionRef) {
-  return { context: { currentSession: sessionRef, activeWorldRef: null,
-    orderedSelectedObjectRefs: [], sessionRevision: revision(), selectionRevision: '0' },
-    turns: [], pendingClarification: null, pendingPlacement: null, frames: [],
-    receipts: [], artifacts: Object.create(null), offeredInventory: null,
-    confirmedIntents: Object.create(null),
-    turnControls: Object.create(null), turnWorldRefs: Object.create(null),
-    lastPlacement: null };
-}
-
-function parseStructureProposal(text) {
-  let value;
-  try { value = JSON.parse(text); } catch { return null; }
-  if (!value || typeof value !== 'object' || Array.isArray(value) ||
-      Object.keys(value).sort().join(',') !== 'dimensions,entrancePortalRefs,kind,purpose,text' ||
-      value.kind !== 'BUILD_STRUCTURE' || typeof value.text !== 'string' || !value.text ||
-      typeof value.purpose !== 'string' || !value.purpose ||
-      !Array.isArray(value.entrancePortalRefs) || value.entrancePortalRefs.length !== 0 ||
-      !value.dimensions || Object.keys(value.dimensions).sort().join(',') !== 'depth,height,unit,width' ||
-      value.dimensions.unit !== 'node' ||
-      !['width', 'depth', 'height'].every(key => Number.isSafeInteger(value.dimensions[key]) &&
-        value.dimensions[key] > 0)) return null;
-  return value;
-}
-
-function confirmingSessionInputId(log, pending, body) {
-  // Core's durable user/message ID identifies the actual Session input. A
-  // caller's requestId alone is not evidence that an Adapter relay issued it.
-  const after = pending.afterSessionEventSeq;
-  if (!Number.isSafeInteger(after) || after < 0)
-    failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-  const inputs = log.events.slice(after + 1).filter(event =>
-    event.type === 'user/message');
-  if (inputs.length !== 1)
-    failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-  const message = inputs[0].data;
-  if (inputs[0].surfaceOp !== 'append' ||
-      message?.role !== 'user' || message?.source?.kind !== 'user' ||
-      message.id !== body.requestId || !Array.isArray(message.content) ||
-      message.content.length !== 1 || message.content[0]?.type !== 'text' ||
-      message.content[0].text !== body.answer)
-    failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-  return message.id;
-}
-
-/** Session state is carried in Core SessionPersistence's public append-only event log. */
-export class WorkshopV1 {
-  constructor({ sessionPersistence, attachments, llm, authority, capabilities,
-    canvas, painter, brush, resources, mediaAuthority, modelRoute,
-    catalogue, safety, compilerConfig, applyAuthority } = {}) {
-    Object.assign(this, { sessionPersistence, attachments, llm, authority,
-      capabilities, canvas, painter, brush, resources, mediaAuthority, modelRoute,
-      catalogue, safety, compilerConfig, applyAuthority });
-    this.locks = new Map();
-    this.contractHandshake = contractHandshake;
-  }
-
-  async #authorized(body, operation) {
-    if (!this.authority?.verify)
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    const proof = await this.authority?.verify?.(body, operation);
-    const required = operation === 'StartOrResumeSession' ? 'READ' :
-      ['AppendMultimodalTurn', 'AnswerClarification',
-        'RecordActionReceipt', 'PersistRequiredArtifactResources'].includes(operation) ? 'APPEND' :
-      operation === 'SwitchWorldContext' || operation === 'SelectObjects' ? 'SELECT' :
-      operation === 'AnalyzeCurrentBuild' ? 'ANALYZE' :
-      operation === 'ApplyCurrentBuild' ? 'APPLY_RECOVERABLE' :
-      ['BeginFirstBuilding', 'InvokeAction', 'CreateBuildPlan', 'CompileCurrentBuild'].includes(operation) ? 'INSPECT' : 'READ';
-    if (!proof?.current || proof.actorRef !== body.actorRef ||
-        proof.sessionRef !== body.sessionRef ||
-        proof.authorizationRef !== body.authorizationRef ||
-        !proof.allowedActions?.includes(required))
-      failure('AUTHORIZATION_REVOKED', 'authorize', 'GRANT_REVOKED');
-    return proof;
-  }
-
-  async #load(id) {
-    if (!this.sessionPersistence?.open) failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    const handle = await this.sessionPersistence.open(id, 'read');
-    let log;
-    try { log = await handle.read(); }
-    finally { await handle.close(); }
-    const records = log.events.filter(e => e.type === 'hanaworlds/workshop-state/v1');
-    if (records.length === 0) failure('SESSION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
-    return { log, state: copy(records.at(-1).data) };
-  }
-
-  async #save(id, log, state) {
-    const next = copy(state);
-    next.context.sessionRevision = revision();
-    const handle = await this.sessionPersistence.open(id, 'write');
-    try {
-      const current = await handle.read();
-      if (current.events.length !== log.events.length)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      await handle.append([{ type: 'hanaworlds/workshop-state/v1',
-        seq: current.events.length, time: Date.now(), data: next, ignorable: true }]);
-      await handle.flush();
-    } finally { await handle.close(); }
-    return next;
-  }
-
-  async #withLock(id, action) {
-    const prior = this.locks.get(id) ?? Promise.resolve();
-    let release;
-    const next = new Promise(resolve => { release = resolve; });
-    const gate = prior.then(() => next);
-    this.locks.set(id, gate);
-    await prior;
-    try { return await action(); }
-    finally { release(); if (this.locks.get(id) === gate) this.locks.delete(id); }
-  }
-
-  #snapshot(state) {
-    if (!this.capabilities)
-      failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    return { context: state.context, turns: state.turns,
-      capabilities: this.capabilities, sessionDeleteSupported: false };
-  }
-
-  async #mediaForModel(body) {
-    const media = [], imageBlocks = [];
-    for (const item of body.media) {
-      // Scope proof deliberately precedes existence and corruption checks.
-      if (!this.mediaAuthority?.verify)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const proof = await this.mediaAuthority?.verify?.({ actorRef: body.actorRef,
-        sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
-        attachmentRef: item.attachmentRef });
-      if (!proof?.current || proof.sessionRef !== body.sessionRef)
-        failure('PERMISSION_DENIED', 'authorize', 'SCOPE_DENIED');
-      if (!this.attachments?.readImage || !this.attachments?.readImageRequest ||
-          !this.modelRoute?.imagePolicy)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const ref = { attachmentId: item.attachmentRef, mediaType: item.mediaType,
-        bytes: item.bytes, width: item.width, height: item.height };
-      let stored, projection;
-      try {
-        stored = await this.attachments.readImage(ref);
-        if (hash(stored.data) !== item.storedBytesDigest ||
-            stored.ref.attachmentId !== item.attachmentRef ||
-            stored.ref.bytes !== item.bytes || stored.ref.width !== item.width ||
-            stored.ref.height !== item.height || stored.ref.mediaType !== item.mediaType)
-          failure('MEDIA_DIGEST_MISMATCH', 'validate', 'DIGEST_MISMATCH');
-        projection = await this.attachments.readImageRequest(ref, this.modelRoute.imagePolicy);
-      } catch (error) {
-        if (error?.publicError) throw error;
-        failure('ATTACHMENT_REJECTED', 'validate', 'POLICY_UNAVAILABLE');
-      }
-      const projectionBytesDigest = hash(projection.data);
-      if (item.projectionVariantId !== null &&
-          (item.projectionVariantId !== projection.variantId ||
-           item.projectionBytesDigest !== projectionBytesDigest))
-        failure('MEDIA_DIGEST_MISMATCH', 'validate', 'DIGEST_MISMATCH');
-      media.push({ ...item, projectionVariantId: projection.variantId,
-        projectionBytesDigest });
-      imageBlocks.push({ type: 'image', attachment: ref });
-    }
-    return { media, imageBlocks };
-  }
-
-  async #modelTurn(body, imageBlocks, priorTurns = []) {
-    if (this.modelRoute?.model !== 'gpt-5.6-luna' ||
-        typeof this.modelRoute.provider !== 'string' || !this.modelRoute.provider ||
-        !this.llm?.stream) failure('MODEL_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-    const message = { id: `hw-${randomUUID()}`, role: 'user', source: { kind: 'user' },
-      content: [{ type: 'text', text: body.text }, ...imageBlocks] };
-    let result = '', finished = false;
-    try {
-      for await (const chunk of this.llm.stream({ provider: this.modelRoute.provider,
-        model: 'gpt-5.6-luna', messages: [
-          ...priorTurns.map(turn => ({ id: `hw-${turn.turnRef}`, role: 'user',
-            source: { kind: 'user' }, content: [{ type: 'text', text: turn.text }] })),
-          message], sessionId: body.sessionRef,
-        system: 'You are HanaWorlds Workshop. Never guess a world, target, dimension, or placement. If the user refers to another or an unclear world, ask them to select or clarify it in the Shell. Later user corrections override earlier details. When the user has supplied a concrete structure and all three node dimensions, respond with only JSON matching {"kind":"BUILD_STRUCTURE","text":"<structure>","purpose":"<purpose>","dimensions":{"width":1,"depth":1,"height":1,"unit":"node"},"entrancePortalRefs":[]}. Use the supplied integer dimensions; do not invent values. If any required fact is missing, ask one concise clarification question in Chinese instead of JSON.' })) {
-        if (chunk.type === 'text-delta') result += chunk.text;
-        if (chunk.type === 'finish') finished = chunk.reason !== 'error' && chunk.reason !== 'aborted';
-      }
-    } catch { failure('MODEL_REQUEST_FAILED', 'validate', 'POLICY_UNAVAILABLE'); }
-    if (!finished || !result.trim()) failure('MODEL_REQUEST_FAILED', 'validate', 'POLICY_UNAVAILABLE');
-    return result.trim();
-  }
-
-  async call(operation, raw) {
-    return this.#call(operation, raw, null);
-  }
-
-  async #call(operation, raw, relayPrincipal) {
-    const version = operation === 'InvokeAction' ? ACTION_VERSION : VERSION;
-    let body;
-    try {
-      body = raw instanceof Uint8Array || typeof raw === 'string' ?
-        admitRequest(version, operation, Buffer.from(raw)) :
-        validateRequest(version, operation, raw);
-      const proof = await this.#authorized(body, operation);
-      if (relayPrincipal && (operation !== 'InvokeAction' ||
-          proof.surface !== 'LUANTI' || proof.worldRef !== relayPrincipal.worldRef ||
-          proof.engineActorName !== relayPrincipal.engineActorName))
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-      validateBoundRequest(version, operation, body);
-      const result = await this.#withLock(body.sessionRef, async () => this.#dispatch(operation, body, proof));
-      const response = packet(version, body.requestId, result);
-      return validateResponse(version, operation, response);
-    } catch (error) {
-      return packet(version, body?.requestId ?? null, null, toPublic(error));
-    }
-  }
-
-  /** The Adapter expects a raw InvokeActionReceipt and supplies its verified relay principal. */
-  async invokeAction(request, principal) {
-    if (!principal || typeof principal.worldRef !== 'string' || !principal.worldRef ||
-        typeof principal.engineActorName !== 'string' || !principal.engineActorName)
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    const response = await this.#call('InvokeAction', request, principal);
-    if (response.error) {
-      const error = new Error(response.error.code);
-      error.code = response.error.code;
-      error.publicError = response.error;
-      throw error;
-    }
-    return response.result;
-  }
-
-  /** Reauthorize the exact pending durable frame before Adapter shows it in Luanti. */
-  async verifyFrameDelivery({ worldRef, engineActorName, frame, authorizationRef } = {}) {
-    if (typeof worldRef !== 'string' || !worldRef ||
-        typeof engineActorName !== 'string' || !engineActorName ||
-        typeof authorizationRef !== 'string' || !authorizationRef)
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    validateType('InteractionFrame', frame);
-    const { state } = await this.#load(frame.sessionRef);
-    const pending = state.pendingPlacement;
-    if (!pending?.frame || state.context.activeWorldRef !== worldRef ||
-        pending.worldRef !== worldRef ||
-        JSON.stringify(pending.frame) !== JSON.stringify(frame))
-      failure('INVALID_FRAME', 'validate', 'REVISION_CHANGED');
-    if (pending.authorizationRef !== authorizationRef || !pending.actorRef)
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    const proof = await this.#authorized({ actorRef: pending.actorRef,
-      sessionRef: frame.sessionRef, authorizationRef }, 'BeginFirstBuilding');
-    if (proof.surface !== 'LUANTI' && proof.surface !== 'SHELL')
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    if (proof.worldRef !== worldRef || proof.engineActorName !== engineActorName)
-      failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-    return { current: true, worldRef, engineActorName, sessionRef: frame.sessionRef,
-      authorizationRef, actorRef: pending.actorRef };
-  }
-
-  async beginFirstBuilding(body) {
-    await this.#authorized(body, 'BeginFirstBuilding');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const saved = state.confirmedIntents[body.turnRef];
-      const intent = saved?.intent;
-      if (!intent || intent.confirmedIntent.kind !== 'BUILD_STRUCTURE')
-        failure('INTENT_UNCONFIRMED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      if (typeof saved.confirmationInputId !== 'string' ||
-          !saved.confirmationInputId)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      if (body.invocationId !== undefined &&
-          body.invocationId !== saved.confirmationInputId)
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-      if (!state.context.activeWorldRef ||
-          intent.intendedWorldRef !== state.context.activeWorldRef)
-        failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      if (state.context.orderedSelectedObjectRefs.length !== 0)
-        failure('TARGET_REQUIRED', 'validate', 'SCOPE_DENIED');
-      const dims = intent.confirmedIntent.dimensions;
-      if (!dims || dims.unit !== 'node' ||
-          !['width', 'height', 'depth'].every(key => Number.isSafeInteger(dims[key]) && dims[key] > 0))
-        failure('AMBIGUOUS_GEOMETRY', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      requirePeer(this.canvas, {
-        wires: ['canvas/v4'], factProfiles: ['target-facts/v3'] });
-      const footprint = { widthCells: dims.width, depthCells: dims.depth,
-        heightCells: dims.height };
-      const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: state.context.activeWorldRef,
-        anchor: { kind: 'DEFAULT_PLAYER', invocationId: saved.confirmationInputId }, footprint };
-      validateBoundRequest('canvas/v4', 'InspectPlacementRegion', request);
-      const response = validateResponse('canvas/v4', 'InspectPlacementRegion',
-        await this.canvas.call('InspectPlacementRegion', request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      const outcome = await this.#recordPlacement(state, body, response.result, footprint, intent);
-      await this.#save(body.sessionRef, log, state);
-      return outcome;
-    });
-  }
-
-  async #recordPlacement(state, body, result, footprint, intent) {
-    if (result.outcome === 'REGION_INSPECTED') {
-      const inspection = validateRegionInspection(result.inspection);
-      state.lastPlacement = { outcome: 'REGION_INSPECTED', inspection,
-        turnRef: body.turnRef, intentDigest: digestValue('intent', intent).sha256 };
-      state.pendingPlacement = null;
-      return { outcome: 'REGION_INSPECTED', inspection };
-    }
-    const choice = result.choice;
-    const frameRef = `frame-${randomUUID()}`, frameRevision = revision();
-    const turnRevision = state.turns.find(turn => turn.turnRef === body.turnRef)?.turnRevision;
-    if (!turnRevision) failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
-    const projections = Object.create(null), actions = [];
-    const add = (kind, choices) => {
-      const actionId = `action-${randomUUID()}`;
-      const projection = { contractVersion: 'interaction-surface/v2',
-        sessionRef: body.sessionRef, turnRevision, frameRef, frameRevision,
-        actionId, orderedTargetRefs: [], intentDigest: digestValue('intent', intent).sha256,
-        operationDigest: null, analysisDigest: null, decisionRevision: null };
-      const surfaceActionDigest = digestValue('surface-action', projection).sha256;
-      projections[actionId] = projection;
-      actions.push({ actionId, inputKinds: [kind], surfaceActionDigest,
-        capabilityRef: 'hanaworlds-workshop', choices });
-    };
-    if (choice.options.includes('NAME_PLAYER'))
-      add('SELECT_CHOICE', choice.candidatePlayerNames.map(name => ({ value: name, label: name })));
-    add('PICK_WORLD_POINT', null);
-    const frame = validateType('InteractionFrame', { sessionRef: body.sessionRef,
-      turnRevision, frameRef, frameRevision,
-      content: choice.options.includes('NAME_PLAYER') ?
-        '请选择在线玩家，或在游戏中选点。' : '请在游戏中选点。', actions });
-    state.pendingPlacement = { choice, frame, projections, footprint,
-      actorRef: body.actorRef, authorizationRef: body.authorizationRef,
-      worldRef: state.context.activeWorldRef, turnRef: body.turnRef,
-      intentDigest: digestValue('intent', intent).sha256 };
-    state.lastPlacement = { outcome: 'PLACEMENT_CHOICE_REQUIRED', choice, frame };
-    return { ...state.lastPlacement, actionProjections: projections };
-  }
-
-  async getPlacementState(body) {
-    await this.#authorized(body, 'BeginFirstBuilding');
-    const { state } = await this.#load(body.sessionRef);
-    return copy(state.lastPlacement);
-  }
-
-  async createBuildPlan(body) {
-    await this.#authorized(body, 'CreateBuildPlan');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const turn = state.turns.find(row => row.turnRef === body.turnRef);
-      const saved = state.confirmedIntents[body.turnRef];
-      const placement = state.lastPlacement;
-      if (!turn || !saved || !placement || placement.outcome !== 'REGION_INSPECTED' ||
-          placement.turnRef !== body.turnRef ||
-          saved.intent.confirmedIntent.kind !== 'BUILD_STRUCTURE')
-        failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      if (turn.media.length === 0) failure('IMAGE_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      if (saved.intent.intendedWorldRef !== state.context.activeWorldRef ||
-          placement.inspection.targetFacts.worldRef !== state.context.activeWorldRef)
-        failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      requirePeer(this.painter,
-        { wires: ['painter/v3'], factProfiles: ['target-facts/v3'] });
-      if (!this.catalogue?.read || !this.safety?.read || !this.painter?.call)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const catalogue = validateType('Catalogue', await this.catalogue.read(state.context.activeWorldRef));
-      const safetyProfile = validateType('SafetyProfile', await this.safety.read(state.context.activeWorldRef));
-      if (digestValue('catalogue', catalogue).sha256 !==
-          placement.inspection.targetFacts.catalogueDigest)
-        failure('CATALOGUE_MISMATCH', 'validate', 'REVISION_CHANGED');
-      const request = { contractVersion: 'painter/v3', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: state.context.activeWorldRef,
-        turnRevision: turn.turnRevision, painterId: 'picture-blocks',
-        invocationId: `paint-${randomUUID()}`, intent: saved.intent,
-        intentDigest: digestValue('intent', saved.intent).sha256,
-        referenceBrief: saved.brief,
-        referenceBriefDigest: digestValue('reference-brief', saved.brief).sha256,
-        catalogue, targetFacts: placement.inspection.targetFacts,
-        targetFactsDigest: placement.inspection.targetFactsDigest,
-        safetyProfile, safetyProfileDigest: digestValue('safety-profile', safetyProfile).sha256,
-        regionInspection: placement.inspection };
-      validateBoundRequest('painter/v3', 'CreateBuildPlan', request);
-      const response = validateResponse('painter/v3', 'CreateBuildPlan',
-        await this.painter.call('CreateBuildPlan', request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      state.lastBuild = { turnRef: body.turnRef, worldRef: state.context.activeWorldRef,
-        plan: response.result, catalogue, safetyProfile, inspection: placement.inspection };
-      await this.#save(body.sessionRef, log, state);
-      return response.result;
-    });
-  }
-
-  async listObjects(body) {
-    await this.#authorized(body, 'ListObjects');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const worldRef = state.context.activeWorldRef;
-      if (!worldRef) failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      requirePeer(this.canvas,
-        { wires: ['canvas/v4'], factProfiles: [] });
-      const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef, expectedRevision: null };
-      validateBoundRequest('canvas/v4', 'ListObjects', request);
-      const response = validateResponse('canvas/v4', 'ListObjects',
-        await this.canvas.call('ListObjects', request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      state.offeredInventory = response.result;
-      await this.#save(body.sessionRef, log, state);
-      return response.result;
-    });
-  }
-
-  async selectObjects(body) {
-    await this.#authorized(body, 'SelectObjects');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const inventory = state.offeredInventory;
-      if (!inventory || inventory.worldRef !== state.context.activeWorldRef)
-        failure('INVALID_SELECTION', 'validate', 'SCOPE_DENIED');
-      const offered = new Set(inventory.objects.map(object => object.objectRef));
-      if (!Array.isArray(body.objectRefs) ||
-          new Set(body.objectRefs).size !== body.objectRefs.length ||
-          !body.objectRefs.every(ref => offered.has(ref)))
-        failure('INVALID_SELECTION', 'validate', 'SCOPE_DENIED');
-      requirePeer(this.canvas,
-        { wires: ['canvas/v4'], factProfiles: [] });
-      const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: inventory.worldRef,
-        objectRefs: body.objectRefs,
-        expectedSelectionRevision: state.context.selectionRevision };
-      validateBoundRequest('canvas/v4', 'SetObjectSelection', request);
-      const response = validateResponse('canvas/v4', 'SetObjectSelection',
-        await this.canvas.call('SetObjectSelection', request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      state.context.orderedSelectedObjectRefs = response.result.selectedObjectRefs;
-      state.context.selectionRevision = response.result.selectionRevision;
-      state.pendingPlacement = null;
-      state.lastPlacement = null;
-      await this.#save(body.sessionRef, log, state);
-      return response.result;
-    });
-  }
-
-  async compileCurrentBuild(body) {
-    await this.#authorized(body, 'CompileCurrentBuild');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const saved = state.lastBuild;
-      if (!saved || saved.turnRef !== body.turnRef ||
-          saved.worldRef !== state.context.activeWorldRef)
-        failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      requirePeer(this.brush,
-        { wires: ['BUILD/V2'], factProfiles: ['target-facts/v3'] });
-      if (!this.brush?.compile || !this.compilerConfig?.read)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const settings = await this.compilerConfig.read(saved.worldRef);
-      const compilationConfig = validateType('CompilationConfig', settings?.compilationConfig);
-      const compilerRevision = settings?.compilerRevision;
-      const request = { contractVersion: 'BUILD/V2', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: saved.worldRef,
-        build: saved.plan.build, buildDigest: saved.plan.buildDigest,
-        catalogue: saved.catalogue,
-        catalogueDigest: digestValue('catalogue', saved.catalogue).sha256,
-        targetFacts: saved.inspection.targetFacts,
-        targetFactsDigest: saved.inspection.targetFactsDigest,
-        safetyProfile: saved.safetyProfile,
-        safetyProfileDigest: digestValue('safety-profile', saved.safetyProfile).sha256,
-        compilationConfig,
-        compilationConfigDigest: digestValue('compilation-config', compilationConfig).sha256,
-        compilerRevision };
-      validateBoundRequest('BUILD/V2', 'BuildDocument', request);
-      const response = validateResponse('BUILD/V2', 'BuildDocument',
-        await this.brush.compile(request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      state.lastCompiled = { turnRef: body.turnRef, worldRef: saved.worldRef,
-        compiled: response.result, build: saved.plan.build,
-        inspection: saved.inspection };
-      await this.#save(body.sessionRef, log, state);
-      return response.result;
-    });
-  }
-
-  async analyzeCurrentBuild(body) {
-    await this.#authorized(body, 'AnalyzeCurrentBuild');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const saved = state.lastCompiled;
-      if (!saved || saved.turnRef !== body.turnRef ||
-          saved.worldRef !== state.context.activeWorldRef)
-        failure('TARGET_REQUIRED', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      requirePeer(this.canvas,
-        { wires: ['canvas/v4'], factProfiles: ['target-facts/v3'] });
-      const base = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, authorizationRef: body.authorizationRef,
-        worldRef: saved.worldRef };
-      const inventoryRequest = { ...base, requestId: `inventory-${body.requestId}`,
-        expectedRevision: null };
-      validateBoundRequest('canvas/v4', 'ListObjects', inventoryRequest);
-      const inventory = validateResponse('canvas/v4', 'ListObjects',
-        await this.canvas.call('ListObjects', inventoryRequest));
-      if (inventory.error) { const error = new Error(inventory.error.code); error.publicError = inventory.error; throw error; }
-      const transactionId = `tx-${randomUUID()}`;
-      const request = { ...base, requestId: body.requestId, transactionId,
-        operations: saved.compiled.projection,
-        operationDigest: saved.compiled.operationDigest,
-        expectedRevision: saved.inspection.targetFacts.worldRevision,
-        expectedRegistryRevision: inventory.result.registryRevision,
-        expectedSelectionRevision: state.context.selectionRevision };
-      validateBoundRequest('canvas/v4', 'AnalyzeAffectedObjects', request);
-      const response = validateResponse('canvas/v4', 'AnalyzeAffectedObjects',
-        await this.canvas.call('AnalyzeAffectedObjects', request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      state.lastAnalysis = { turnRef: body.turnRef, transactionId,
-        analysis: response.result, analysisDigest: digestValue('affected-analysis', response.result).sha256 };
-      await this.#save(body.sessionRef, log, state);
-      return response.result;
-    });
-  }
-
-  async applyCurrentBuild(body) {
-    await this.#authorized(body, 'ApplyCurrentBuild');
-    return this.#withLock(body.sessionRef, async () => {
-      const { log, state } = await this.#load(body.sessionRef);
-      const pending = state.pendingApply;
-      if (pending?.status === 'RESERVED' && pending.turnRef !== body.turnRef)
-        failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-      if (pending?.turnRef === body.turnRef) {
-        if (pending.status === 'VERIFIED') return pending.response.result;
-        if (pending.status !== 'RESERVED')
-          failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-        if (pending.request.actorRef !== body.actorRef ||
-            pending.request.authorizationRef !== body.authorizationRef)
-          failure('AUTHORIZATION_REVOKED', 'authorize', 'GRANT_REVOKED');
-        // Canvas owns durable transaction recovery. Reuse the exact reserved
-        // request and idempotency key after an uncertain transport outcome.
-        requirePeer(this.canvas,
-          { wires: ['canvas/v4'], factProfiles: ['target-facts/v3'] });
-        validateBoundRequest('canvas/v4', 'ApplyRecoverableCommit', pending.request);
-        const retried = validateResponse('canvas/v4', 'ApplyRecoverableCommit',
-          await this.canvas.call('ApplyRecoverableCommit', pending.request));
-        state.pendingApply.status = retried.error?.mutationState === 'NONE' ||
-          retried.error?.mutationState === 'ROLLED_BACK' ? 'FAILED' :
-          retried.error ? 'RESERVED' : retried.result.status;
-        state.pendingApply.response = retried;
-        await this.#save(body.sessionRef, log, state);
-        if (retried.error) { const error = new Error(retried.error.code); error.publicError = retried.error; throw error; }
-        return retried.result;
-      }
-      const compiled = state.lastCompiled, analysis = state.lastAnalysis;
-      const intent = state.confirmedIntents[body.turnRef]?.intent;
-      if (!compiled || !analysis || !intent ||
-          compiled.turnRef !== body.turnRef || analysis.turnRef !== body.turnRef ||
-          state.context.activeWorldRef !== compiled.worldRef ||
-          analysis.analysis.operationDigest !== compiled.compiled.operationDigest)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      if (analysis.analysis.affectedObjectRefs.length > 0)
-        failure('OTHER_OBJECTS_AFFECTED', 'validate', 'SCOPE_DENIED');
-      requirePeer(this.canvas,
-        { wires: ['canvas/v4'], factProfiles: ['target-facts/v3'] });
-      if (!this.applyAuthority?.issue)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const turnRevision = state.turns.find(row => row.turnRef === body.turnRef)?.turnRevision;
-      const facts = { actorRef: body.actorRef, sessionRef: body.sessionRef,
-        worldRef: compiled.worldRef, turnRevision,
-        intentDigest: digestValue('intent', intent).sha256,
-        transactionId: analysis.transactionId,
-        operationDigest: compiled.compiled.operationDigest,
-        worldRevision: analysis.analysis.worldRevision,
-        selectionRevision: analysis.analysis.selectionRevision,
-        analysisDigest: analysis.analysisDigest,
-        decisionRevision: null, allowedAction: 'APPLY_RECOVERABLE' };
-      const authorizationBinding = validateType('AuthProjection',
-        await this.applyAuthority.issue(facts, body));
-      if (!['actorRef','sessionRef','worldRef','turnRevision','intentDigest','transactionId',
-        'operationDigest','worldRevision','selectionRevision','analysisDigest','decisionRevision',
-        'allowedAction'].every(key => authorizationBinding[key] === facts[key]))
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-      const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: compiled.worldRef,
-        transactionId: analysis.transactionId,
-        operations: compiled.compiled.projection,
-        operationDigest: compiled.compiled.operationDigest,
-        authorizationBinding,
-        authorizationBindingDigest: digestValue('authorization-binding', authorizationBinding).sha256,
-        analysisDigest: analysis.analysisDigest, decisionRevision: null,
-        expectedWorldRevision: analysis.analysis.worldRevision,
-        expectedObjectRevisions: {}, guarantee: 'RECOVERABLE_VERIFIED',
-        regionInspectionBinding: { inspectionId: compiled.inspection.inspectionId,
-          build: compiled.build } };
-      validateBoundRequest('canvas/v4', 'ApplyRecoverableCommit', request);
-      state.pendingApply = { request, turnRef: body.turnRef, status: 'RESERVED' };
-      await this.#save(body.sessionRef, log, state);
-      const response = validateResponse('canvas/v4', 'ApplyRecoverableCommit',
-        await this.canvas.call('ApplyRecoverableCommit', request));
-      const latest = await this.#load(body.sessionRef);
-      latest.state.pendingApply.status = response.error?.mutationState === 'NONE' ||
-        response.error?.mutationState === 'ROLLED_BACK' ? 'FAILED' :
-        response.error ? 'RESERVED' : response.result.status;
-      latest.state.pendingApply.response = response;
-      await this.#save(body.sessionRef, latest.log, latest.state);
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      return response.result;
-    });
-  }
-
-  async #dispatch(operation, body, proof) {
-    if (operation === 'DeleteSession')
-      failure('SESSION_DELETE_UNSUPPORTED', 'validate', 'POLICY_UNAVAILABLE');
-    if (operation === 'ReopenExistingArtifact') {
-      if (!this.resources?.reopen)
-        failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      let reopened;
-      try { reopened = await this.resources.reopen(body); }
-      catch { failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE'); }
-      const result = validateType('ReopenedArtifact', reopened);
-      if (result.artifactRef !== body.artifactRef ||
-          result.resourceManifestDigest !== body.resourceManifestDigest ||
-          result.manifest.workRevision !== body.workRevision ||
-          digestValue('saved-work-resources', result.manifest).sha256 !== body.resourceManifestDigest)
-        failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'DIGEST_MISMATCH');
-      return result;
-    }
-    if (operation === 'StartOrResumeSession') {
-      if (!this.capabilities)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      let loaded;
-      try { loaded = await this.#load(body.sessionRef); }
-      catch (error) {
-        if (error.code !== 'SESSION_NOT_FOUND' &&
-            error.name !== 'SessionPersistenceNotFoundError') throw error;
-        if (body.expectedRevision !== null) failure('SESSION_NOT_FOUND', 'validate', 'SCOPE_DENIED');
-        const header = { version: SESSION_FORMAT_VERSION, id: body.sessionRef,
-          createdAt: Date.now(), isSeeded: false };
-        const handle = await this.sessionPersistence.create(header);
-        const state = initialState(body.sessionRef);
-        state.context.sessionRevision = revision();
-        try {
-          await handle.append([{ type: 'hanaworlds/workshop-state/v1',
-            seq: 0, time: Date.now(), data: state, ignorable: true }]);
-          await handle.flush();
-        } finally { await handle.close(); }
-        return this.#snapshot(state);
-      }
-      if (body.expectedRevision !== null &&
-          loaded.state.context.sessionRevision !== body.expectedRevision)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      return this.#snapshot(loaded.state);
-    }
-    const { log, state } = await this.#load(body.sessionRef);
-    if (operation === 'InvokeAction') {
-      const pending = state.pendingPlacement;
-      if (!pending || !pending.frame ||
-          state.context.activeWorldRef !== pending.worldRef)
-        failure('INVALID_FRAME', 'validate', 'REVISION_CHANGED');
-      if (pending.actorRef !== body.actorRef ||
-          pending.authorizationRef !== body.authorizationRef)
-        failure('PERMISSION_DENIED', 'authorize', 'IDENTITY_UNVERIFIED');
-      validateChoiceSelection(pending.frame, body);
-      const descriptor = pending.frame.actions.find(action => action.actionId === body.actionId);
-      const projection = pending.projections[body.actionId];
-      if (!projection || descriptor.surfaceActionDigest !== body.surfaceActionDigest ||
-          digestValue('surface-action', projection).sha256 !== body.surfaceActionDigest ||
-          JSON.stringify(projection) !== JSON.stringify(body.surfaceAction) ||
-          body.turnRevision !== pending.frame.turnRevision ||
-          !descriptor.inputKinds.includes(body.input.kind))
-        failure('INVALID_FRAME', 'validate', 'REVISION_CHANGED');
-      if (body.input.kind === 'SELECT_CHOICE' && proof.surface !== 'SHELL')
-        failure('RENDERER_CAPABILITY_UNAVAILABLE', 'validate', 'SCOPE_DENIED');
-      if (body.input.kind === 'PICK_WORLD_POINT' && proof.surface !== 'LUANTI')
-        failure('RENDERER_CAPABILITY_UNAVAILABLE', 'validate', 'SCOPE_DENIED');
-      const anchor = body.input.kind === 'SELECT_CHOICE' ?
-        { kind: 'NAMED_PLAYER', engineActorName: body.input.value } :
-        { kind: 'PICKED_POINT', pickRef: body.input.pickRef };
-      requirePeer(this.canvas,
-        { wires: ['canvas/v4'], factProfiles: ['target-facts/v3'] });
-      const request = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: body.requestId,
-        authorizationRef: body.authorizationRef, worldRef: pending.worldRef,
-        anchor, footprint: pending.footprint };
-      validateBoundRequest('canvas/v4', 'InspectPlacementRegion', request);
-      const response = validateResponse('canvas/v4', 'InspectPlacementRegion',
-        await this.canvas.call('InspectPlacementRegion', request));
-      if (response.error) { const error = new Error(response.error.code); error.publicError = response.error; throw error; }
-      const intent = state.confirmedIntents[pending.turnRef].intent;
-      await this.#recordPlacement(state, { ...body, turnRef: pending.turnRef },
-        response.result, pending.footprint, intent);
-      await this.#save(body.sessionRef, log, state);
-      return { invocationId: body.invocationId, resultRevision: revision(),
-        ownerRef: 'hanaworlds-workshop', domainReceiptDigest: null, accepted: true };
-    }
-    if (operation === 'PersistRequiredArtifactResources') {
-      if (!this.resources?.persist)
-        failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      let persisted;
-      try { persisted = await this.resources.persist(body); }
-      catch { failure('SAVED_RESOURCE_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE'); }
-      const result = validateType('SavedResourceReceipt', persisted);
-      if (!result.durable || result.resourceManifestDigest !== body.resourceManifestDigest ||
-          digestValue('saved-work-resources', result.manifest).sha256 !== body.resourceManifestDigest)
-        failure('SAVED_RESOURCE_UNAVAILABLE', 'persist', 'POLICY_UNAVAILABLE');
-      state.artifacts[body.artifactRef] = { workRevision: body.manifest.workRevision,
-        resourceManifestDigest: body.resourceManifestDigest };
-      await this.#save(body.sessionRef, log, state);
-      return result;
-    }
-    if (operation === 'RecordActionReceipt') {
-      if (state.context.sessionRevision !== body.expectedRevision)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      const turn = state.turns.find(row => row.turnRef === body.turnRef);
-      const receipt = state.pendingApply?.response?.result;
-      if (!turn || !receipt || receipt.status !== 'VERIFIED' ||
-          state.pendingApply.request.sessionRef !== body.sessionRef ||
-          digestValue('receipt', receipt).sha256 !== body.domainReceiptDigest)
-        failure('RECOVERY_PENDING', 'validate', 'REQUIRED_FACT_UNKNOWN');
-      turn.actionReceiptDigest = body.domainReceiptDigest;
-      state.receipts.push({ turnRef: body.turnRef, actionId: body.actionId,
-        domainReceiptDigest: body.domainReceiptDigest });
-      await this.#save(body.sessionRef, log, state);
-      return { sessionRef: body.sessionRef, turnRef: body.turnRef,
-        turnRevision: turn.turnRevision, briefDigest: turn.referenceBriefDigest,
-        model: 'gpt-5.6-luna', resultText: '已记录已验证的操作回执。', clarification: null };
-    }
-    if (operation === 'SwitchWorldContext') {
-      if (state.context.sessionRevision !== body.expectedRevision)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      if (state.pendingApply?.status === 'RESERVED')
-        failure('RECOVERY_PENDING', 'restore', 'REQUIRED_FACT_UNKNOWN');
-      requirePeer(this.canvas,
-        { wires: ['canvas/v4'], factProfiles: [] });
-      if (!this.canvas?.call)
-        failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-      const inventoryRequest = { contractVersion: 'canvas/v4', actorRef: body.actorRef,
-        sessionRef: body.sessionRef, requestId: `world-proof-${body.requestId}`,
-        authorizationRef: body.authorizationRef, worldRef: body.worldRef,
-        expectedRevision: null };
-      validateBoundRequest('canvas/v4', 'ListObjects', inventoryRequest);
-      const inventory = validateResponse('canvas/v4', 'ListObjects',
-        await this.canvas.call('ListObjects', inventoryRequest));
-      if (inventory.error) { const error = new Error(inventory.error.code); error.publicError = inventory.error; throw error; }
-      if (inventory.result.worldRef !== body.worldRef)
-        failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      state.context.activeWorldRef = body.worldRef;
-      state.context.orderedSelectedObjectRefs = [];
-      state.context.selectionRevision = body.selectionRevision;
-      state.offeredInventory = null;
-      state.pendingPlacement = null;
-      state.lastPlacement = null;
-      return this.#snapshot(await this.#save(body.sessionRef, log, state));
-    }
-    if (operation === 'AppendMultimodalTurn') {
-      if (state.context.sessionRevision !== body.expectedRevision)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      if (state.turns.some(turn => turn.turnRef === body.turnRef))
-        failure('REPLAY_MISMATCH', 'replay', 'PAYLOAD_CHANGED');
-      const { media, imageBlocks } = await this.#mediaForModel(body);
-      const answer = await this.#modelTurn(body, imageBlocks,
-        state.turns.filter(turn => state.turnWorldRefs?.[turn.turnRef] ===
-          state.context.activeWorldRef));
-      const proposal = parseStructureProposal(answer);
-      const turnRevision = revision();
-      const clarification = { sessionRef: body.sessionRef, turnRevision,
-        invocationId: body.requestId, clarificationId: `clarify-${randomUUID()}`,
-        code: 'AMBIGUOUS_INTENT', question: proposal ?
-          `请确认在当前世界建造${proposal.text}，尺寸为${proposal.dimensions.width}×${proposal.dimensions.depth}×${proposal.dimensions.height}个节点。回复“确认”或说明修改。` : answer };
-      state.turns.push({ turnRef: body.turnRef, turnRevision, text: body.text,
-        media, referenceBriefDigest: null, intentDigest: null, actionReceiptDigest: null });
-      state.turnWorldRefs ??= Object.create(null);
-      state.turnWorldRefs[body.turnRef] = state.context.activeWorldRef;
-      state.pendingClarification = { ...clarification, proposal, turnRef: body.turnRef,
-        answers: [], afterSessionEventSeq: log.events.length };
-      state.turnControls[body.turnRef] = body.controls;
-      await this.#save(body.sessionRef, log, state);
-      return { sessionRef: body.sessionRef, turnRef: body.turnRef, turnRevision,
-        briefDigest: null, model: 'gpt-5.6-luna', resultText: clarification.question, clarification };
-    }
-    if (operation === 'AnswerClarification') {
-      if (state.context.sessionRevision !== body.expectedRevision)
-        failure('STALE_REVISION', 'validate', 'REVISION_CHANGED');
-      const pending = state.pendingClarification;
-      if (!pending || pending.clarificationId !== body.clarificationId ||
-          pending.turnRef !== body.turnRef)
-        failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
-      const confirmationInputId = confirmingSessionInputId(log, pending, body);
-      const confirmed = ['确认', 'yes', 'YES'].includes(body.answer.trim());
-      if (!pending.proposal || !confirmed) {
-        const original = state.turns.find(value => value.turnRef === body.turnRef);
-        if (!original) failure('TURN_REVISION_MISMATCH', 'validate', 'REVISION_CHANGED');
-        const answers = confirmed ? (pending.answers ?? []) :
-          [...(pending.answers ?? []), body.answer];
-        let answer = '请补充明确的建造意图和节点尺寸。';
-        let proposal = null;
-        if (!confirmed) {
-          const { imageBlocks } = await this.#mediaForModel({ ...body, media: original.media });
-          answer = await this.#modelTurn({ ...body,
-            text: `${original.text}\n${answers.map((value, index) =>
-              `用户补充${index + 1}：${value}`).join('\n')}` }, imageBlocks);
-          proposal = parseStructureProposal(answer);
-        }
-        const next = { ...pending, proposal, answers,
-          afterSessionEventSeq: log.events.length,
-          clarificationId: `clarify-${randomUUID()}`,
-          question: proposal ?
-            `请确认在当前世界建造${proposal.text}，尺寸为${proposal.dimensions.width}×${proposal.dimensions.depth}×${proposal.dimensions.height}个节点。回复“确认”或说明修改。` : answer };
-        state.pendingClarification = next;
-        await this.#save(body.sessionRef, log, state);
-        return { sessionRef: body.sessionRef, turnRef: body.turnRef,
-          turnRevision: pending.turnRevision, briefDigest: null, model: 'gpt-5.6-luna',
-          resultText: next.question, clarification: {
-            sessionRef: next.sessionRef, turnRevision: next.turnRevision,
-            invocationId: next.invocationId, clarificationId: next.clarificationId,
-            code: 'AMBIGUOUS_INTENT', question: next.question } };
-      }
-      if (!state.context.activeWorldRef)
-        failure('WORLD_NOT_BOUND', 'validate', 'SCOPE_DENIED');
-      const turn = state.turns.find(value => value.turnRef === body.turnRef);
-      const brief = validateType('BriefProjection', { contractVersion: 'ReferenceBrief/v2',
-        sessionRef: body.sessionRef, turnRevision: turn.turnRevision,
-        briefRevision: revision(), media: turn.media, text: turn.text,
-        controls: state.turnControls[body.turnRef] });
-      const briefDigest = digestValue('reference-brief', brief).sha256;
-      const p = pending.proposal;
-      const intent = validateType('IntentProjection', { contractVersion: 'session/v2',
-        referenceBriefDigest: briefDigest,
-        confirmedIntent: { kind: p.kind, text: p.text, purpose: p.purpose,
-          dimensions: p.dimensions, entrancePortalRefs: p.entrancePortalRefs,
-          confirmedTurnRevision: turn.turnRevision },
-        intendedWorldRef: state.context.activeWorldRef, orderedTargetRefs: [] });
-      turn.referenceBriefDigest = briefDigest;
-      turn.intentDigest = digestValue('intent', intent).sha256;
-      state.confirmedIntents[body.turnRef] = { brief, intent,
-        confirmationInputId };
-      state.pendingClarification = null;
-      await this.#save(body.sessionRef, log, state);
-      return { sessionRef: body.sessionRef, turnRef: body.turnRef,
-        turnRevision: turn.turnRevision, briefDigest,
-        model: 'gpt-5.6-luna', resultText: '已确认建造意图。', clarification: null };
-    }
-    failure('CAPABILITY_UNAVAILABLE', 'validate', 'POLICY_UNAVAILABLE');
-  }
-}
-
-export const name = 'hanaworlds-workshop';
-export const inject = [];
+export const name='hanaworlds-workshop';
+export const inject=[];
 export function apply(ctx) {
-  const service = new WorkshopV1();
-  const ports = {
-    sessionPersistence: 'sessionPersistence', attachments: 'attachments',
-    llm: 'llm', authority: 'hanaworldsAuthority',
-    capabilities: 'hanaworldsCapabilities', canvas: 'hanaworldsCanvasV4',
-    painter: 'hanaworldsPainterV2PictureBlocks', brush: 'hanaworldsBrushV2',
-    resources: 'hanaworldsRequiredResources', catalogue: 'hanaworldsCatalogue',
-    safety: 'hanaworldsSafetyProfile', compilerConfig: 'hanaworldsCompilerConfig',
-    applyAuthority: 'hanaworldsApplyAuthority',
-    mediaAuthority: 'hanaworldsMediaAuthority', modelRoute: 'hanaworldsModelRoute',
-  };
-  for (const [field, port] of Object.entries(ports))
-    Object.defineProperty(service, field, { enumerable: true,
-      get: () => ctx.get?.(port) });
-  ctx.provide?.('hanaworldsWorkshopV1', service);
-  ctx.provide?.('hanaworldsWorkshop', service);
+ const projectionStore=new WorkshopProjectionStore(()=>ctx.get('storageDomain'));
+ ctx.effect?.(()=>()=>projectionStore.close(),'hanaworlds-workshop.projection-close');
+ const service=new WorkshopV3({projectionStore});
+ for(const [field,port] of Object.entries({sessions:'sessions',agents:'agents',attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',safety:'hanaworldsSafetyProfile',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities',painterRegion:'hanaworldsPainterRegionV1',brushRegion:'hanaworldsBrushRegionV1',canvasRegion:'hanaworldsCanvasRegionV1'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
+ registerImageTool(ctx,service);
+ ctx.provide('hanaworldsWorkshop',service);ctx.provide('hanaworldsWorkshopV3',service);
+ new WorkshopImageLinkPanelService(ctx);
 }
-export default { name, inject, apply };
+export default {name,inject,apply};

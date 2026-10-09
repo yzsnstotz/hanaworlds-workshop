@@ -1,0 +1,44 @@
+✖ K3 Painter/Canvas: cross patch/hash and methods accept normal image proposal → advance → same-build Undo (FIXTURE) (597.475458ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 695.956208
+
+✖ failing tests:
+
+test at test/write-tools.test.mjs:320:1
+✖ K3 Painter/Canvas: cross patch/hash and methods accept normal image proposal → advance → same-build Undo (FIXTURE) (597.475458ms)
+  AssertionError [ERR_ASSERTION]: {"contractVersion":"session/v3","requestId":"switch","result":null,"error":{"code":"UNSUPPORTED_VERSION","phase":"decode","retryability":"NEVER","mutationState":"NONE","transactionRef":null,"causeCode":null,"reason":"VERSION_UNSUPPORTED"}}
+  + actual - expected
+  
+  + {
+  +   causeCode: null,
+  +   code: 'UNSUPPORTED_VERSION',
+  +   mutationState: 'NONE',
+  +   phase: 'decode',
+  +   reason: 'VERSION_UNSUPPORTED',
+  +   retryability: 'NEVER',
+  +   transactionRef: null
+  + }
+  - null
+  
+      at call (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/final-043-fixture/runtime.wIG1VR/old/test/write-tools.test.mjs:71:81)
+      at async imageBrief (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/final-043-fixture/runtime.wIG1VR/old/test/write-tools.test.mjs:84:11)
+      at async file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/final-043-fixture/runtime.wIG1VR/old/test/write-tools.test.mjs:264:25
+      at async withRuntime (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/final-043-fixture/runtime.wIG1VR/old/test/write-tools.test.mjs:67:7)
+      at async perCellFlow (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/final-043-fixture/runtime.wIG1VR/old/test/write-tools.test.mjs:263:2)
+      at async TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/final-043-fixture/runtime.wIG1VR/old/test/write-tools.test.mjs:327:2)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { code: 'UNSUPPORTED_VERSION', phase: 'decode', retryability: 'NEVER', mutationState: 'NONE', transactionRef: null, causeCode: null, reason: 'VERSION_UNSUPPORTED' },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+baseline exit 1

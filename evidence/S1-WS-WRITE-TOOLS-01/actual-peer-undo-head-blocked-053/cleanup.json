@@ -1,0 +1,19 @@
+{
+  "deleted": [
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-053/node_modules",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-053-npm-cache",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/runtime-053-dev-1",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/runtime-053-dev-2",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/runtime-053-dev-3",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/runtime-053-dev-4"
+  ],
+  "retained": [
+    "source",
+    "latest Workshop0.4.3 tar",
+    "fixed peer inputs",
+    "all original E",
+    "latest full fresh runtime durable state/media/core/rollback under E",
+    "actual-peers-053 public inputs/manifests/install/dev logs"
+  ],
+  "scope": "own card run only"
+}

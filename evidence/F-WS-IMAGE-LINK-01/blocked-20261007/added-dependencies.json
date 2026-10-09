@@ -1,0 +1,30 @@
+[
+  {
+    "name": "@deepseek-ai/dsh-typert-protocol",
+    "version": "0.2.0-rc.2",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/",
+    "usage": "Official Remote binding/generator and compiler dependencies; generator only at build time."
+  },
+  {
+    "name": "@deepseek-ai/dsh-typert-generator",
+    "version": "0.2.0-rc.2",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/",
+    "usage": "Official Remote binding/generator and compiler dependencies; generator only at build time."
+  },
+  {
+    "name": "typescript",
+    "version": "6.0.3",
+    "license": "Apache-2.0",
+    "source": "https://registry.npmjs.org/",
+    "usage": "Official Remote binding/generator and compiler dependencies; generator only at build time."
+  },
+  {
+    "name": "@jridgewell/gen-mapping",
+    "version": "0.3.13",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/",
+    "usage": "Official Remote binding/generator and compiler dependencies; generator only at build time."
+  }
+]

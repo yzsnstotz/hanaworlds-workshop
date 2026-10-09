@@ -1,0 +1,126 @@
+{
+  "stage": "FIXTURE_ONLY",
+  "sourceSha": "5e77997e93e0deee0ff7b29bc82aef6e3e427855",
+  "files": [
+    {
+      "path": "baseline-042-k3.log",
+      "bytes": 2466,
+      "sha256": "ef6f949a5dfb3aff3afc002fd27f3deeef0b1475e7294e666a7a0d131f791d3b"
+    },
+    {
+      "path": "baseline-identity.json",
+      "bytes": 468,
+      "sha256": "4bc6729d9dd6faefb7ee6dadf2e238b5778a32d10e48c52b928c554c623fdbbb"
+    },
+    {
+      "path": "baseline-install.log",
+      "bytes": 25,
+      "sha256": "e441bfcbb4e4602b6b672db43d435e6dcc0abe7dd3dbd353aa35c9bb63c48a88"
+    },
+    {
+      "path": "build.log",
+      "bytes": 354,
+      "sha256": "bc9d7dd2d3e8d6f0e161ecd1353e5a023c5b3a8ac0fcd863f736853ed0d04ddd"
+    },
+    {
+      "path": "cleanup.json",
+      "bytes": 945,
+      "sha256": "361f2ae0b2adc5994ce93a50299cdc23aee111d1f6e1c1668302b456583c0bb0"
+    },
+    {
+      "path": "consumer-identity.json",
+      "bytes": 2079,
+      "sha256": "12a696db6d9d8179974dae4501c83752e3a83c9e4319ff3ecf592c21ab7e030f"
+    },
+    {
+      "path": "consumer-install.log",
+      "bytes": 25,
+      "sha256": "c3fc1dc063186514c64598b8387cf5457f6c47eaa9b0fd5130d1c950aa2092f6"
+    },
+    {
+      "path": "gate-peer-protocol-fixture.sh",
+      "bytes": 7196,
+      "sha256": "5cc6da6a3485cde56502b513b33e926403c3b42418f97bbba8a64bd0cd41f81d"
+    },
+    {
+      "path": "hanaworlds-workshop-0.4.3.tgz",
+      "bytes": 32327,
+      "sha256": "ceb5a79ff89c3fc07b117f678c14e6b7a646334c5a34cb5bed6626a1897ab6c3"
+    },
+    {
+      "path": "input-identity.json",
+      "bytes": 424,
+      "sha256": "2bbcad52a7111c07a49042e2af8a1c2e3f9ecf874bfb1775e27e671a0ece7ec8"
+    },
+    {
+      "path": "npm-ci.log",
+      "bytes": 236,
+      "sha256": "2c67648ba92a0543cb34cdbea05569f0e546cd9d59d77f7b9657be113a9ecc50"
+    },
+    {
+      "path": "pack-sha256.json",
+      "bytes": 271,
+      "sha256": "295476c19494d25fc7b94136305ec5fd019a97996e034bbbfd8a2a6ee82249ea"
+    },
+    {
+      "path": "pack.json",
+      "bytes": 1460,
+      "sha256": "e112392e2844ac67a3fd2ed0ab628590e2a9a7db711bd16504960b832664f614"
+    },
+    {
+      "path": "packed-tests.log",
+      "bytes": 14695,
+      "sha256": "3a8fb65bee1ce69b5cc39c35e17790ef9381d032a55cd9dc4e7818ba67d264bb"
+    },
+    {
+      "path": "peer-043-gate-command.log",
+      "bytes": 71,
+      "sha256": "cb37fa885b99bd521fb9302029d0b57dc5b9e3a0d645ef273f4945508b7658de"
+    },
+    {
+      "path": "peer-043-green-2.log",
+      "bytes": 3661,
+      "sha256": "50cfaca84e36a9c6482077988af88f6ad02792c73353ada4374c9bb81c97b075"
+    },
+    {
+      "path": "peer-043-green.log",
+      "bytes": 4388,
+      "sha256": "c7b1bb972b11f27bea4a3551f195873e4ae40b19a620d1daf56f67efc66eae61"
+    },
+    {
+      "path": "peer-043-npm-ci.log",
+      "bytes": 236,
+      "sha256": "cb6c7c7d39649ad89f951adbcf9d849ccd2a7183f93520dc12086736201246eb"
+    },
+    {
+      "path": "peer-043-red.log",
+      "bytes": 6636,
+      "sha256": "bc86d1546f1f67221328a704b923012955ccc94b542f2b8d0cc5c0ddab8ac015"
+    },
+    {
+      "path": "published-bytes.json",
+      "bytes": 1296,
+      "sha256": "04a1c674d7ae762d64dee9ac7fe3a7d8a28a34e899161332eaeb40ce59ebaea3"
+    },
+    {
+      "path": "result.json",
+      "bytes": 1152,
+      "sha256": "869d2b2de17648edd516c2e2a97fd325b1087009b76cd4af3e0f8b13258ff2b8"
+    },
+    {
+      "path": "runtime.txt",
+      "bytes": 16,
+      "sha256": "99af57870446d3520115ad2ce902c628a3a32c7766c9da2f013ad5649cae8305"
+    },
+    {
+      "path": "source-sha.txt",
+      "bytes": 41,
+      "sha256": "5d2df43b670441f296df5ec43f1a8a40d8b47225a222eaf0e4588131ab6b8347"
+    },
+    {
+      "path": "source-tests.log",
+      "bytes": 14694,
+      "sha256": "bf742802f642e7673fe29d53a28dec5a421a5110555f90565eb0759e286011f2"
+    }
+  ]
+}

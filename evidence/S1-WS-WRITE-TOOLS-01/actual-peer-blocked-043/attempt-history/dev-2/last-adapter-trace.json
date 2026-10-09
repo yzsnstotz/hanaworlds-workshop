@@ -1,0 +1,29 @@
+[
+  {
+    "adapter": "DiscoverConnections",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "unbound:discover",
+      "adapterId": "fixture-adapter"
+    }
+  },
+  {
+    "adapter": "ReadLocalConnection",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "select:connection",
+      "connectionRef": "local-connection"
+    }
+  },
+  {
+    "adapter": "DiscoverConnections",
+    "request": {
+      "contractVersion": "world-adapter/v6",
+      "sessionRef": "s1",
+      "requestId": "select:discover",
+      "adapterId": "fixture-adapter"
+    }
+  }
+]

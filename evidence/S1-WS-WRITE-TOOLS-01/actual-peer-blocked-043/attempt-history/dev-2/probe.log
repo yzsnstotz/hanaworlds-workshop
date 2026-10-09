@@ -1,0 +1,22 @@
+✖ ACTUAL three public peers: image proposal → real compile → durable Canvas readback → same-build Undo (32.956875ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 777.374709
+
+✖ failing tests:
+
+test at ../actual-peers-043/test/actual-peer-runtime.test.mjs:122:1
+✖ ACTUAL three public peers: image proposal → real compile → durable Canvas readback → same-build Undo (32.956875ms)
+  Error: service "hanaworldsPainterV2PictureBlocks" has been registered at <hanaworlds-building-exterior-painter>
+      at Fiber.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/node_modules/@deepseek-ai/cordis/lib/index.js:813:31)
+      at file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/node_modules/@deepseek-ai/cordis/lib/index.js:1142:34
+      at Proxy.provide (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/node_modules/@deepseek-ai/cordis/lib/index.js:801:25)
+      at withRuntime (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/test/actual-peer-runtime.test.mjs:91:51)
+      at async TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/test/actual-peer-runtime.test.mjs:123:27)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)

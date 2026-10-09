@@ -1,0 +1,38 @@
+{"evidence":"G2_PER_CELL_METHOD_SHAPED_BRUSH","workshop":"0.4.1","contracts":"hanaworlds-contracts@0.5.2","brush":"ACTUAL hanaworlds-brush@0.5.0","brushHasProperty":{"contractHandshake":false,"protocolHandshake":"function"},"perCell":{"method":"PER_CELL","available":true,"unmet":[]},"regionDescriptor":{"method":"REGION","toolName":"hanaworlds_region_proposal","purpose":"Large fill or dig in one Canvas transaction: flatten or raise terrain, fill a basin, carve a valley or clear a slab.","inputType":"RegionProposal","typicalScale":"Hundreds to millions of cells across many 16×16×16 mapblocks, written per mapblock as one logical transaction with whole-region Undo. Typical scale is guidance for the skill, not a limit: Workshop has no size threshold or setting, never truncates a proposal, changes its target or switches method.","scaleUnit":"cells","requiredCapabilities":["canvas-region/v1:compressed-before-snapshot","canvas-region/v1:rollback-on-failure","canvas-region/v1:single-logical-transaction","canvas-region/v1:whole-region-undo","painter-region/v1:validate-region-proposal","region-build/v1:compile-mapblock-chunks"],"unavailableReason":"PEER_UNAVAILABLE: needs Painter service hanaworldsPainterRegionV1 (painter-region/v1); PEER_UNAVAILABLE: needs Brush service hanaworldsBrushRegionV1 (region-build/v1); PEER_UNAVAILABLE: needs Canvas service hanaworldsCanvasRegionV1 (canvas-region/v1)"},"outcome":"VERIFIED","undo":"VERIFIED","canvasWrites":1,"undoWrites":1,"media":{"attachmentRef":"sha256:ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3","storedBytesDigest":"ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3","projectionVariantId":null,"projectionBytesDigest":null,"mediaType":"image/png","bytes":96,"width":2,"height":2}}
+✖ G2: actual Brush 0.5.0 package BrushV3 drives the PER_CELL path (real compile) (1093.562ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1248.607208
+
+✖ failing tests:
+
+test at test/write-tools.test.mjs:278:1
+✖ G2: actual Brush 0.5.0 package BrushV3 drives the PER_CELL path (real compile) (1093.562ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+      compiledOperationsVersion: 'operations/v3',
+  +   contracts: 'hanaworlds-contracts@0.5.0',
+  -   contracts: 'hanaworlds-contracts@0.5.2',
+      factProfiles: [
+        'target-facts/v4'
+      ],
+      wireVersions: [
+        'BUILD/V3',
+  
+      at TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:282:9)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { contracts: 'hanaworlds-contracts@0.5.0', wireVersions: [ 'BUILD/V3', 'ReferenceBrief/v3', 'canvas-region/v1', 'canvas/v5', 'interaction-surface/v4', 'painter-region/v1', 'painter/v4', 'region-build/v1', 'session/v3', 'world-adapter-region/v1', 'world-adapter/v6' ], compiledOperationsVersion: 'operations/v3', factProfiles: [ 'target-facts/v4' ] },
+    expected: { contracts: 'hanaworlds-contracts@0.5.2', wireVersions: [ 'BUILD/V3', 'ReferenceBrief/v3', 'canvas-region/v1', 'canvas/v5', 'interaction-surface/v4', 'painter-region/v1', 'painter/v4', 'region-build/v1', 'session/v3', 'world-adapter-region/v1', 'world-adapter/v6' ], compiledOperationsVersion: 'operations/v3', factProfiles: [ 'target-facts/v4' ] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

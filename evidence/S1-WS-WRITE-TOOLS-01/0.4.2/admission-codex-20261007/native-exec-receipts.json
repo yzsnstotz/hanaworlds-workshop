@@ -1,0 +1,39 @@
+{
+  "commands": [
+    {
+      "cwd": "/Users/yzliu/work/projects/hana-world-mvp",
+      "label": "project-root",
+      "cmd": "python3 - <<'PY'\nimport os, pathlib, tempfile, hashlib, json, stat, datetime\ncwd=pathlib.Path.cwd().resolve()\nexpected=pathlib.Path(\"/Users/yzliu/work/projects/hana-world-mvp\").resolve()\nassert cwd == expected, (cwd,expected)\nevidence=pathlib.Path('/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/admission-codex-20261007')\nevidence.mkdir(mode=0o700,parents=True,exist_ok=True)\nos.chmod(evidence,0o700)\nprobe=pathlib.Path(tempfile.mkdtemp(prefix='.hw-ws-admission-',dir=cwd))\nos.chmod(probe,0o700)\nfile=probe/'payload.bin'\npayload=os.urandom(32)\nwith file.open('xb') as f: f.write(payload)\nos.chmod(file,0o600)\nwritten=hashlib.sha256(payload).hexdigest()\nreadback=file.read_bytes()\nreadsha=hashlib.sha256(readback).hexdigest()\nmode=stat.S_IMODE(file.stat().st_mode)\ndirmode=stat.S_IMODE(probe.stat().st_mode)\nassert len(readback)==32 and mode==0o600 and dirmode==0o700 and written==readsha\nfile.unlink()\nprobe.rmdir()\nassert not file.exists() and not probe.exists()\nreceipt={'card':'S1-WS-WRITE-TOOLS-01','stage':'ADMISSION_ONLY','workerThreadId':os.environ.get('CODEX_THREAD_ID'),'timestampUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'nativeTool':'exec_command','actualCwd':str(cwd),'probeDirectory':str(probe),'directoryMode':oct(dirmode),'fileMode':oct(mode),'bytes':len(readback),'writeSHA256':written,'readSHA256':readsha,'shaMatch':written==readsha,'fileDeleted':not file.exists(),'directoryDeleted':not probe.exists(),'sudoUsed':False,'sourceChanged':False,'gatesRun':False}\nreceiptpath=evidence/'project-root-receipt.json'\nreceiptpath.write_text(json.dumps(receipt,indent=2)+'\\n')\nos.chmod(receiptpath,0o600)\nprint(json.dumps({'receiptPath':str(receiptpath),'receipt':receipt},indent=2))\nPY"
+    },
+    {
+      "cwd": "/private/tmp",
+      "label": "private-tmp",
+      "cmd": "python3 - <<'PY'\nimport os, pathlib, tempfile, hashlib, json, stat, datetime\ncwd=pathlib.Path.cwd().resolve()\nexpected=pathlib.Path(\"/private/tmp\").resolve()\nassert cwd == expected, (cwd,expected)\nevidence=pathlib.Path('/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/admission-codex-20261007')\nevidence.mkdir(mode=0o700,parents=True,exist_ok=True)\nos.chmod(evidence,0o700)\nprobe=pathlib.Path(tempfile.mkdtemp(prefix='.hw-ws-admission-',dir=cwd))\nos.chmod(probe,0o700)\nfile=probe/'payload.bin'\npayload=os.urandom(32)\nwith file.open('xb') as f: f.write(payload)\nos.chmod(file,0o600)\nwritten=hashlib.sha256(payload).hexdigest()\nreadback=file.read_bytes()\nreadsha=hashlib.sha256(readback).hexdigest()\nmode=stat.S_IMODE(file.stat().st_mode)\ndirmode=stat.S_IMODE(probe.stat().st_mode)\nassert len(readback)==32 and mode==0o600 and dirmode==0o700 and written==readsha\nfile.unlink()\nprobe.rmdir()\nassert not file.exists() and not probe.exists()\nreceipt={'card':'S1-WS-WRITE-TOOLS-01','stage':'ADMISSION_ONLY','workerThreadId':os.environ.get('CODEX_THREAD_ID'),'timestampUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'nativeTool':'exec_command','actualCwd':str(cwd),'probeDirectory':str(probe),'directoryMode':oct(dirmode),'fileMode':oct(mode),'bytes':len(readback),'writeSHA256':written,'readSHA256':readsha,'shaMatch':written==readsha,'fileDeleted':not file.exists(),'directoryDeleted':not probe.exists(),'sudoUsed':False,'sourceChanged':False,'gatesRun':False}\nreceiptpath=evidence/'private-tmp-receipt.json'\nreceiptpath.write_text(json.dumps(receipt,indent=2)+'\\n')\nos.chmod(receiptpath,0o600)\nprint(json.dumps({'receiptPath':str(receiptpath),'receipt':receipt},indent=2))\nPY"
+    }
+  ],
+  "outputs": [
+    {
+      "label": "project-root",
+      "chunk_id": "c36829",
+      "wall_time_seconds": 7.583e-06,
+      "exit_code": 0,
+      "original_token_count": 233,
+      "output": "{\n  \"receiptPath\": \"/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/admission-codex-20261007/project-root-receipt.json\",\n  \"receipt\": {\n    \"card\": \"S1-WS-WRITE-TOOLS-01\",\n    \"stage\": \"ADMISSION_ONLY\",\n    \"workerThreadId\": \"01a11392-fae1-7862-8968-676841044b15\",\n    \"timestampUTC\": \"2026-10-06T23:37:00.354384+00:00\",\n    \"nativeTool\": \"exec_command\",\n    \"actualCwd\": \"/Users/yzliu/work/projects/hana-world-mvp\",\n    \"probeDirectory\": \"/Users/yzliu/work/projects/hana-world-mvp/.hw-ws-admission-duhin0qe\",\n    \"directoryMode\": \"0o700\",\n    \"fileMode\": \"0o600\",\n    \"bytes\": 32,\n    \"writeSHA256\": \"242677b7c6841f95ca1c5b7e40e61cca00b78bfb6428dc2735385e8600f538f5\",\n    \"readSHA256\": \"242677b7c6841f95ca1c5b7e40e61cca00b78bfb6428dc2735385e8600f538f5\",\n    \"shaMatch\": true,\n    \"fileDeleted\": true,\n    \"directoryDeleted\": true,\n    \"sudoUsed\": false,\n    \"sourceChanged\": false,\n    \"gatesRun\": false\n  }\n}\n"
+    },
+    {
+      "label": "private-tmp",
+      "chunk_id": "670352",
+      "wall_time_seconds": 5.292e-06,
+      "exit_code": 0,
+      "original_token_count": 218,
+      "output": "{\n  \"receiptPath\": \"/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/admission-codex-20261007/private-tmp-receipt.json\",\n  \"receipt\": {\n    \"card\": \"S1-WS-WRITE-TOOLS-01\",\n    \"stage\": \"ADMISSION_ONLY\",\n    \"workerThreadId\": \"01a11392-fae1-7862-8968-676841044b15\",\n    \"timestampUTC\": \"2026-10-06T23:37:00.429339+00:00\",\n    \"nativeTool\": \"exec_command\",\n    \"actualCwd\": \"/private/tmp\",\n    \"probeDirectory\": \"/private/tmp/.hw-ws-admission-14pax3kf\",\n    \"directoryMode\": \"0o700\",\n    \"fileMode\": \"0o600\",\n    \"bytes\": 32,\n    \"writeSHA256\": \"9e60f5b1551660a08c92640f3acb193c35b76ef80085b5b5dfc4a6b499bd9996\",\n    \"readSHA256\": \"9e60f5b1551660a08c92640f3acb193c35b76ef80085b5b5dfc4a6b499bd9996\",\n    \"shaMatch\": true,\n    \"fileDeleted\": true,\n    \"directoryDeleted\": true,\n    \"sudoUsed\": false,\n    \"sourceChanged\": false,\n    \"gatesRun\": false\n  }\n}\n"
+    }
+  ],
+  "permissions": {
+    "source": "current session developer permission profile",
+    "sandboxMode": "danger-full-access",
+    "approvalPolicy": "never",
+    "escalationRequested": false
+  },
+  "workerThreadId": "01a11392-fae1-7862-8968-676841044b15"
+}

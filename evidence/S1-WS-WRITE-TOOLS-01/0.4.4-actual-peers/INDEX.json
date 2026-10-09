@@ -1,0 +1,311 @@
+{
+  "status": "DELIVERED_COMPONENT_SELF_TEST_MATERIALS",
+  "sourceSha": "200096ae4c8871daccaefa1977306d01effcdde4",
+  "files": [
+    {
+      "path": "build.log",
+      "bytes": 354,
+      "sha256": "f01eccc543d9d13e39a82f7c3aa5f1bb02f1c0d955bf9616319456d504bfdf87"
+    },
+    {
+      "path": "cleanup.json",
+      "bytes": 813,
+      "sha256": "5665deafe14567ad337aaadada79e79c1ef1f1ce8a7d8a15dd021d03093ad2de"
+    },
+    {
+      "path": "consumer-install.log",
+      "bytes": 25,
+      "sha256": "4e5375db48f9f92d8c4d44698b9570a479130e18a2a18a5b5d5aa6571a5275d6"
+    },
+    {
+      "path": "development/build.log",
+      "bytes": 354,
+      "sha256": "f01eccc543d9d13e39a82f7c3aa5f1bb02f1c0d955bf9616319456d504bfdf87"
+    },
+    {
+      "path": "development/green.log",
+      "bytes": 13452,
+      "sha256": "f782405a725f10b069dff49b65f5ee76715aa4cffb6d51083940ecac3eb5798b"
+    },
+    {
+      "path": "development/local-normal.log",
+      "bytes": 238,
+      "sha256": "6267154dfcabc7f3a8a76f803fac85d4e37450f9c297114f3461d268ffdcff6c"
+    },
+    {
+      "path": "development/npm-ci.log",
+      "bytes": 236,
+      "sha256": "cb6c7c7d39649ad89f951adbcf9d849ccd2a7183f93520dc12086736201246eb"
+    },
+    {
+      "path": "development/red.log",
+      "bytes": 3098,
+      "sha256": "0eb154c76f66a7b692c807d0ed1d61c0d4ecc8155f264fdefc6e198854e70618"
+    },
+    {
+      "path": "gate.stdout.log",
+      "bytes": 95,
+      "sha256": "2133dc08e6fade87eecb7842f3e1c24f4491f50af3588dfec572bd364cac7f5c"
+    },
+    {
+      "path": "hanaworlds-workshop-0.4.4.tgz",
+      "bytes": 32686,
+      "sha256": "d33b9561d889f6deb9f8f73dc643c92de0c3603f9c9d2649670baead0fa2daf2"
+    },
+    {
+      "path": "input-identity.json",
+      "bytes": 1016,
+      "sha256": "1bc60de32316f42f1f45a9e43fd61e666dfe807733eed71cde332146f9f468af"
+    },
+    {
+      "path": "native-gate-events.jsonl",
+      "bytes": 31811,
+      "sha256": "2de133f0dd8149d35ca77c17dc29d579c453819bb6a1e1208fa3d332d470b566"
+    },
+    {
+      "path": "native-gate-source.json",
+      "bytes": 399,
+      "sha256": "1684c8f5729d6d098fbdc525805d626d9285c235f48b8788bcf819899c6121cb"
+    },
+    {
+      "path": "npm-ci.log",
+      "bytes": 236,
+      "sha256": "cb6c7c7d39649ad89f951adbcf9d849ccd2a7183f93520dc12086736201246eb"
+    },
+    {
+      "path": "pack.json",
+      "bytes": 1460,
+      "sha256": "43f7d431d6a5fb0f2e6ad1473795add9a2d751da3c61e4a3dad1252f20f2f373"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 80397,
+      "sha256": "b601a6c14ef08848b8687e7c340ce4bd7b02d26c3a99f6749d9e0fa42293ef46"
+    },
+    {
+      "path": "package.json",
+      "bytes": 905,
+      "sha256": "d980815017b1e52500ab0a0a0518e29c063622fc9e2518f47a7cdda8a9a11937"
+    },
+    {
+      "path": "packed-actual.log",
+      "bytes": 12879,
+      "sha256": "368d523dea55dc4b800583dec3ec3af5151609b98e84db00f950c04b55f6ea16"
+    },
+    {
+      "path": "packed-related-fixture.log",
+      "bytes": 13585,
+      "sha256": "5d2197ba82537b3cdd933a0925328410eb4bcc97f2e7a8dd9044095ca5017ca4"
+    },
+    {
+      "path": "packed-runtime/canvas-durable-after-undo/canvas-v5.json",
+      "bytes": 23935,
+      "sha256": "8064af03a86aa336b147ffac3ed699acaac96f070763eb12c20e1dde838deb8c"
+    },
+    {
+      "path": "packed-runtime/canvas-durable-before-undo/canvas-v5.json",
+      "bytes": 14908,
+      "sha256": "7aeb348ee22ab8d719e26ab5f4e65e0b8356dac52e97c040d90897fe291c7402"
+    },
+    {
+      "path": "packed-runtime/durable-runtime/canvas/canvas-v5.json",
+      "bytes": 23935,
+      "sha256": "8064af03a86aa336b147ffac3ed699acaac96f070763eb12c20e1dde838deb8c"
+    },
+    {
+      "path": "packed-runtime/durable-runtime/core/--actual-peer-fixture--/s1/session.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "packed-runtime/durable-runtime/core/--actual-peer-fixture--/s1/session.v4.jsonl",
+      "bytes": 2016,
+      "sha256": "ea700ce996abd7be2b13ffc8cd383174cab7ad86124dbb44adb864fd585fc26d"
+    },
+    {
+      "path": "packed-runtime/durable-runtime/media/attachments/v1/objects/ff/ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+      "bytes": 96,
+      "sha256": "ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3"
+    },
+    {
+      "path": "packed-runtime/durable-runtime/projection/hanaworlds_workshop.json",
+      "bytes": 73567,
+      "sha256": "64523a52e7eed60222dafc37247c9675754eb04da034e74302d4d47c4c9a7a2f"
+    },
+    {
+      "path": "packed-runtime/last-adapter-trace.json",
+      "bytes": 22531,
+      "sha256": "953632fd88e9cfb0e7b432be28bdc15809366bd8e745ef0c1c9c7effdb5a5a33"
+    },
+    {
+      "path": "packed-runtime/public-canvas-trace.json",
+      "bytes": 77183,
+      "sha256": "c9061dd7f219f6ef8aa93822e6e63e59934120a829bdb7774c88aa8443cbd945"
+    },
+    {
+      "path": "packed-runtime/workshop-durable-after-undo/hanaworlds_workshop.json",
+      "bytes": 73567,
+      "sha256": "64523a52e7eed60222dafc37247c9675754eb04da034e74302d4d47c4c9a7a2f"
+    },
+    {
+      "path": "packed-runtime/workshop-durable-before-undo/hanaworlds_workshop.json",
+      "bytes": 69620,
+      "sha256": "c1fd56a5aa22045dcde4f7e7327bfc414091ac8745fb578cd004c8825fb78d01"
+    },
+    {
+      "path": "packed-runtime/world-fixture-after.json",
+      "bytes": 494,
+      "sha256": "984ebc18b59ecf29792641f53e49de92b80f95beb01238f5c73d7d72711bc591"
+    },
+    {
+      "path": "packed-undo-correlation.json",
+      "bytes": 4288,
+      "sha256": "5a3f0811eb4bbd6c3ade349c4a2b38e034d4dd0ad57e6a43d57092f7803d3b46"
+    },
+    {
+      "path": "public-canvas-input/GADGET.md",
+      "bytes": 9208,
+      "sha256": "21a225a5d775948e630a0e1e90d77845791b8116467ae940b3eafa3701df0723"
+    },
+    {
+      "path": "public-canvas-input/README.md",
+      "bytes": 9125,
+      "sha256": "934aff5ed3591cfbc41bce472ebc66d91631dff756c7097785cdd3758db26a17"
+    },
+    {
+      "path": "public-canvas-input/examples/native-facts-consumer.mjs",
+      "bytes": 1633,
+      "sha256": "65976f53a55cadb1dae995133a52932b8ad719285a551e6e1cc5560be32d78c3"
+    },
+    {
+      "path": "public-canvas-input/fixtures/native-facts-scoped-state.json",
+      "bytes": 522,
+      "sha256": "7780c64077218111bc1ba4f5669a83b03f8cfe8f1368ace6f71c68812a9f8b69"
+    },
+    {
+      "path": "public-canvas-input/fixtures/native-facts-scoped-state.schema.json",
+      "bytes": 3760,
+      "sha256": "c2e3a2ab42fa023c218af6377c22d95f7a530a3b6e007619bc091aee93c65df9"
+    },
+    {
+      "path": "public-canvas-input/fixtures/native-facts-scoped-state.source.json",
+      "bytes": 2233,
+      "sha256": "0c1d5dddf1ba0a020ceefeecd742a28e8455824274c6a52269aae5dcee75ec0e"
+    },
+    {
+      "path": "public-canvas-input/package.json",
+      "bytes": 1999,
+      "sha256": "adb8e912d6259afc6f8263ad5d6e1f49f143ebf6fdca3baf7e6fd469b6061470"
+    },
+    {
+      "path": "public-canvas-input/types/index.d.ts",
+      "bytes": 3338,
+      "sha256": "c20b2c62760b867906bbea76a93dbc071c5fc503b27415499643fa0e0c30f4fd"
+    },
+    {
+      "path": "public-canvas-input/types/native-facts-consumer.d.ts",
+      "bytes": 447,
+      "sha256": "4904a78f3c293912b8666b39c42e9f4f3af2057bc851f154849bde7f72dad2d8"
+    },
+    {
+      "path": "public-canvas-input/types/native-facts.d.ts",
+      "bytes": 547,
+      "sha256": "9857fcaad99104f6732d0ae599d50b14a08cd882ada1ec77033c0fdb571bb44e"
+    },
+    {
+      "path": "receipt.json",
+      "bytes": 4009,
+      "sha256": "2e9466d0db52df21b8a571026027ad919bce7863886cd852a849528ba57cb2d6"
+    },
+    {
+      "path": "runtime.txt",
+      "bytes": 16,
+      "sha256": "99af57870446d3520115ad2ce902c628a3a32c7766c9da2f013ad5649cae8305"
+    },
+    {
+      "path": "source-actual.log",
+      "bytes": 12875,
+      "sha256": "1f989f9cc4a45859d2906c71683f84595f6b062e525642797a00938bf9819902"
+    },
+    {
+      "path": "source-peer-install.log",
+      "bytes": 48,
+      "sha256": "db033d4b583b5c3bd2692cc68c111f967617bff8991883025e2ae976f5fb1c4d"
+    },
+    {
+      "path": "source-related-fixture.log",
+      "bytes": 13585,
+      "sha256": "2d332d66b70837928d7ab3546a59ed4817d302f3c83e88a180bd5c24a7f50c79"
+    },
+    {
+      "path": "source-runtime/canvas-durable-after-undo/canvas-v5.json",
+      "bytes": 23935,
+      "sha256": "96cb7bb5c3b8d90730f1bb6f520a3eaf37b2bfd6805d604991a61e192d079c47"
+    },
+    {
+      "path": "source-runtime/canvas-durable-before-undo/canvas-v5.json",
+      "bytes": 14908,
+      "sha256": "66c8360ac36f6cc2ac954a01ecbc56b79934e63bf5f83df917d20c385f973c99"
+    },
+    {
+      "path": "source-runtime/durable-runtime/canvas/canvas-v5.json",
+      "bytes": 23935,
+      "sha256": "96cb7bb5c3b8d90730f1bb6f520a3eaf37b2bfd6805d604991a61e192d079c47"
+    },
+    {
+      "path": "source-runtime/durable-runtime/core/--actual-peer-fixture--/s1/session.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-runtime/durable-runtime/core/--actual-peer-fixture--/s1/session.v4.jsonl",
+      "bytes": 2016,
+      "sha256": "ddc75ea44e2a69c2f6ddd463ac0c9a9915fdf7f2e3ef7ed7cebd85075e9b6d7b"
+    },
+    {
+      "path": "source-runtime/durable-runtime/media/attachments/v1/objects/ff/ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+      "bytes": 96,
+      "sha256": "ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3"
+    },
+    {
+      "path": "source-runtime/durable-runtime/projection/hanaworlds_workshop.json",
+      "bytes": 73567,
+      "sha256": "48b8b5767f704296412188530300370dd3785937d121805db5861d50b5478364"
+    },
+    {
+      "path": "source-runtime/last-adapter-trace.json",
+      "bytes": 22531,
+      "sha256": "4978ae4699dffcd1a79769f71e342b4e6e040735695643611893c5dfba10a4a8"
+    },
+    {
+      "path": "source-runtime/public-canvas-trace.json",
+      "bytes": 77183,
+      "sha256": "c2c0f9535783eabdbdf73430af71a742c6167acbdeeaf50e6704800944ca05de"
+    },
+    {
+      "path": "source-runtime/workshop-durable-after-undo/hanaworlds_workshop.json",
+      "bytes": 73567,
+      "sha256": "48b8b5767f704296412188530300370dd3785937d121805db5861d50b5478364"
+    },
+    {
+      "path": "source-runtime/workshop-durable-before-undo/hanaworlds_workshop.json",
+      "bytes": 69620,
+      "sha256": "5f482db39aa765c3cc9ad04d67d490a758205549814b16422ea2546c6014fefe"
+    },
+    {
+      "path": "source-runtime/world-fixture-after.json",
+      "bytes": 494,
+      "sha256": "984ebc18b59ecf29792641f53e49de92b80f95beb01238f5c73d7d72711bc591"
+    },
+    {
+      "path": "source-sha.txt",
+      "bytes": 41,
+      "sha256": "341684c171691b668e349d661492fdcaf3aeef10e6cae288bc6f668eb2211915"
+    },
+    {
+      "path": "source-undo-correlation.json",
+      "bytes": 4288,
+      "sha256": "3f61a4e7bffc1dc9dba51f0b963a4f962893a358c1c3b22af6550f6b19bef777"
+    }
+  ]
+}

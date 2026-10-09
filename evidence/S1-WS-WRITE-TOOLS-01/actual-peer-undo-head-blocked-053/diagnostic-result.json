@@ -1,0 +1,52 @@
+{
+  "status": "BLOCKED_WORKSHOP_UNDO_HEAD_CONSUMPTION",
+  "runtimeProbe": {
+    "tests": 1,
+    "pass": 0,
+    "fail": 1,
+    "exit": 1
+  },
+  "formalSourcePackedGate": "NOT_RUN",
+  "buildReceipt": {
+    "contractVersion": "canvas/v5",
+    "transactionId": "build-c517b4d4-19a7-4f8a-a821-23e2bacf234e",
+    "operationDigest": "9de34c13392112526f35d35a532f9b47ba425ababd764457a597615f2681d942",
+    "transactionPayloadDigest": "7cf47424fdfa0a44a99e4d79f4c46a00c178703935f9f0672e480855bf635729",
+    "status": "VERIFIED",
+    "previousWorldRevision": "world-0",
+    "observedWorldRevision": "world-1",
+    "readbackDigest": "4c32a092ec88cce9bc2b9c0043c50687dd9e7180f4dc59e2486c825b2de0810f",
+    "restoreStatus": "NOT_REQUIRED",
+    "error": null,
+    "localContext": {
+      "connectionRef": "local-connection",
+      "connectionIncarnationRef": "socket-open-1",
+      "worldRef": "fixture-world",
+      "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+    }
+  },
+  "undoReceipt": {
+    "contractVersion": "canvas/v5",
+    "transactionId": "undo-ec68ec38-1f0a-4386-9d23-d42056014024",
+    "operationDigest": "b51e1be950db8555ecdf702235afa1189d84af81b773451fff7973932d8d0c63",
+    "transactionPayloadDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "status": "VERIFIED",
+    "previousWorldRevision": "world-1",
+    "observedWorldRevision": "world-2",
+    "readbackDigest": "640d018ec730cb3f7544a9ad7def39fc37b216935b36d926cb2597776b65c0fb",
+    "restoreStatus": "NOT_REQUIRED",
+    "error": null,
+    "localContext": {
+      "connectionRef": "local-connection",
+      "connectionIncarnationRef": "socket-open-1",
+      "worldRef": "fixture-world",
+      "selectionRevision": "selection-ba54ad0d-602e-404c-96b1-ce33f6e99b03"
+    }
+  },
+  "headExpectedByWorkshop": null,
+  "actualHead": "undo-ec68ec38-1f0a-4386-9d23-d42056014024",
+  "failedPredicates": [
+    "workshopExpectedAfterHead"
+  ],
+  "currentRoute": "harness only; Workshop production expected head differs from actual public Canvas"
+}

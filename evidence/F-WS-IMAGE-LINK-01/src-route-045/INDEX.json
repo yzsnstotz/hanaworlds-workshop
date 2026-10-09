@@ -1,0 +1,72 @@
+[
+  {
+    "file": "build.log",
+    "bytes": 501,
+    "sha256": "36f2124270fc21e2eafcc7ae39267eb9b8ef9aa6f66c406d7413e4ce259acac9"
+  },
+  {
+    "file": "client-final.log",
+    "bytes": 432,
+    "sha256": "dc6cbaf0bf6aeac88d84f0cf0fda70e58ab7e6051af5c556d59dd129ed678c8e"
+  },
+  {
+    "file": "client-green.log",
+    "bytes": 432,
+    "sha256": "ab1102444abf739764b1f769758b3018693f0fc63b54c0f3cd8e9cb5a496969b"
+  },
+  {
+    "file": "client-red.log",
+    "bytes": 3249,
+    "sha256": "6496379470cd77c6b16f0ceafb5d9ed2d689bbbbff0598a72fac059886e64a57"
+  },
+  {
+    "file": "consumer-install.log",
+    "bytes": 25,
+    "sha256": "4a600d9cbce84b137bcd0437c2244cea2c483df7c43a3948cef31514acb9d2c5"
+  },
+  {
+    "file": "hanaworlds-workshop-0.4.5.tgz",
+    "bytes": 38181,
+    "sha256": "affddfc6b058015d94094c42046b30107fdd3492e93a879b52b2f7044d03c068"
+  },
+  {
+    "file": "native-events.json",
+    "bytes": 19009,
+    "sha256": "b1c282bfe7560d92d7f3a3faeb17a9c3d67f6942a6273cdb9ba2e6dc5a35352d"
+  },
+  {
+    "file": "pack.json",
+    "bytes": 1654,
+    "sha256": "afcc3493f24f74ab2b57002d7e6c1add656d2a51c50289f135bba1e9924502fb"
+  },
+  {
+    "file": "packed-panel.log",
+    "bytes": 1235,
+    "sha256": "89ae20001cb4eea76cf8489a4fcec64cd74ddbc8ff80f460187ffedea9e24ac0"
+  },
+  {
+    "file": "receipt.json",
+    "bytes": 2453,
+    "sha256": "587fff18b8d743e59aca20d49cd2a177f4d116ce0b6bf5a3ef07a584da0d5c1f"
+  },
+  {
+    "file": "source-final.log",
+    "bytes": 1238,
+    "sha256": "80cd9f2b6574e6db3db0dd9fa4bb078675e18cc3ffe3c8cb7ea634c8c23ed150"
+  },
+  {
+    "file": "source-panel.log",
+    "bytes": 740,
+    "sha256": "a5d9e700ffd9014d5373c1c8c5a455e69c1f6fec0ab03894feef313c89bca901"
+  },
+  {
+    "file": "src-gateway-01.log",
+    "bytes": 609,
+    "sha256": "965e6f116777a4ef8e2bb31cb86c1157632bc8a1d5995475fa1c2e47e5bb9fc7"
+  },
+  {
+    "file": "stopped-strict-build-panel.mjs",
+    "bytes": 1300,
+    "sha256": "62b8e8b7c012a154f70cf02d11eff08cfaaa05b9c3c1532b4936b825c753db55"
+  }
+]

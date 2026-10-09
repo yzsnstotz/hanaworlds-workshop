@@ -1,0 +1,166 @@
+{
+  "status": "BLOCKED",
+  "checkpoint": "14497c865edd44096a038436ef8a653a929d4d0e",
+  "files": [
+    {
+      "path": "actual-peer-runtime.test.mjs",
+      "bytes": 17854,
+      "sha256": "98087058c39129a177a902f0c3bc5c59fd1ea651428ddf32db3bfa273e1688f5"
+    },
+    {
+      "path": "attempt-history/dev-1/probe.log",
+      "bytes": 1345,
+      "sha256": "5622a99c252317f86b8ff53079e18c09238029d9667d14eeb403ebbd5e15b0f0"
+    },
+    {
+      "path": "attempt-history/dev-2/last-adapter-trace.json",
+      "bytes": 659,
+      "sha256": "56948783d58c1c3176d566ff8b65c9b0f5df4a3a15c4e237c1db3a7b2abf02a5"
+    },
+    {
+      "path": "attempt-history/dev-2/probe.log",
+      "bytes": 1489,
+      "sha256": "05e6f060b90f6a37b4088f1ce28c0b620fdb7cb221a50454e0c9b2893fbd46ba"
+    },
+    {
+      "path": "attempt-history/dev-3/last-adapter-trace.json",
+      "bytes": 1895,
+      "sha256": "975cf00553cb9e62523edfeb2bf2bb9e58122b76d901391b89f4848af3dac176"
+    },
+    {
+      "path": "attempt-history/dev-3/probe.log",
+      "bytes": 2287,
+      "sha256": "9a981296ee4fa2929214fadb97cfb42a1326e259360936c06615b5afba3f2354"
+    },
+    {
+      "path": "attempt-history/dev-4/last-adapter-trace.json",
+      "bytes": 2690,
+      "sha256": "7454eaa7972c4c7e4a07d28efa8e5130f43f1d93ae187b7ad676bd2fc22ede22"
+    },
+    {
+      "path": "attempt-history/dev-4/probe.log",
+      "bytes": 2557,
+      "sha256": "ca94647096d901130f231b8a0d87102905d4921157968a1025dc7a82c24d9f87"
+    },
+    {
+      "path": "attempt-history/dev-5/last-adapter-trace.json",
+      "bytes": 2768,
+      "sha256": "24cd0e6fbc5ecb62408b5e2ce699309a59b1d4d11d6652c48ae35fb109416a60"
+    },
+    {
+      "path": "attempt-history/dev-5/probe.log",
+      "bytes": 2554,
+      "sha256": "7a6ed22b5ddc975b77bccc9fbbc3de9f3a5fa3a3ffe1d3e09d4c2ee529e95092"
+    },
+    {
+      "path": "attempt-history/dev-6/last-adapter-trace.json",
+      "bytes": 2789,
+      "sha256": "ce20c7a416b2573b5f9082d8973b416a1d69d96038bac6ba2ad68a040155e3e4"
+    },
+    {
+      "path": "attempt-history/dev-6/probe.log",
+      "bytes": 2556,
+      "sha256": "f16fd67c7d1b9a81e4ad52fedd6efa68dd38528f41e1c45d5542f1b36c2e57f7"
+    },
+    {
+      "path": "attempt-history/dev-7/last-adapter-trace.json",
+      "bytes": 2789,
+      "sha256": "3e19f1ce48fb4866911009f6faa4a26c9a29e1dde92fd51df06a265111446494"
+    },
+    {
+      "path": "attempt-history/dev-7/probe.log",
+      "bytes": 2555,
+      "sha256": "09bf65d8e18ab9d9bfdcf081ec906dde49276748a7ebe73adc2d4923a52f7f7f"
+    },
+    {
+      "path": "cleanup.json",
+      "bytes": 989,
+      "sha256": "b672e2a5fbb49b70f9d2b307ac7c51c9d6295e8b403c96164b6419ea4750ff48"
+    },
+    {
+      "path": "diagnostic-result.json",
+      "bytes": 1657,
+      "sha256": "4c8a73e1137a4be74029640912c06e49f8ac1de072c1c47ea640a12824a3c3a5"
+    },
+    {
+      "path": "input-identity.json",
+      "bytes": 1368,
+      "sha256": "466a511009169154f7901a46f6d1b477518990ebc25ff4eeb6a9de4c6ab18729"
+    },
+    {
+      "path": "install.log",
+      "bytes": 237,
+      "sha256": "53cf785ce05a183a92dfab1caec435e560d1c9469c841d3328b63d6fb2223ded"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 80395,
+      "sha256": "be9fbbeb554d07230f9fb63044cc826a2d27752ee27e0be36f20ca6a75b9b1cf"
+    },
+    {
+      "path": "package.json",
+      "bytes": 904,
+      "sha256": "fad38d3e03108908a5160535e97a69f0e474abc1ce9b15d4ab272b380e43cc58"
+    },
+    {
+      "path": "probe-actual-peers.sh",
+      "bytes": 2855,
+      "sha256": "7f13e2f37f441368ae4ede80aee7af1c2ad411d570a8dc353823b3b53f88cd52"
+    },
+    {
+      "path": "public-docs/brush/GADGET.md",
+      "bytes": 5714,
+      "sha256": "db00d62251cf73620597b93073e604e5e64a33f1b10af56586143e75dcac758a"
+    },
+    {
+      "path": "public-docs/brush/README.md",
+      "bytes": 1982,
+      "sha256": "f27835bb4fb3f1cc020ad2ee4243496608659b2922b447a64f7a4b081b7d6614"
+    },
+    {
+      "path": "public-docs/brush/package.json",
+      "bytes": 2052,
+      "sha256": "89631695b0e91d9dc6933f1b8585975dc7d9b76fa224fe626b5449c810a13cfc"
+    },
+    {
+      "path": "public-docs/brush/types/index.d.mts",
+      "bytes": 3001,
+      "sha256": "1021a0aeb85cd2a2345db4a242100a219cd6a05c4175707ed206b56832fed9ba"
+    },
+    {
+      "path": "public-docs/canvas/GADGET.md",
+      "bytes": 8311,
+      "sha256": "06dc3dd1f884c60dc0e25cdc6a8625b7148e520b49835d3738f234cde6babe9c"
+    },
+    {
+      "path": "public-docs/canvas/README.md",
+      "bytes": 3462,
+      "sha256": "6d9719812e6910d1cd13f26992dbabb7ac4dee793992a44e1d1421e69d2e34f0"
+    },
+    {
+      "path": "public-docs/canvas/package.json",
+      "bytes": 1364,
+      "sha256": "4c3c966b73a25d5a84d089b03af5b56427de4505b79392dc2aa3be22c8fdec07"
+    },
+    {
+      "path": "public-docs/canvas/types/index.d.ts",
+      "bytes": 3186,
+      "sha256": "c24f6bd6e58077ee59334eaf90ac8dc324ab999f5993c1f8c4547fff0feff2be"
+    },
+    {
+      "path": "public-docs/painter/GADGET.md",
+      "bytes": 13886,
+      "sha256": "4e209e9b3b8fb36408b1b3504085b4150d47aa4fc7743dd9040bb71d01eaf588"
+    },
+    {
+      "path": "public-docs/painter/README.md",
+      "bytes": 1099,
+      "sha256": "8469ad5794318bc3829a3c1ca36ddb6543c4e26eaf7e6cc80dfe978738729d32"
+    },
+    {
+      "path": "public-docs/painter/package.json",
+      "bytes": 1633,
+      "sha256": "fe34a848e9bd5bc8117996c019966a2b9be77bd1c3f7ecdd87fd358e6123374d"
+    }
+  ]
+}

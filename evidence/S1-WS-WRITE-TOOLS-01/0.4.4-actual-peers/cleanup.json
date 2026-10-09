@@ -1,0 +1,18 @@
+{
+  "deleted": [
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/node_modules",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/undo-head-044-npm-cache",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/undo-head-044-red-runtime",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/undo-head-044-green-runtime",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/undo-head-044-local-runtime"
+  ],
+  "gateScratch": "EXIT trap removed runtime.AwcNk2 and its source/consumer node_modules/cache/runtime",
+  "retained": [
+    "source",
+    "new latest 0.4.4 tar",
+    "all historical and fixed input tar under E",
+    "all prior E",
+    "complete before/after Canvas/Workshop/Core/media/profile/rollback evidence"
+  ],
+  "scope": "own card only"
+}

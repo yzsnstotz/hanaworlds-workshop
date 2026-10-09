@@ -1,0 +1,32 @@
+✖ K3 per-cell: Brush on another contracts patch/hash (same BUILD major + capability) builds and undoes (838.178625ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 947.394541
+
+✖ failing tests:
+
+test at test/write-tools.test.mjs:302:1
+✖ K3 per-cell: Brush on another contracts patch/hash (same BUILD major + capability) builds and undoes (838.178625ms)
+  AssertionError [ERR_ASSERTION]: {"method":"PER_CELL","available":false,"unmet":[{"code":"UNSUPPORTED_VERSION","need":"Brush advertising BUILD/V3 on hanaworlds-contracts@0.5.0","remedy":"Install a Brush build on the same contracts package."}]}
+  
+  false !== true
+  
+      at file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/final-042/runtime.D91xXJ/old/test/write-tools.test.mjs:264:10
+      at async withRuntime (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/final-042/runtime.D91xXJ/old/test/write-tools.test.mjs:67:7)
+      at async perCellFlow (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/final-042/runtime.D91xXJ/old/test/write-tools.test.mjs:261:2)
+      at async TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/_evidence/final-042/runtime.D91xXJ/old/test/write-tools.test.mjs:304:2)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+baseline exit 1

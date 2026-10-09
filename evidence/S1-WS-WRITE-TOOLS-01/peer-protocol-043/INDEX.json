@@ -1,0 +1,76 @@
+{
+  "artifactBaseline": "947231b92488e2c38c29977d11ad3135f0df7117",
+  "result": "BLOCKED_PUBLIC_CANVAS_V5_PROTOCOL_UNADVERTISED",
+  "files": [
+    {
+      "path": "cleanup.json",
+      "bytes": 271,
+      "sha256": "bcec9e743b554492b3d05ecf5c45c10dc57124d96e79d8955b23928c1a83e264"
+    },
+    {
+      "path": "diagnostic-notes.json",
+      "bytes": 459,
+      "sha256": "16d517bd8bf119d19f1078f52bba53154cc5d024d558371ffdde67cfd633cac6"
+    },
+    {
+      "path": "hanaworlds-building-exterior-painter-GADGET.md",
+      "bytes": 13886,
+      "sha256": "4e209e9b3b8fb36408b1b3504085b4150d47aa4fc7743dd9040bb71d01eaf588"
+    },
+    {
+      "path": "hanaworlds-building-exterior-painter-README.md",
+      "bytes": 1099,
+      "sha256": "8469ad5794318bc3829a3c1ca36ddb6543c4e26eaf7e6cc80dfe978738729d32"
+    },
+    {
+      "path": "hanaworlds-canvas-GADGET.md",
+      "bytes": 7693,
+      "sha256": "5fbad6ee964a95141a0a0f4f35254a4d42adbb2d696e9d5975508dd8ebedc7d0"
+    },
+    {
+      "path": "hanaworlds-canvas-README.md",
+      "bytes": 826,
+      "sha256": "aa2c6b865a53939b3902fbdde5ebd9361f089a3ab6e7ce7c49ec10db87574053"
+    },
+    {
+      "path": "input-identity.json",
+      "bytes": 2419,
+      "sha256": "31158b953c1c3e6f9d72ade9a625f59aa70144d41aebac0db6fa0f2fe32f66dd"
+    },
+    {
+      "path": "install.log",
+      "bytes": 237,
+      "sha256": "c6bc4902764b5fab0642c5c7f721857bb49f83b55527859e317cc70ebdeaab36"
+    },
+    {
+      "path": "native-output.txt",
+      "bytes": 35,
+      "sha256": "90fefae23115886429b1452bb8a07b927af14d0b10bb74961eb43f281f203638"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 42079,
+      "sha256": "889552fb6d87281286dd7d745e0efbd0e7ef135a1a0d0bbfa1c9b9c35d4222de"
+    },
+    {
+      "path": "package.json",
+      "bytes": 674,
+      "sha256": "27dbe79c16cab7dacff0b11d20e2c02fd5c7e25b9bbf334bb1746886c2ae64c9"
+    },
+    {
+      "path": "peer-admission.mjs",
+      "bytes": 3686,
+      "sha256": "1375d8666b8813a5292ca2ce41746f29e70d873ebefea0711b85e9b997a8b7c9"
+    },
+    {
+      "path": "public-admission.json",
+      "bytes": 8522,
+      "sha256": "dd2804e015863adf34785b8ea2406cff2224c75afb5eb347405d098e8f1d4c9a"
+    },
+    {
+      "path": "public-admission.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

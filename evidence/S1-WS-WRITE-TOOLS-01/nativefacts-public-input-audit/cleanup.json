@@ -1,0 +1,5 @@
+{
+  "deleted": "none; this route made no installs/cache/runtime/build",
+  "retained": "own source and all prior/current E, fixed packages, public docs/profile/world/rollback",
+  "noBroadCleanup": true
+}

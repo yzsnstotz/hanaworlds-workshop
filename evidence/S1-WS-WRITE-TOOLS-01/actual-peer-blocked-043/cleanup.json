@@ -1,0 +1,15 @@
+{
+  "removed": [
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peers-043/node_modules",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-peer-npm-cache",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-runtime-dev-2",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-runtime-dev-3",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-runtime-dev-4",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-runtime-dev-5",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-runtime-dev-6",
+    "/Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/actual-runtime-dev-7"
+  ],
+  "perAttempt": "test finally removes its own temporary profile/runtime; empty parent directories now removed",
+  "preserved": "all source, public docs/lock/scripts, fixed tar inputs, all prior E/profile/world/rollback, partial traces and logs",
+  "outsideCardCleanup": false
+}

@@ -1,0 +1,5 @@
+
+> hanaworlds-workshop@0.4.4 build
+> node scripts/verify-vendored-contracts.mjs && node --check src/index.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/write-tools.mjs
+
+{"source":"6185622e977ef5136e9ef12219e0ba89dbba29db","pack":"e6c50766ffc821ca90e07c38f473456952ef650e8a321f676dc44ce7d7d72209","files":25}

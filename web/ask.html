@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Workshop · 附图提问</title><link rel="stylesheet" href="/ask.css"></head>
+<body><main>
+ <header><span class="brand">HanaWorlds <b>Workshop</b></span><span class="local" id="local-port">本机开发网页</span></header>
+ <aside class="fixture" id="fixture" role="note"><strong>FIXTURE 模型 · 不是真实模型，不会真正看图</strong>
+  <p>对话走官方 AgentLoop；图片字节真实进入模型回合。默认对话用醒目标注的 FIXTURE 模型回答；真实模型要先在下方「真实模型登录」登录后，新建对话时选它。会话是本页独立会话，不是 HanaWorlds App 的当前对话。本页不写世界。</p><p class="mono" id="fixture-model">连接中…</p></aside>
+ <section class="card auth" id="auth-card"><h2><span>00</span> 真实模型登录（可选）</h2>
+  <p class="route"><b id="auth-route">连接中…</b> · <span id="auth-status" class="tag">—</span></p>
+  <p class="hint" id="auth-cost"></p><p class="hint" id="auth-storage"></p>
+  <div class="row"><button id="auth-begin" class="secondary" disabled>登录 ChatGPT</button><button id="auth-cancel" class="ghost" disabled>取消登录</button><button id="auth-signout" class="ghost" disabled>退出登录</button></div>
+  <ul id="auth-notices"></ul>
+  <p class="hint" id="auth-waiting" hidden></p>
+  <form id="auth-prompt-form" hidden><label for="auth-answer" id="auth-prompt-label"></label><input id="auth-answer" autocomplete="off"><select id="auth-select" hidden></select><button id="auth-submit">提交</button></form>
+  <p id="auth-error" role="alert" hidden></p></section>
+ <section class="bar"><label for="conversation">对话</label><select id="conversation"></select><span id="conv-model" class="tag model"></span><label for="model">新对话模型</label><select id="model"></select><button id="new" class="secondary">＋ 新对话</button><span id="conv-state" class="tag"></span></section>
+ <div class="workspace">
+  <section class="card"><h2><span>01</span> 附图</h2>
+   <form id="upload-form"><label for="file">本机图片（PNG / JPEG / WebP / GIF）</label><input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><button id="upload" disabled>附加本机图片</button></form>
+   <form id="link-form"><label for="url">或贴图片链接（HTTP / HTTPS 直达图片）</label><input id="url" type="url" spellcheck="false" autocomplete="off" placeholder="https://…/picture.png"><div class="row"><button id="link" disabled>下载并附加链接</button><button type="button" id="sample" class="ghost">填入示例 PNG（FIXTURE，2×2）</button></div></form>
+   <p id="limits" class="hint"></p>
+   <div id="attachments"></div>
+  </section>
+  <section class="card"><h2><span>02</span> 提交给当前对话的模型</h2>
+   <div id="chat" aria-live="polite"><p class="empty">附一张图，再提问。模型回答会显示在这里。</p></div>
+   <form id="ask-form"><label for="question">问题</label><textarea id="question" rows="2">描述这张图片里的建筑结构</textarea><button id="ask" disabled>提交给模型</button></form>
+  </section>
+ </div>
+ <p id="status" role="status">正在连接…</p><p id="error" role="alert" hidden></p>
+ <footer>Workshop 附图提问开发入口 · 图片描述阶段只开放只读图片工具，不写世界</footer>
+</main><script type="module" src="/ask.mjs"></script></body></html>

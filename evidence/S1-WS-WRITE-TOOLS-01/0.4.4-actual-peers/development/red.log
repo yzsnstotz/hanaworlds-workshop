@@ -1,0 +1,63 @@
+✖ PER_CELL chain on 0.5.2: image brief → Painter → Brush → Canvas → same build Undo (1008.480708ms)
+✖ Undo history: rejects a head unrelated to its verified Undo receipt (309.081583ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1443.671833
+
+✖ failing tests:
+
+test at test/write-tools.test.mjs:226:1
+✖ PER_CELL chain on 0.5.2: image brief → Painter → Brush → Canvas → same build Undo (1008.480708ms)
+  AssertionError [ERR_ASSERTION]: {"contractVersion":"session/v3","requestId":"undo","result":null,"error":{"code":"READBACK_FAILED","phase":"validate","retryability":"AFTER_NEW_FACTS","mutationState":"UNKNOWN","transactionRef":"undo-3b792723-4fd6-4aa1-a4a6-3ff1bd8f5cb1","causeCode":null,"reason":"REQUIRED_FACT_UNKNOWN"}}
+  + actual - expected
+  
+  + {
+  +   causeCode: null,
+  +   code: 'READBACK_FAILED',
+  +   mutationState: 'UNKNOWN',
+  +   phase: 'validate',
+  +   reason: 'REQUIRED_FACT_UNKNOWN',
+  +   retryability: 'AFTER_NEW_FACTS',
+  +   transactionRef: 'undo-3b792723-4fd6-4aa1-a4a6-3ff1bd8f5cb1'
+  + }
+  - null
+  
+      at call (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:71:81)
+      at async file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:237:14
+      at async withRuntime (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:67:7)
+      at async TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:227:20)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { code: 'READBACK_FAILED', phase: 'validate', retryability: 'AFTER_NEW_FACTS', mutationState: 'UNKNOWN', transactionRef: 'undo-3b792723-4fd6-4aa1-a4a6-3ff1bd8f5cb1', causeCode: null, reason: 'REQUIRED_FACT_UNKNOWN' },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/write-tools.test.mjs:377:1
+✖ Undo history: rejects a head unrelated to its verified Undo receipt (309.081583ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'READBACK_FAILED'
+  
+      at file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:383:10
+      at async withRuntime (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:67:7)
+      at async TestContext.<anonymous> (file:///Users/yzliu/.cache/hanaworlds-runs/S1-WS-WRITE-TOOLS-01/source/test/write-tools.test.mjs:378:39)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:785:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'READBACK_FAILED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

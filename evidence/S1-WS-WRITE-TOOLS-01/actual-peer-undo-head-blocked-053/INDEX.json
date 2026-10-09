@@ -1,0 +1,186 @@
+{
+  "status": "BLOCKED_WORKSHOP_UNDO_HEAD_CONSUMPTION",
+  "harnessSource": "8fec81f",
+  "files": [
+    {
+      "path": "canvas-public-input/GADGET.md",
+      "bytes": 9208,
+      "sha256": "21a225a5d775948e630a0e1e90d77845791b8116467ae940b3eafa3701df0723"
+    },
+    {
+      "path": "canvas-public-input/README.md",
+      "bytes": 9125,
+      "sha256": "934aff5ed3591cfbc41bce472ebc66d91631dff756c7097785cdd3758db26a17"
+    },
+    {
+      "path": "canvas-public-input/examples/native-facts-consumer.mjs",
+      "bytes": 1633,
+      "sha256": "65976f53a55cadb1dae995133a52932b8ad719285a551e6e1cc5560be32d78c3"
+    },
+    {
+      "path": "canvas-public-input/fixtures/native-facts-scoped-state.json",
+      "bytes": 522,
+      "sha256": "7780c64077218111bc1ba4f5669a83b03f8cfe8f1368ace6f71c68812a9f8b69"
+    },
+    {
+      "path": "canvas-public-input/fixtures/native-facts-scoped-state.schema.json",
+      "bytes": 3760,
+      "sha256": "c2e3a2ab42fa023c218af6377c22d95f7a530a3b6e007619bc091aee93c65df9"
+    },
+    {
+      "path": "canvas-public-input/fixtures/native-facts-scoped-state.source.json",
+      "bytes": 2233,
+      "sha256": "0c1d5dddf1ba0a020ceefeecd742a28e8455824274c6a52269aae5dcee75ec0e"
+    },
+    {
+      "path": "canvas-public-input/package.json",
+      "bytes": 1999,
+      "sha256": "adb8e912d6259afc6f8263ad5d6e1f49f143ebf6fdca3baf7e6fd469b6061470"
+    },
+    {
+      "path": "canvas-public-input/types/index.d.ts",
+      "bytes": 3338,
+      "sha256": "c20b2c62760b867906bbea76a93dbc071c5fc503b27415499643fa0e0c30f4fd"
+    },
+    {
+      "path": "canvas-public-input/types/native-facts-consumer.d.ts",
+      "bytes": 447,
+      "sha256": "4904a78f3c293912b8666b39c42e9f4f3af2057bc851f154849bde7f72dad2d8"
+    },
+    {
+      "path": "canvas-public-input/types/native-facts.d.ts",
+      "bytes": 547,
+      "sha256": "9857fcaad99104f6732d0ae599d50b14a08cd882ada1ec77033c0fdb571bb44e"
+    },
+    {
+      "path": "cleanup.json",
+      "bytes": 814,
+      "sha256": "3048c7aa090ee37d33b012a5520ec6845e51a0eca733cd666ead6bdec9fcdc15"
+    },
+    {
+      "path": "dev-1-trace/last-adapter-trace.json",
+      "bytes": 6321,
+      "sha256": "1323c926f4d7b4bf93b0d4ecc2e86e6476c5857256312fd2824c47551a2e622f"
+    },
+    {
+      "path": "dev-1.log",
+      "bytes": 2560,
+      "sha256": "a86eefadfd4cb3e5c5034ef3603633a68e554092e58bea43ce316dd5082a2837"
+    },
+    {
+      "path": "dev-2-trace/last-adapter-trace.json",
+      "bytes": 16069,
+      "sha256": "c50e20106dda8942281dcf3ab5c0f9c451b775c52360e92a778f0d4ce4fd6a42"
+    },
+    {
+      "path": "dev-2.log",
+      "bytes": 5161,
+      "sha256": "dbddc6cbeecbdea3fb1154f72c1c569ba8369aed899984982fa7531509c880ae"
+    },
+    {
+      "path": "dev-3-trace/last-adapter-trace.json",
+      "bytes": 22531,
+      "sha256": "3b1af757711956ef7d57580a90fa39f4eb41471bf93a023a2141f3959b365537"
+    },
+    {
+      "path": "dev-3.log",
+      "bytes": 2744,
+      "sha256": "6cfdd1d9461a62499f4f437ead5b5c23c80fb55112fc17c35d07a0ad25ec28b5"
+    },
+    {
+      "path": "dev-4.log",
+      "bytes": 2744,
+      "sha256": "dc4df4b434de62cc55d03b13d3a8cacc4ac259ce9f59decd183c21aebd63437f"
+    },
+    {
+      "path": "diagnostic-result.json",
+      "bytes": 2046,
+      "sha256": "d427d0dab9bda1de8d1e0419767798666af0a3cd6369c4a8bb2097d05389dcc9"
+    },
+    {
+      "path": "harness/scripts/analyse-actual-undo.mjs",
+      "bytes": 2104,
+      "sha256": "f7b55598634c53816f9b071e699dbd1c727afcbe97c5a2a436d18ec807f0981a"
+    },
+    {
+      "path": "harness/scripts/probe-actual-peers.sh",
+      "bytes": 3159,
+      "sha256": "be6d1358eb8313b5308e08d51b524d6694aba7819f8bf256a0cd21ac77f54659"
+    },
+    {
+      "path": "harness/test/actual-peer-runtime.test.mjs",
+      "bytes": 18772,
+      "sha256": "85975188f9276a00599485582321141d61a00871ae16bbc0bb97c9c138156168"
+    },
+    {
+      "path": "harness-verification.txt",
+      "bytes": 328,
+      "sha256": "85e9485bec7d910c292e12d30836f07f1a91b65d386af6bcba0d07b032e6aff2"
+    },
+    {
+      "path": "input-identity.json",
+      "bytes": 1371,
+      "sha256": "d43eee1e617be389e285d29af1cfe637e69526752e5f91688414822f532a3fa8"
+    },
+    {
+      "path": "install.log",
+      "bytes": 237,
+      "sha256": "5ad37199f562ae0ed46199159c87424f2e31109b2b618614f1281a3998d877f4"
+    },
+    {
+      "path": "latest-probe/durable-runtime/canvas/canvas-v5.json",
+      "bytes": 23935,
+      "sha256": "646245c9cf0c076a367310313b8f7f9499331883f4e7b3f056758303b79912eb"
+    },
+    {
+      "path": "latest-probe/durable-runtime/core/--actual-peer-fixture--/s1/session.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "latest-probe/durable-runtime/core/--actual-peer-fixture--/s1/session.v4.jsonl",
+      "bytes": 2016,
+      "sha256": "546cb20a0b952fb21b7413ce07b7b8b811b568d6d8eca04c2eb4dc6698a27136"
+    },
+    {
+      "path": "latest-probe/durable-runtime/media/attachments/v1/objects/ff/ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3",
+      "bytes": 96,
+      "sha256": "ff9f970de8b6a6c692eb9703a7ae2d37db2a0e3bd59fdd260d496cc7924aa6b3"
+    },
+    {
+      "path": "latest-probe/durable-runtime/projection/hanaworlds_workshop.json",
+      "bytes": 72535,
+      "sha256": "c0a35ac510c96df2f8b4b845321049f3a5395714e877e3ba824e9c56e8f846e9"
+    },
+    {
+      "path": "latest-probe/last-adapter-trace.json",
+      "bytes": 22531,
+      "sha256": "f8975e2804cd4c751a47f203203c10201a8d1e5b03023fcea3753b96d30b1150"
+    },
+    {
+      "path": "latest-probe/public-canvas-trace.json",
+      "bytes": 75454,
+      "sha256": "226d8fab81431d9a3c77aed399e161311f0f4d212aacc269d63891dec6191ff8"
+    },
+    {
+      "path": "latest-probe/undo-correlation.json",
+      "bytes": 4251,
+      "sha256": "7567abfb84c10698f56a3e3bd1b74506041e93d98798e0612c38d6cc9aeb1c87"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 80391,
+      "sha256": "8a6ac7316bf0fd58f41d28fa5021c5bdad09a73a42911b3459ae2a04b39200d3"
+    },
+    {
+      "path": "package.json",
+      "bytes": 902,
+      "sha256": "70b57e8a2875c4f8e237ee2cb2c047ae565b91da050791492865df964d9237a9"
+    },
+    {
+      "path": "workshop-source-packed-byte-identity.json",
+      "bytes": 1621,
+      "sha256": "4a77e62efa17917716684601de133bc4a9aedc4c0d28a0caabe3bacfa4ba4e10"
+    }
+  ]
+}
