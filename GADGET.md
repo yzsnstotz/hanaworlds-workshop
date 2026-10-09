@@ -1,6 +1,6 @@
 # Workshop 0.5.0 — local-world skill business component
 
-Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.0.0-rc.3` (contracts v1.0.0 candidate; after the formal v1.0.0 only the range and lock change to `^1.0.0`) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
+Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.0.0-rc.4` (contracts v1.0.0 candidate; after the formal v1.0.0 only the range and lock change to `^1.0.0`) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
 ## Session identity and deletion
 
@@ -88,6 +88,15 @@ public `guardRefusal {guard, stage, finding}` and `applyFailure` next to the err
 in Workshop's REGION envelope, so the skill can name the cause (for example a
 protected cell) instead of only an error code. Per-cell receipts reach the skill
 unchanged inside `BuildEntryOutcome` with the same two fields.
+
+Guard relay (contracts v1 rc.4): session/v4 `AdvanceCurrentBuild`, `UndoCurrentBuild`
+and `RecoverPendingUndo` responses carry `guardRefusal` (null normally). When a
+Canvas envelope (ApplyRecoverableCommit, Undo, InspectPlacementRegion …) refuses
+with a guard refusal, Workshop relays that refusal and the exact public error it
+explains to the Host and skill, unchanged and durable on replay. `hanaworlds_context`
+read names an inspection refusal (guard, stage, finding) for the skill. Peer public
+errors are relayed as is in session responses (previously a plain relayed peer
+error was reported as SCHEMA_INVALID/decode).
 
 ## One native image-link tool (S1-WS-IMAGE-ATTACHMENT-01)
 

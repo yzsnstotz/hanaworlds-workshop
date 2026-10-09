@@ -27,8 +27,9 @@ async function setup(fn){
  await ctx.plugin(StorageDomain,{backend:'json'}).await();await ctx.plugin(Attachments,{dshHome:join(root,'media')}).await();await ctx.plugin(SystemPrompt).await();await ctx.plugin(Tools).await();
  ctx.provide('hanaworldsCapabilities',{providerRef:'fixture-host',capabilityRevision:'cap1',worldRef:local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile:{profileVersion:'state-profile/v2',nodeFields:['nodeName','param1','param2'],metadataMode:'exact',inventoryMode:'exact',timerMode:'exact',derivedLightMode:'recompute-with-readback'},sessionDeleteSupported:false,imageMediaTypes:['image/png'],model:null,engineGuards:null});
  ctx.provide('hanaworldsCanvasV5',{contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-canvas',protocols:[{protocol:'canvas',major:6,minor:0}],capabilities:[],provenance:{packageName:'hanaworlds-canvas',packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}},async call(op,q){f.calls.push(op);C.validateBoundRequest('canvas/v6',op,q);
-  const response=result=>({contractVersion:'canvas/v6',requestId:q.requestId,result,error:null});
+  const response=result=>({contractVersion:'canvas/v6',requestId:q.requestId,result,error:null,...(['ApplyRecoverableCommit','Undo','Redo','RecoverPendingUndo','ReadPendingUndoResult','InspectPlacementRegion'].includes(op)?{guardRefusal:null}:{})});
   if(op==='ReadWorldSelectionContext')return response({sessionRef:q.sessionRef,worldRef:q.worldRef,inventory:{capabilityRevision:'cap1',connections:[]},selection:{status:'BOUND',connectionRef:local.connectionRef,context:{currentSession:q.sessionRef,activeWorldRef:local.worldRef,orderedSelectedObjectRefs:[],sessionRevision:'c1',selectionRevision:local.selectionRevision,localContext:clone(local)}}});
+  if(op==='InspectPlacementRegion'&&f.refuse)return {contractVersion:'canvas/v6',requestId:q.requestId,result:null,error:C.guardRefusalError(f.refuse),guardRefusal:clone(f.refuse),unavailableSettings:null};
   if(op==='InspectPlacementRegion')return {...response({outcome:'REGION_INSPECTED',inspection:f.inspection??clone(sample.request.regionInspection)}),unavailableSettings:null};
   f.writes++;throw Error(`context tool must not reach ${op}`);}});
  ctx.provide('hanaworldsCatalogue',{read:async()=>clone(sample.request.catalogue)});
@@ -130,4 +131,11 @@ test('region path: a confirmed entrance requirement is refused by name (painter-
  const turn=(await snapshot(r)).turns.at(-1);
  const out=await r.ws.readWriteProposalContext('REGION',{contractVersion:'session/v4',sessionRef:'s1',requestId:'region-context',worldRef:local.worldRef,expectedTurnRevision:turn.turnRevision,localContext:local}).catch(e=>e);
  assert.equal(out.code,'CAPABILITY_UNAVAILABLE');assert.equal((await r.persisted()).includes('region-context'),false);
+}));
+test('rc.4 read: a Canvas inspection guard refusal (public relay fixture) is named for the skill; no context stored',async()=>setup(async r=>{
+ const c=JSON.parse(await read(new URL(import.meta.resolve('hanaworlds-contracts/fixtures/skill-site-rules')),'utf8')).engineGuards.relay.cases.find(c=>c.refusal.stage==='INSPECT_REGION');
+ await r.bind();await r.append('s1',user('ask','建一个小屋'));await r.tool(prepare);await r.append('s1',user('yes','确认'));await r.tool({action:'confirm'});
+ r.f.refuse=c.refusal;const out=await r.tool({action:'read'});assert.equal(out.isError,true);
+ assert.match(out.text,/CAPABILITY_UNAVAILABLE: engine guard CELL_PROTECTION refused at INSPECT_REGION \(GUARD_UNAVAILABLE\)/);
+ assert.equal((await r.persisted()).includes('"proposal-'),false,'no captured context');
 }));
