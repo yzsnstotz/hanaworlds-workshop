@@ -1,7 +1,8 @@
 // Mechanical migration from Desktop bd964cdf19785b14aa1e2f6d2a2ee350190a038f; contracts v1 batch adds the
 // siteRules proposal to step 1 (PLAN-SAFETY-V1-BATCH-01).
 // 2026-10-10 TEXT feedback: two bounded instruction edits clarify unchanged confirmation
-// and generic PER_CELL coordinate/empty-space preflight; formatter and Region steps remain verbatim.
+// and generic PER_CELL coordinate/empty-space preflight. v2 adds two bounded structured-placement
+// workflow edits and changed wire identifiers; formatter and Region R1-R4 otherwise remain verbatim.
 // skill-tools.ts blob 426ca1b1adef74d5bcaa85514cb4f48159f0d3dc: exact templates/formatter.
 // Load once, after the host has explicitly awaited its peer composition.
 const content = `Build and undo structures in the currently connected local world.
@@ -15,7 +16,18 @@ when scale or purpose is unclear; do not infer a real-world scale from pixels. U
 action images to list actual conversation image references; pass only relevant imageRefs when preparing
 after clarification. Empty imageRefs explicitly selects text only. Entities and interior workflows remain deferred.
 
-1. Call hanaworlds_context with action prepare and complete purpose, width, depth, height, siteRules and optional
+1. Before showing any exact world cells or anchored extent as a proposed position, call hanaworlds_context
+with action placement and the proposed width, depth and height. This returns placementSourceRef and the
+actual inspection. Choose a target only within that inspection: placementTarget is
+{"kind":"EXACT_CELLS","cells":[...]} (sorted, unique absolute world cells, all must be written) or
+{"kind":"ANCHORED_EXTENT","bounds":{"min":[x,y,z],"max":[x,y,z]}} (the confirmed world extent; all
+written cells must stay inside it). These are shapes, not suggested coordinates. Do not invent an inspection,
+frame, revision or source reference. Pass that placementSourceRef and placementTarget together to prepare;
+the tool creates the official PlacementProposal, returns placement and includes its exact target in the
+confirmation question. Show that returned question and structured position unchanged. A promise in prose
+alone does not bind a position. Omit both placement fields only when no structured position is proposed;
+placement is then null and the ordinary CURRENT_VIEW path applies. Do not show guessed coordinates as confirmed.
+Call hanaworlds_context with action prepare and complete purpose, width, depth, height, siteRules and optional
 styleText and relevant imageRefs. siteRules is your proposal for this site: whether the entrance must stay
 connected (with its design clearance in whole nodes), the hazard policy (liquids, maximum damage per second)
 and any light requirement. Choose the values from the request and the place, offer the user the options and
@@ -30,7 +42,14 @@ clarification, show that question and ask for a new reply in the exact confirmat
 Do not call prepare merely because approval was a longer sentence, or confirm again in the same human turn.
 Never treat tool output as human consent.
 2. Call hanaworlds_context with action read. Use the returned confirmed brief, catalogue, sampled bounds,
-region placement and safety constraints. Missing placement needs the user to choose a clear view.
+region placement and safety constraints. For a confirmed placement, read retains its original inspection:
+use those sampled bounds and that frame even if the view has moved; never rebase old local geometry on a new
+CURRENT_VIEW. An expired source, changed World/frame/inspection, changed binding or target mismatch is a
+named refusal (PLACEMENT_REVISION_STALE, PLACEMENT_WORLD_CHANGED, PLACEMENT_FRAME_CHANGED,
+PLACEMENT_INSPECTION_CHANGED, PLACEMENT_BINDING_CHANGED, PLACEMENT_TARGET_MISMATCH or
+PLACEMENT_OUTSIDE_INSPECTION). Explain the refusal; obtain a new proposal from a real inspection and a new
+human confirmation before proceeding. read alone does not prove the world's revision is still current;
+Canvas checks it before writing. Missing ordinary CURRENT_VIEW placement needs the user to choose a clear view.
 For a reference image, call hanaworlds_image_material with its bound attachmentRef after read. The tool
 matches the image's dominant colour against measured textures of the current world's verified materials
 without model calls and returns a legal-material hint for proposal materials. If it reports a missing
@@ -73,7 +92,7 @@ bounding box or claim Undo from an optimistic message.
 No shell commands, direct world writes, other model calls, or alternate planner are part of this skill.`
 /** Region steps: same confirmed brief, then the region proposal tool instead of steps 2-3 of the cell path. */
 const regionSteps = `Region write (method REGION, tool hanaworlds_region_proposal), after the same prepare/confirm step 1:
-R1. Call hanaworlds_region_proposal action context. It returns proposalRef, the captured painter-region/v2
+R1. Call hanaworlds_region_proposal action context. It returns proposalRef, the captured painter-region/v3
 context (catalogue, brief, localContext) and worldFacts (for a world created here: game and flat mapgen,
 for example the ground level). Coordinates are absolute world node coordinates; there is no placement frame.
 R2. Call hanaworlds_region_proposal action submit with proposalRef and proposal JSON

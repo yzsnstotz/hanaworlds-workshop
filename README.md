@@ -1,9 +1,14 @@
 # hanaworlds-workshop
 
-HanaWorlds Stage 1 Workshop 0.5.0 component. See [GADGET.md](GADGET.md)
+HanaWorlds Stage 1 Workshop 0.6.0 component (contracts 2.0.0-rc.1). See [GADGET.md](GADGET.md)
 for its host ports, Session flow, installation and recovery boundary. Product
 composition and human acceptance remain unproven.
 
+
+Structured positions are captured before prepare, displayed for a separate human
+confirmation and retained through Painter and per-cell Canvas binding. Current
+verification is SOURCE/FIXTURE/PACK; the new real placement flow is NOT_RUN.
+The old 47618 runtime is preserved and has not been upgraded. See GADGET.md.
 
 ## Historical public-peer Undo consumption (0.4.4)
 
