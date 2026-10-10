@@ -194,7 +194,7 @@ test('current-build authorization admits a later confirmed turn without reusing 
     let opened = await runtime.workshop.call('StartOrResumeSession', startRequest);
     const turn = await runtime.workshop.call('AppendMultimodalTurn', { ...startRequest, requestId: 'next-text',
       expectedRevision: opened.result.context.sessionRevision, turnRef: 'next-turn', text: '建一块石头', media: [],
-      controls:{placement:null, purpose: null, dimensions: null, entrancePortalRefs: [], styleText: null } });
+      controls:{ purpose: null, dimensions: null, entrancePortalRefs: [], styleText: null } });
     assert.equal(turn.error, null);
     opened = await runtime.workshop.call('StartOrResumeSession', startRequest);
     const writer = await runtime.ctx.sessionPersistence.open('s1', 'write');

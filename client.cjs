@@ -40,7 +40,7 @@ window.__ModuleLoader__.load({
         const response = await invoke('hanaworlds_request', {
           operation: 'workshop', input: { sessionRef, operation,
             payload: { contractVersion: operation === 'InvokeAction' ?
-              'interaction-surface/v4' : 'session/v5', ...payload } },
+              'interaction-surface/v4' : 'session/v4', ...payload } },
         });
         if (!response || response.error || !response.result) {
           const code = response?.error?.code ?? 'INVALID_RESPONSE';
