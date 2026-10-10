@@ -16,8 +16,8 @@ const stateSchema = z.object({
   }).passthrough()),
 }).passthrough();
 export const workshopProjectionDomain = defineDomain({
-  // contracts v2 confirmed placement starts a fresh root; old projections are not migrated.
-  name: 'hanaworlds_workshop_v2', version: 1,
+  // contracts v1.1 optional confirmed placement starts a fresh root; old projections are not migrated.
+  name: 'hanaworlds_workshop_v11', version: 1,
   tables: { sessions: domainTable(z.object({
     coreIdentity: identitySchema, state: stateSchema,
   })) },

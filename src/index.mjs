@@ -9,7 +9,7 @@ import { registerContextTool } from './context-tool.mjs';
 export { prepareImageAsk, IMAGE_ASK_ALLOWED_TOOLS } from './image-ask.mjs';
 import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
 export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
-const VERSION = 'session/v5', CANVAS = 'canvas/v7';
+const VERSION = 'session/v4', CANVAS = 'canvas/v6';
 const copy = structuredClone, revision = () => `rev-${randomUUID()}`;
 const same = (a,b) => C.canonicalJSON(a) === C.canonicalJSON(b);
 // Cordis supplies a new caller-context proxy per get; compare its public origin.
@@ -21,7 +21,7 @@ const placementFail = name => {const f=C.confirmedPlacement.namedFailures.find(f
 const explainPlacement = error => {const f=placementFailure(error);if(f)error.message=`${f.failure}: ${f.code}/${f.reason}. ${C.confirmedPlacement.remedy}`;return error;};
 const packet = (wire,id,result,error=null) => ({contractVersion:wire,requestId:id,result,error});
 const pub = error => error?.publicError ?? C.publicError(error);
-// session/v5 build responses carry the engine guard refusal (contracts v1 rc.4): null normally; a refusal
+// session/v4 build responses carry the engine guard refusal (contracts v1 rc.4): null normally; a refusal
 // relayed by Canvas travels up unchanged with the error it explains, for the Host and the skill.
 const GUARDED = new Set(['AdvanceCurrentBuild','UndoCurrentBuild','RecoverPendingUndo']);
 // A peer's public error is relayed as is (pub); C.publicError alone would turn it into SCHEMA_INVALID.
@@ -47,11 +47,11 @@ const initial = (id,identity) => ({context:{currentSession:id,activeWorldRef:nul
 export class WorkshopV3 {
  constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;
   this.protocolHandshake=C.validateType('ProtocolHandshake',{profileVersion:'protocol-handshake/v1',component:'hanaworlds-workshop',
-   protocols:[{protocol:'session',major:5,minor:0}],capabilities:[],
-   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.6.0',sourceRevision:null,artifactDigest:null}});
+   protocols:[{protocol:'session',major:4,minor:0}],capabilities:[],
+   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.7.0',sourceRevision:null,artifactDigest:null}});
   this.locks=new Map(); }
  /** Trusted composition-only metadata preparation for G-S. Returns the official
-  * SessionPersistence snapshot verbatim; this is not a session/v5 wire operation.
+  * SessionPersistence snapshot verbatim; this is not a session/v4 wire operation.
   * No World selection, Workshop projection, full log read or Session creation. */
  async readSessionMetadata(sessionRef) {
   const port=this.sessionPersistence;
@@ -279,7 +279,7 @@ export class WorkshopV3 {
   if(!same(core.identity,coreIdentity(session.header,id)))throw Error('SESSION_MISMATCH');
   if(action==='images')return {sessionRef:id,images:await this.#conversationImages(core,state,null,signal)};
   const localContext=state.context.localContext;
-  if(!localContext)throw Error('LOCAL_CONTEXT_REQUIRED: this conversation is not bound to a current world yet; the Host must bind it (session/v5 SwitchWorldContext) before building.');
+  if(!localContext)throw Error('LOCAL_CONTEXT_REQUIRED: this conversation is not bound to a current world yet; the Host must bind it (session/v4 SwitchWorldContext) before building.');
   const base={contractVersion:VERSION,sessionRef:id,localContext:copy(localContext)};
   const run=async(operation,fields)=>{signal.throwIfAborted();const out=await this.call(operation,{...base,...fields});signal.throwIfAborted();if(out.error){const f=placementFailure(out.error);throw Error(f?`${f.failure}: ${out.error.code}/${out.error.reason}. ${C.confirmedPlacement.remedy}`:`${out.error.code}: ${operation} refused`);}return out.result;};
   if(action==='placement')return this.#lock(id,async()=>{
@@ -299,8 +299,8 @@ export class WorkshopV3 {
   }).catch(error=>{throw explainPlacement(error);});
   if(action==='prepare'){
    const input=this.#human(core),done=state.requests[`AppendMultimodalTurn:${input.id}`]?.response;
-   if(done){if(done.error)throw Error(`${done.error.code}: the latest user message was already prepared and refused; ask the user for a new message.`);return {...copy(done.result),placement:copy(state.pending?.controls.placement??state.confirmed[done.result.turnRef]?.intent.confirmedIntent.placement??null)};}
-   let placement=null;
+   if(done){if(done.error)throw Error(`${done.error.code}: the latest user message was already prepared and refused; ask the user for a new message.`);const retained=state.pending?.controls.placement??state.confirmed[done.result.turnRef]?.intent.confirmedIntent.placement;return {...copy(done.result),...(retained===undefined?{}:{placement:copy(retained)})};}
+   let placement;
    if(args.placementTarget!==undefined||args.placementSourceRef!==undefined){
     const source=state.placementSources[args.placementSourceRef];
     if(!source||!args.placementTarget||source.inputId!==input.id||!same(source.localContext,localContext)){
@@ -309,12 +309,12 @@ export class WorkshopV3 {
     try{placement=C.createPlacementProposal(source.inspection,args.placementTarget);}catch(error){throw explainPlacement(error);}
    }
    const controls={purpose:args.purpose??null,dimensions:[args.width,args.depth,args.height].some(v=>v===undefined)?null:{width:args.width,depth:args.depth,height:args.height,unit:'node'},
-    entrancePortalRefs:args.entrancePortalRefs??[],styleText:args.styleText??null,siteRules:args.siteRules??null,placement};
-   if(controls.siteRules?.optionalLightRule!=null)throw Error('CAPABILITY_UNAVAILABLE: painter/v6:light-rule — no peer can check a light rule yet. Tell the player the light requirement is currently unavailable; it can be kept for later or left out (optionalLightRule null).');
+    entrancePortalRefs:args.entrancePortalRefs??[],styleText:args.styleText??null,siteRules:args.siteRules??null,...(placement===undefined?{}:{placement})};
+   if(controls.siteRules?.optionalLightRule!=null)throw Error('CAPABILITY_UNAVAILABLE: painter/v5:light-rule — no peer can check a light rule yet. Tell the player the light requirement is currently unavailable; it can be kept for later or left out (optionalLightRule null).');
    if(controls.siteRules)C.requireSiteRuleChecks(controls.siteRules,{entrance:true});
    const media=await this.#conversationImages(core,state,args.imageRefs??input.images,signal);
    const result=await run('AppendMultimodalTurn',{requestId:input.id,expectedRevision:state.context.sessionRevision,turnRef:`${media.length?'image':'text'}:${input.id}`,text:input.text,media,controls});
-   return {...result,placement:copy(placement)};
+   return {...result,...(placement===undefined?{}:{placement:copy(placement)})};
   }
   if(action==='confirm'){
    const pending=state.pending,input=this.#human(core);
@@ -407,7 +407,7 @@ export class WorkshopV3 {
    if(rules)C.requireSiteRuleChecks(rules,{entrance:true});
    const complete=body.text.trim()&&body.controls.purpose?.trim()&&dims?.unit==='node'&&['width','height','depth'].every(k=>Number.isSafeInteger(dims[k])&&dims[k]>0)&&rules!==null&&(!rules.requireEntranceConnectivity||rules.entranceClearance!==null);
    let placementInspection=null;
-   if(body.controls.placement!==null){
+   if(body.controls.placement!==undefined){
     const source=Object.values(state.placementSources).find(s=>s.inputId===body.requestId&&same(s.localContext,body.localContext)&&s.inspection.inspectionId===body.controls.placement.source.inspectionId);
     if(!source||source.inputId!==this.#human(core).id||body.text!==this.#human(core).text)placementFail('PLACEMENT_BINDING_CHANGED');
     C.requirePlacementSource(body.controls.placement,source.inspection,body.localContext.worldRef);
@@ -415,7 +415,7 @@ export class WorkshopV3 {
     placementInspection=copy(source.inspection);
    }
    const turn={turnRef:body.turnRef,turnRevision:revision(),text:body.text,media,referenceBriefDigest:null,intentDigest:null,actionReceiptDigest:null};state.turns.push(turn);
-   const positionText=body.controls.placement===null?'':`；已提议位置（世界${body.controls.placement.worldRef}）：${JSON.stringify(body.controls.placement.target)}`;
+   const positionText=body.controls.placement===undefined?'':`；已提议位置（世界${body.controls.placement.worldRef}）：${JSON.stringify(body.controls.placement.target)}`;
    const question=complete?`请确认建造${body.text}，尺寸${dims.width}×${dims.depth}×${dims.height}个节点；场地规则：${siteRulesText(rules)}${positionText}。回复“确认”或修改。`:
     rules===null?'请由当前skill提出入口、危险物、光照规则选项并补齐用途和节点尺寸后重新提交。':'请由当前skill补齐用途、节点尺寸和所需入口净空后重新提交。';
    state.pending={sessionRef:body.sessionRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,invocationId:body.requestId,clarificationId:revision(),question,complete:!!complete,controls:body.controls,placementInspection,afterSeq:core.events.length-1};
@@ -432,9 +432,9 @@ export class WorkshopV3 {
     pending.complete=false;pending.afterSeq=core.events.length-1;pending.clarificationId=revision();pending.question='请更新建造参数并重新提交，之后再确认。';
     return this.#turnReceipt(body,state,turn,pending.question,this.#clarification(pending));
    }
-   const brief=C.validateType('BriefProjection',{contractVersion:'ReferenceBrief/v5',sessionRef:body.sessionRef,turnRevision:turn.turnRevision,briefRevision:revision(),media:await this.#media(turn.media,core,state),text:turn.text,controls:pending.controls});
+   const brief=C.validateType('BriefProjection',{contractVersion:'ReferenceBrief/v4',sessionRef:body.sessionRef,turnRevision:turn.turnRevision,briefRevision:revision(),media:await this.#media(turn.media,core,state),text:turn.text,controls:pending.controls});
    const briefDigest=digest('reference-brief',brief);
-   const intent=C.validateType('IntentProjection',{contractVersion:VERSION,referenceBriefDigest:briefDigest,confirmedIntent:{kind:'BUILD_STRUCTURE',text:turn.text,purpose:pending.controls.purpose,dimensions:pending.controls.dimensions,entrancePortalRefs:pending.controls.entrancePortalRefs,confirmedTurnRevision:turn.turnRevision,siteRules:pending.controls.siteRules,placement:pending.controls.placement},intendedWorldRef:body.localContext.worldRef,orderedTargetRefs:[]});
+   const intent=C.validateType('IntentProjection',{contractVersion:VERSION,referenceBriefDigest:briefDigest,confirmedIntent:{kind:'BUILD_STRUCTURE',text:turn.text,purpose:pending.controls.purpose,dimensions:pending.controls.dimensions,entrancePortalRefs:pending.controls.entrancePortalRefs,confirmedTurnRevision:turn.turnRevision,siteRules:pending.controls.siteRules,...(pending.controls.placement===undefined?{}:{placement:pending.controls.placement})},intendedWorldRef:body.localContext.worldRef,orderedTargetRefs:[]});
    C.confirmedPlacementOf(intent,brief);
    turn.referenceBriefDigest=briefDigest;turn.intentDigest=digest('intent',intent);
    state.confirmed[turn.turnRef]={brief,intent,confirmationInputId:message.id,localContext:copy(body.localContext),placementInspection:copy(pending.placementInspection)};state.pending=null;
@@ -455,7 +455,7 @@ export class WorkshopV3 {
   // Sole SafetyProfile source: invariants plus the player-confirmed site rules bound by intentDigest.
   const safetyProfile=C.safetyProfileFromConfirmedIntent(saved.intent);
   const region=C.validateRegionInspection(stored.inspection);
-  return copy(C.validateType('BuildProposalContext',{contractVersion:'painter/v6',sessionRef:body.sessionRef,worldRef:body.localContext.worldRef,turnRevision:turn.turnRevision,painterId:'picture-blocks',invocationId:stored.invocationId,intent:saved.intent,intentDigest:turn.intentDigest,referenceBrief:saved.brief,referenceBriefDigest:turn.referenceBriefDigest,catalogue,targetFacts:region.targetFacts,targetFactsDigest:region.targetFactsDigest,safetyProfile,safetyProfileDigest:digest('safety-profile',safetyProfile),regionInspection:region,localContext:body.localContext}));
+  return copy(C.validateType('BuildProposalContext',{contractVersion:'painter/v5',sessionRef:body.sessionRef,worldRef:body.localContext.worldRef,turnRevision:turn.turnRevision,painterId:'picture-blocks',invocationId:stored.invocationId,intent:saved.intent,intentDigest:turn.intentDigest,referenceBrief:saved.brief,referenceBriefDigest:turn.referenceBriefDigest,catalogue,targetFacts:region.targetFacts,targetFactsDigest:region.targetFactsDigest,safetyProfile,safetyProfileDigest:digest('safety-profile',safetyProfile),regionInspection:region,localContext:body.localContext}));
  }
  async readBuildProposalContext(raw) {
   const body=copy(C.validateBoundRequest(VERSION,'AdvanceCurrentBuild',raw));
@@ -482,7 +482,7 @@ export class WorkshopV3 {
  async #proposalFacts(request,state,stored) {
   if(!stored||state.contexts[state.currentContextId]!==stored)fail('TARGET_FACTS_STALE');
   const currentContext=await this.#context(request,state,stored);
-  const record=stored.response?{response:stored.response,digest:C.requestDigest('painter/v6','ValidateBuildProposal',stored.request)}:null;
+  const record=stored.response?{response:stored.response,digest:C.requestDigest('painter/v5','ValidateBuildProposal',stored.request)}:null;
   const requestFacts=await this.#facts(request,state,record);
   return C.validateType('BuildProposalProviderFacts',{sourceContext:stored.context,currentContext,requestFacts});
  }
@@ -504,9 +504,9 @@ export class WorkshopV3 {
   return this.#readProposalProviderFacts('REGION',request,async(state,stored)=>{
    if(state.contexts[state.currentContextId]!==stored)fail('TARGET_FACTS_STALE');
    if(!same(await this.#regionContext(request,state,stored),stored.context))fail('TARGET_FACTS_STALE');
-   const record=stored.response?{response:stored.response,digest:C.requestDigest('painter-region/v3','ValidateRegionProposal',stored.request)}:null;
+   const record=stored.response?{response:stored.response,digest:C.requestDigest('painter-region/v2','ValidateRegionProposal',stored.request)}:null;
    const facts=await this.#facts(request,state,record);
-   C.validateCurrentRequest('painter-region/v3','ValidateRegionProposal',request,facts);return facts;
+   C.validateCurrentRequest('painter-region/v2','ValidateRegionProposal',request,facts);return facts;
   });
  }
  // Shared exact-retention and read stability boundary. No reservation, write or
@@ -528,7 +528,7 @@ export class WorkshopV3 {
  /** Existing proposal entry: the PER_CELL write method. */
  async submitBuildProposal(raw) {return (await this.#submit(raw,'PER_CELL')).response;}
  /** Same skill, either self-described write method. Returns a Workshop business
-  * envelope around the exact painter/v6 or painter-region/v3 response; unmet needs
+  * envelope around the exact painter/v5 or painter-region/v2 response; unmet needs
   * are explained and nothing is sent to Painter. No method switch, truncation or
   * target rewrite. */
  async submitWriteProposal(method,raw) {const {availability,response}=await this.#submit(raw,method);return {method,availability,response};}
@@ -549,8 +549,9 @@ export class WorkshopV3 {
   return copy({skillGuidance:writeToolSkillGuidance,tools:WRITE_METHODS.map(method=>describeWriteMethod(method,facts)),currentBuild:current});
  }
  /** PER_CELL delegates to readBuildProposalContext. REGION captures the current
-  * confirmed brief (with verified media), intent and catalogue for painter-region/v3;
-  * the region itself is in world node coordinates, so no placement inspection. */
+  * confirmed brief (with verified media), intent and catalogue for painter-region/v2;
+  * the region itself is in world node coordinates. Structured placement uses the retained
+  * native placement inspection; Canvas checks its own record before writing. */
  async readWriteProposalContext(method,raw) {
   if(method==='PER_CELL')return this.readBuildProposalContext(raw);
   if(method!=='REGION')fail('CAPABILITY_UNAVAILABLE');
@@ -573,7 +574,7 @@ export class WorkshopV3 {
   // The region path has no entrance check in this major: a confirmed entrance requirement is refused by name.
   C.requireSiteRuleChecks(saved.intent.confirmedIntent.siteRules,{entrance:false});
   const catalogue=C.validateType('Catalogue',await this.catalogue.read(body.localContext.worldRef));
-  return copy({contractVersion:'painter-region/v3',sessionRef:body.sessionRef,worldRef:body.localContext.worldRef,turnRevision:turn.turnRevision,invocationId:stored.invocationId,intent:saved.intent,intentDigest:turn.intentDigest,referenceBrief:saved.brief,referenceBriefDigest:turn.referenceBriefDigest,catalogue,catalogueDigest:digest('catalogue',catalogue),localContext:copy(body.localContext)});
+  return copy({contractVersion:'painter-region/v2',sessionRef:body.sessionRef,worldRef:body.localContext.worldRef,turnRevision:turn.turnRevision,invocationId:stored.invocationId,intent:saved.intent,intentDigest:turn.intentDigest,referenceBrief:saved.brief,referenceBriefDigest:turn.referenceBriefDigest,catalogue,catalogueDigest:digest('catalogue',catalogue),localContext:copy(body.localContext)});
  }
  async #submit(raw,method) {
   let request,availability=null;const region=method==='REGION';
@@ -597,7 +598,7 @@ export class WorkshopV3 {
    if(painter!==(region?this.painterRegion:this.painter))fail('CURRENT_WORLD_MISMATCH');
    if(!response.error){stored.response=copy(response);state.builds[turn.turnRef]={contextId:state.currentContextId,method,plan:response.result,compiled:null,submission:null,dispatched:false,outcome:null,...(region?{region:{compiled:null,commitRequest:null,dispatched:false,result:null,undo:null}}:{})};await this.#save(request.sessionRef,core,state);}
    return {availability,response:copy(response)};
-  });}catch(error){return {availability,response:packet(region?'painter-region/v3':'painter/v6',request?.requestId??raw?.requestId??null,null,pub(error))};}
+  });}catch(error){return {availability,response:packet(region?'painter-region/v2':'painter/v5',request?.requestId??raw?.requestId??null,null,pub(error))};}
  }
  /** REGION Advance: validated plan → Brush CompileRegionBuild → Canvas
   * ApplyRegionCommit (one logical transaction). Request is persisted before
@@ -606,7 +607,7 @@ export class WorkshopV3 {
   let body;
   try {body=copy(C.validateBoundRequest(VERSION,'AdvanceCurrentBuild',raw));return await this.#lock(body.sessionRef,async()=>{
    const {core,state}=await this.#load(body.sessionRef);C.validateCurrentRequest(VERSION,'AdvanceCurrentBuild',body,await this.#facts(body,state));
-   const {turn}=this.#turn(state),build=state.builds[turn.turnRef];
+   const {turn,saved}=this.#turn(state),build=state.builds[turn.turnRef];
    if(body.expectedTurnRevision!==turn.turnRevision)fail('TURN_REVISION_MISMATCH');
    if(build?.method!=='REGION')fail('TARGET_REQUIRED');const r=build.region;
    const out=(result,outcome)=>({method:'REGION',sessionRef:body.sessionRef,worldRef:body.worldRef,turnRevision:turn.turnRevision,outcome,result,error:null});
@@ -618,7 +619,9 @@ export class WorkshopV3 {
    const brush=this.brushRegion,compiled=C.validateCompiledRegionSet(compile,await brush.call('CompileRegionBuild',copy(compile)));
    if(compiled.error)peerFail(compiled);if(brush!==this.brushRegion)fail('CURRENT_WORLD_MISMATCH');
    await this.#current(body,state);r.compiled=compiled.result;
-   const apply={contractVersion:'canvas-region/v2',sessionRef:body.sessionRef,requestId:`${body.requestId}:region-apply`,worldRef:body.worldRef,transactionId:`region-${randomUUID()}`,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,guarantee:'RECOVERABLE_VERIFIED',localContext:body.localContext};
+   const binding=C.confirmedPlacementBinding(saved.intent);
+   const apply={contractVersion:'canvas-region/v2',sessionRef:body.sessionRef,requestId:`${body.requestId}:region-apply`,worldRef:body.worldRef,transactionId:`region-${randomUUID()}`,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,guarantee:'RECOVERABLE_VERIFIED',localContext:body.localContext,...(binding===null?{}:{confirmedPlacement:binding})};
+   C.validateRegionCommitSubmission(saved.intent,saved.brief,apply);
    r.commitRequest=apply;r.dispatched=true;await this.#save(body.sessionRef,core,state);
    let response;try{response=await this.canvasRegion.call('ApplyRegionCommit',copy(apply));}catch{return out(null,'PENDING');}
    response=C.validateRegionCommit(apply,response);
@@ -669,7 +672,8 @@ export class WorkshopV3 {
   const objects=await this.#canvas('ListObjects',this.#child(body,'objects',{expectedRevision:null}));
   const tx=`build-${randomUUID()}`;
   const analysis=await this.#canvas('AnalyzeAffectedObjects',this.#child(body,'analysis',{transactionId:tx,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,expectedRevision:ctx.targetFacts.worldRevision,expectedRegistryRevision:objects.registryRevision,expectedSelectionRevision:body.localContext.selectionRevision}));
-  const apply=this.#child(body,'apply',{transactionId:tx,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,analysisDigest:digest('affected-analysis',analysis),decisionRevision:null,expectedWorldRevision:analysis.worldRevision,expectedObjectRevisions:{},guarantee:'RECOVERABLE_VERIFIED',regionInspectionBinding:{inspectionId:ctx.regionInspection.inspectionId,build:build.plan.build,confirmedPlacement:C.confirmedPlacementBinding(saved.intent)}});
+  const binding=C.confirmedPlacementBinding(saved.intent);
+  const apply=this.#child(body,'apply',{transactionId:tx,operations:compiled.result.projection,operationDigest:compiled.result.operationDigest,analysisDigest:digest('affected-analysis',analysis),decisionRevision:null,expectedWorldRevision:analysis.worldRevision,expectedObjectRevisions:{},guarantee:'RECOVERABLE_VERIFIED',regionInspectionBinding:{inspectionId:ctx.regionInspection.inspectionId,build:build.plan.build,...(binding===null?{}:{confirmedPlacement:binding})}});
   C.checkConfirmedPlacementApply(apply,ctx.regionInspection,analysis.worldRevision);
   const submission={parentRequest:body,turnRef:turn.turnRef,confirmationInputId:saved.confirmationInputId,intent:saved.intent,analysis,apply};
   C.validateCurrentBuildSubmission(submission,await this.#facts(body,state));build.submission=submission;await this.#save(body.sessionRef,core,state);

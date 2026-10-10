@@ -2,7 +2,8 @@
 // siteRules proposal to step 1 (PLAN-SAFETY-V1-BATCH-01).
 // 2026-10-10 TEXT feedback: two bounded instruction edits clarify unchanged confirmation
 // and generic PER_CELL coordinate/empty-space preflight. v2 adds two bounded structured-placement
-// workflow edits and changed wire identifiers; formatter and Region R1-R4 otherwise remain verbatim.
+// workflow edits and changed wire identifiers. v1.1 restores old wires, says absence instead of null,
+// and adds the formal REGION binding instruction; formatter and original R1-R4 are retained.
 // skill-tools.ts blob 426ca1b1adef74d5bcaa85514cb4f48159f0d3dc: exact templates/formatter.
 // Load once, after the host has explicitly awaited its peer composition.
 const content = `Build and undo structures in the currently connected local world.
@@ -26,7 +27,7 @@ frame, revision or source reference. Pass that placementSourceRef and placementT
 the tool creates the official PlacementProposal, returns placement and includes its exact target in the
 confirmation question. Show that returned question and structured position unchanged. A promise in prose
 alone does not bind a position. Omit both placement fields only when no structured position is proposed;
-placement is then null and the ordinary CURRENT_VIEW path applies. Do not show guessed coordinates as confirmed.
+the placement field is then omitted (never null) and the ordinary CURRENT_VIEW path applies. Do not show guessed coordinates as confirmed.
 Call hanaworlds_context with action prepare and complete purpose, width, depth, height, siteRules and optional
 styleText and relevant imageRefs. siteRules is your proposal for this site: whether the entrance must stay
 connected (with its design clearance in whole nodes), the hazard policy (liquids, maximum damage per second)
@@ -92,7 +93,7 @@ bounding box or claim Undo from an optimistic message.
 No shell commands, direct world writes, other model calls, or alternate planner are part of this skill.`
 /** Region steps: same confirmed brief, then the region proposal tool instead of steps 2-3 of the cell path. */
 const regionSteps = `Region write (method REGION, tool hanaworlds_region_proposal), after the same prepare/confirm step 1:
-R1. Call hanaworlds_region_proposal action context. It returns proposalRef, the captured painter-region/v3
+R1. Call hanaworlds_region_proposal action context. It returns proposalRef, the captured painter-region/v2
 context (catalogue, brief, localContext) and worldFacts (for a world created here: game and flat mapgen,
 for example the ground level). Coordinates are absolute world node coordinates; there is no placement frame.
 R2. Call hanaworlds_region_proposal action submit with proposalRef and proposal JSON
@@ -102,6 +103,10 @@ Index = (x-ox) + sx*((y-oy) + sy*(z-oz)). Palette entries are catalogue nodes so
 unique and all used; runs are canonical (adjacent runs differ) and their counts sum to sx*sy*sz.
 Explicit {"nodeName":"air","param2":0} digs; null means unspecified: that cell is not written and keeps its node.
 Painter validates; respond to its errors instead of bypassing validation.
+For a structured REGION position use the same real action placement / prepare / new-human confirm path
+in step 1. Workshop sends its confirmed binding; Canvas checks its own recorded source inspection and
+current world revision before writing. A changed source, stale revision or missing/changed binding is
+refusal: get a new real inspection, proposal and new human confirmation; never move or truncate the target.
 R3. Call hanaworlds_build action advance: Brush compiles mapblock chunks, Canvas writes one transaction and reads
 the whole region back. Only outcome VERIFIED is success; ROLLED_BACK, PENDING or errors are not.
 R4. hanaworlds_build action undo restores the whole region of the latest verified region write when nothing

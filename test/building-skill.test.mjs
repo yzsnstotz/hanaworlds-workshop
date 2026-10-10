@@ -12,12 +12,12 @@ const { default: Workshop, WRITE_METHOD_PORTS } = await import(process.env.HW_WO
 
 // SOURCE/FIXTURE: official services + Workshop package's own late skill plugin.
 // Full-content SHA oracles: exact bd964cdf/426ca1b1 stage0 baseline (40d72a58/3d0ec2c5/15f8e350 on main 5a63915f)
-// plus the approved v1 edits, 0.5.2 guidance, v2 wire identifiers and bounded structured-placement workflow.
-// Current SHA oracles were derived from the prior exact full content + the two v2 workflow edits before implementation; formatter/Region branches stay unchanged apart from wire.
+// plus the approved v1 edits, 0.5.2 guidance, v1.1 wire identifiers, optional absence and REGION confirmed-binding workflow.
+// Current SHA oracles were derived from the prior exact full content + the two v1.1 difference edits before implementation; formatter/Region branches stay unchanged apart from wire.
 // Peer ports advertise fixture handshakes only; the agents service is a fixture.
 // No AgentLoop/model/world/auth/server/profile is created or called.
 const metadata = { name: 'hanaworlds-building' };
-const expectedSha = {"object-available": "6d697ba8f0802db843025dfd05a91d09350cf41466af01e7f236e202c0068633", "object-unavailable": "f0e07b6197e4a47d264fa06afb473e0ab4771f90797cd261ae6ea84a816edf94", "rejected-catch-null": "32e68ca1dcd9b0337e90a7d796e13c222ec758144702f4b2a5f5f8d8f6c43c2c", "resolved-null": "32e68ca1dcd9b0337e90a7d796e13c222ec758144702f4b2a5f5f8d8f6c43c2c", "config-undefined": "32e68ca1dcd9b0337e90a7d796e13c222ec758144702f4b2a5f5f8d8f6c43c2c"};
+const expectedSha = {"object-available": "faa051f008a8d1417aece71f87b63cf43ac9065d7f7debd9e59efb68bc94df2a", "object-unavailable": "03d2b757f169ff74bd6a6d364f2f9c43282dddae660c1c595432f0f248f3c5ce", "rejected-catch-null": "f68086f1e0bce4fcd3e5ebe15664114d227ca6f214fa551ad4c909b65b5d387d", "resolved-null": "f68086f1e0bce4fcd3e5ebe15664114d227ca6f214fa551ad4c909b65b5d387d", "config-undefined": "f68086f1e0bce4fcd3e5ebe15664114d227ca6f214fa551ad4c909b65b5d387d"};
 const results = [];
 const hash = value => createHash('sha256').update(value).digest('hex');
 function peerPorts() {
@@ -100,6 +100,8 @@ for (const scenario of ['object-available', 'object-unavailable', 'rejected-catc
       assert.ok(loadedContent.includes('placementSourceRef and placementTarget together'));
       assert.ok(loadedContent.includes('never rebase old local geometry'));
       assert.ok(loadedContent.includes('PLACEMENT_REVISION_STALE'));
+      assert.ok(loadedContent.includes('placement field is then omitted (never null)'));
+      assert.ok(loadedContent.includes('Canvas checks its own recorded source inspection'));
       assert.equal(hash(loadedContent), expectedSha[scenario], 'full byte digest equals Desktop baseline plus the authorized guidance edits and wire identifiers at the same peer composition');
       assert.ok(order.indexOf('peers:await-settled') < order.indexOf('skill:registered'));
       if (scenario === 'object-available') {
@@ -147,7 +149,7 @@ for (const scenario of ['object-available', 'object-unavailable', 'rejected-catc
         configNullishCoalescingPreserved: true, fullContentBytes: Buffer.byteLength(loadedContent),
         fullContentSha256: hash(loadedContent), fullContent: loadedContent, consumedContentSha256: hash(output.content), renderedContentSha256: hash(renderedText), renderedContentBytes: Buffer.byteLength(renderedText),
         runtimeIdentity: { processId: process.pid, workshopEntry: process.env.HW_WORKSHOP_PACKAGE_ENTRY??new URL('../src/index.mjs',import.meta.url).href, skillEntry: process.env.HW_WORKSHOP_BUILDING_SKILL_ENTRY??new URL('../src/building-skill.mjs',import.meta.url).href, codeRuntimeAvailable: !!ctx.get('ptcRuntime'), codeToolExposed: ctx.tools.schemas().some(t=>t.name==='run_code') },
-        originalBaselineEqual: false, authorizedGuidanceEdits: 4, candidateContracts: "2.0.0-rc.1", afterLoadUnchanged, realModelCalls: 0, worldWrites: 0, productRuntime: false });
+        originalBaselineEqual: false, authorizedGuidanceEdits: 6, candidateContracts: "1.1.0-rc.1", afterLoadUnchanged, realModelCalls: 0, worldWrites: 0, productRuntime: false });
     } finally { await ctx.fiber.dispose(); }
   });
 }
