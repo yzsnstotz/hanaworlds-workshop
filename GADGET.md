@@ -1,4 +1,4 @@
-# Workshop 0.7.2 — local-world skill business component
+# Workshop 0.7.3 — local-world skill business component
 
 Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.1.0` (formal contracts 1.1.0, lock 5177522d; same content as candidate 1.1.0-rc.1) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
@@ -245,6 +245,15 @@ free-text `typicalScale`, `scaleUnit:"cells"`, `requiredCapabilities`,
 There is no size threshold, setting or admin switch. The skill picks the method
 from its goal and volume and may refine the choice; Workshop never truncates a
 proposal, changes its target or switches method.
+
+`submitWriteProposal('REGION', request)` also returns `effectSummary`
+(`workshop-region-effects/v1`, also exported as `regionEffectSummary(block, confirmedIntent)`):
+Workshop's decoding of the validated block in world coordinates — per y layer, each node's
+count and x/z range and the unspecified cells — plus `writtenLayers` and the confirmed
+`dimensions`. It is facts only: no refusal or threshold. A VERIFIED region write proves the
+world equals the submitted block, not that the block matches the request; the skill compares
+`effectSummary` with the confirmed purpose before advance and reports from it. The confirmation
+question also states the proposed purpose and the placement as per-axis ranges (y in layers).
 
 Compatibility: REGION requires each region port to advertise a contracts
 `ProtocolHandshake` and pass `checkProtocolCompatibility` for its wire and the

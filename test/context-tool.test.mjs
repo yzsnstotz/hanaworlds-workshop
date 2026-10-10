@@ -60,7 +60,7 @@ test('prepare → human confirm → read: actual user text, model controls incl.
  await r.bind();await r.append('s1',user('ask','照这个建一个小屋'));
  const prepared=await r.tool({...prepare,entrancePortalRefs:['portal-a']});assert.equal(prepared.isError,false,prepared.text);
  assert.equal(prepared.json.turnRef,'text:ask');
- assert.equal(prepared.json.clarification.question,'请确认建造照这个建一个小屋，尺寸3×4×3个节点；场地规则：入口需要连通（净空1×1×2个节点）；危险物：禁止液体，伤害上限每秒0；光照：不要求。回复“确认”或修改。');
+ assert.equal(prepared.json.clarification.question,'请确认建造照这个建一个小屋，尺寸3×4×3个节点；提议内容：小屋；场地规则：入口需要连通（净空1×1×2个节点）；危险物：禁止液体，伤害上限每秒0；光照：不要求。回复“确认”或修改。');
  const again=await r.tool({...prepare,entrancePortalRefs:['portal-a']});assert.deepEqual(again.json,prepared.json,'same human message prepares once');
  const selfConfirm=await r.tool({action:'confirm'});assert.equal(selfConfirm.isError,true);assert.match(selfConfirm.text,/HUMAN_CONFIRMATION_REQUIRED/);
  const early=await r.tool({action:'read'});assert.equal(early.isError,true);assert.match(early.text,/INTENT_UNCONFIRMED/);
