@@ -149,7 +149,7 @@ for (const scenario of ['object-available', 'object-unavailable', 'rejected-catc
         configNullishCoalescingPreserved: true, fullContentBytes: Buffer.byteLength(loadedContent),
         fullContentSha256: hash(loadedContent), fullContent: loadedContent, consumedContentSha256: hash(output.content), renderedContentSha256: hash(renderedText), renderedContentBytes: Buffer.byteLength(renderedText),
         runtimeIdentity: { processId: process.pid, workshopEntry: process.env.HW_WORKSHOP_PACKAGE_ENTRY??new URL('../src/index.mjs',import.meta.url).href, skillEntry: process.env.HW_WORKSHOP_BUILDING_SKILL_ENTRY??new URL('../src/building-skill.mjs',import.meta.url).href, codeRuntimeAvailable: !!ctx.get('ptcRuntime'), codeToolExposed: ctx.tools.schemas().some(t=>t.name==='run_code') },
-        originalBaselineEqual: false, authorizedGuidanceEdits: 6, candidateContracts: "1.1.0-rc.1", afterLoadUnchanged, realModelCalls: 0, worldWrites: 0, productRuntime: false });
+        originalBaselineEqual: false, authorizedGuidanceEdits: 6, candidateContracts: "1.1.0", afterLoadUnchanged, realModelCalls: 0, worldWrites: 0, productRuntime: false });
     } finally { await ctx.fiber.dispose(); }
   });
 }
