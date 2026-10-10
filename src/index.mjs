@@ -19,6 +19,11 @@ const fail = (code,details) => { throw new C.ContractError(code,'validate','REQU
 const placementFailure = error => C.confirmedPlacement.namedFailures.find(f=>f.code===(error?.publicError??error)?.code&&f.reason===(error?.publicError??error)?.reason);
 const placementFail = name => {const f=C.confirmedPlacement.namedFailures.find(f=>f.failure===name);const error=new C.ContractError(f.code,f.phase,f.reason);error.placementFailure=name;throw error;};
 const explainPlacement = error => {const f=placementFailure(error);if(f)error.message=`${f.failure}: ${f.code}/${f.reason}. ${C.confirmedPlacement.remedy}`;return error;};
+// A placement source belongs to the user message it was inspected for. Say the one legal next step, so a position
+// shown only in prose is not left for the user to "confirm" in the next message (K3 formal run E10/E13).
+const placementNext = ref => ({action:'prepare',placementSourceRef:ref,validUntil:'NEXT_USER_MESSAGE',
+ instruction:'Choose placementTarget inside this inspection and call hanaworlds_context action prepare with this placementSourceRef now, in this same reply, before writing to the user. A position described only in prose is not a proposal and cannot be confirmed; this reference is refused once the next user message arrives.'});
+const EARLIER_SOURCE = ' This placementSourceRef was inspected for an earlier user message, so no proposal was made then and this reply cannot confirm it. In this reply call action placement again, then prepare with the new placementSourceRef, show the returned question and wait for the next user message.';
 const packet = (wire,id,result,error=null) => ({contractVersion:wire,requestId:id,result,error});
 const pub = error => error?.publicError ?? C.publicError(error);
 // session/v4 build responses carry the engine guard refusal (contracts v1 rc.4): null normally; a refusal
@@ -48,7 +53,7 @@ export class WorkshopV3 {
  constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;
   this.protocolHandshake=C.validateType('ProtocolHandshake',{profileVersion:'protocol-handshake/v1',component:'hanaworlds-workshop',
    protocols:[{protocol:'session',major:4,minor:0}],capabilities:[],
-   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.7.1',sourceRevision:null,artifactDigest:null}});
+   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.7.2',sourceRevision:null,artifactDigest:null}});
   this.locks=new Map(); }
  /** Trusted composition-only metadata preparation for G-S. Returns the official
   * SessionPersistence snapshot verbatim; this is not a session/v4 wire operation.
@@ -295,7 +300,7 @@ export class WorkshopV3 {
    const live=await this.#core(id);if(this.#human(live).id!==input.id)placementFail('PLACEMENT_BINDING_CHANGED');
    await this.#current(base,state);
    const ref=`placement-source-${randomUUID()}`;state.placementSources[ref]={inputId:input.id,localContext:copy(localContext),inspection:copy(inspection)};
-   await this.#save(id,core,state);return {placementSourceRef:ref,inspection:copy(inspection)};
+   await this.#save(id,core,state);return {placementSourceRef:ref,inspection:copy(inspection),next:placementNext(ref)};
   }).catch(error=>{throw explainPlacement(error);});
   if(action==='prepare'){
    const input=this.#human(core),done=state.requests[`AppendMultimodalTurn:${input.id}`]?.response;
@@ -304,7 +309,7 @@ export class WorkshopV3 {
    if(args.placementTarget!==undefined||args.placementSourceRef!==undefined){
     const source=state.placementSources[args.placementSourceRef];
     if(!source||!args.placementTarget||source.inputId!==input.id||!same(source.localContext,localContext)){
-     try{placementFail('PLACEMENT_BINDING_CHANGED');}catch(error){throw explainPlacement(error);}
+     try{placementFail('PLACEMENT_BINDING_CHANGED');}catch(error){explainPlacement(error);if(source&&source.inputId!==input.id)error.message+=EARLIER_SOURCE;throw error;}
     }
     try{placement=C.createPlacementProposal(source.inspection,args.placementTarget);}catch(error){throw explainPlacement(error);}
    }

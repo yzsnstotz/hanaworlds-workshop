@@ -12,7 +12,7 @@ export function registerContextTool(ctx,workshop) {
    action:{type:'string',enum:['placement','prepare','confirm','read','images'],required:true},
    imageRefs:{type:'array',items:{type:'string'},description:'Actual references from action images or the download tool. Only relevant images in this conversation; an empty array selects text only.'},
    purpose:{type:'string'},width:{type:'integer'},depth:{type:'integer'},height:{type:'integer'},styleText:{type:'string'},
-   placementSourceRef:{type:'string',description:'Own Session/current human request reference returned by action placement before prepare. Supply together with placementTarget; never fabricate a source.'},
+   placementSourceRef:{type:'string',description:'Own Session/current human request reference returned by action placement before prepare. Supply together with placementTarget; never fabricate a source. Valid only until the next user message: call prepare in the same reply.'},
    placementTarget:{description:'Select from the real inspection returned by action placement. The tool creates the official PlacementProposal and displays it for new human confirmation; omit both placement fields when no structured position is proposed.',oneOf:[
     {type:'object',additionalProperties:false,properties:{kind:{type:'string',enum:['EXACT_CELLS'],required:true},cells:{type:'array',required:true,items:{type:'array',items:{type:'integer'}}}}},
     {type:'object',additionalProperties:false,properties:{kind:{type:'string',enum:['ANCHORED_EXTENT'],required:true},bounds:{type:'object',required:true,additionalProperties:false,properties:{min:{type:'array',required:true,items:{type:'integer'}},max:{type:'array',required:true,items:{type:'integer'}}}}}},
