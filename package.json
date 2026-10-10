@@ -1,6 +1,6 @@
 {
   "name": "hanaworlds-workshop",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -86,7 +86,7 @@
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
     "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.2",
     "canonicalize": "5.1.0",
-    "hanaworlds-contracts": "git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.1.0-rc.1",
+    "hanaworlds-contracts": "git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.1.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
