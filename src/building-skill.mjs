@@ -6,6 +6,7 @@
 // and adds the formal REGION binding instruction; formatter and original R1-R4 are retained.
 // 0.7.2 (K3 formal E10/E13): one bounded step-1 edit — placement and prepare in the same reply.
 // 0.7.3 (K3 run 01a123a6 E12/E14): two bounded REGION insertions — check effectSummary before advance; VERIFIED ≠ request met.
+// 0.7.4 (I-K2-IMAGE-01 run 01a123a8 E19 seq51/52): the same two insertions for the PER_CELL path.
 // skill-tools.ts blob 426ca1b1adef74d5bcaa85514cb4f48159f0d3dc: exact templates/formatter.
 // Load once, after the host has explicitly awaited its peer composition.
 const content = `Build and undo structures in the currently connected local world.
@@ -83,6 +84,9 @@ Only catalogue materials are allowed. Do not insert world, session, facts, recei
 or transaction fields. Call hanaworlds_proposal with proposalRef from the current read and pure geometry.
 Painter validates it; a tool result carrying error or result:null is refusal, even if the tool itself
 isError=false. Do not advance until validation returned a successful result.
+When the submit result includes effectSummary, it is Workshop's decoding of your boxes in world coordinates
+(size, writtenLayers and per y layer each material's count and x/z range) next to the confirmed dimensions; it
+is not a validation verdict. Compare it with the confirmed design, roof shape and height before advance.
 On geometry refusal, recheck exact coordinates, inclusive extents, known-empty membership, overlaps and
 confirmed empty clearance before correcting the geometry. The error alone does not prove insufficient
 space. Request a new placement or design only when current bounds/occupied/unknown cells or the confirmed
@@ -91,6 +95,8 @@ Never bypass validation, silently relax the rules, or reuse an old proposalRef a
 4. After successful validation, call hanaworlds_build action advance. Brush compiles and Canvas owns
 writes and readback. Report success only when outcome is VERIFIED; PENDING, UNKNOWN, ROLLED_BACK or
 errors are not success and must not trigger a new invented transaction.
+VERIFIED means Canvas wrote exactly the validated proposal, not that it matched the request; describe the
+result from effectSummary, never from your intention.
 5. On a user's Undo request call hanaworlds_build action undo. It reads the current durable head and
 undoes that exact build. Use status to inspect availability. Report the actual result; never erase a
 bounding box or claim Undo from an optimistic message.

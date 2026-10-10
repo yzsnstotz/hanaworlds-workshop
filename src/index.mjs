@@ -7,8 +7,8 @@ import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, uploa
 import { prepareImageAsk } from './image-ask.mjs';
 import { registerContextTool } from './context-tool.mjs';
 export { prepareImageAsk, IMAGE_ASK_ALLOWED_TOOLS } from './image-ask.mjs';
-import { regionEffectSummary } from './region-effects.mjs';
-export { regionEffectSummary } from './region-effects.mjs';
+import { regionEffectSummary, cellEffectSummary } from './region-effects.mjs';
+export { regionEffectSummary, cellEffectSummary } from './region-effects.mjs';
 import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
 export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
 const VERSION = 'session/v4', CANVAS = 'canvas/v6';
@@ -62,7 +62,7 @@ export class WorkshopV3 {
  constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;
   this.protocolHandshake=C.validateType('ProtocolHandshake',{profileVersion:'protocol-handshake/v1',component:'hanaworlds-workshop',
    protocols:[{protocol:'session',major:4,minor:0}],capabilities:[],
-   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.7.3',sourceRevision:null,artifactDigest:null}});
+   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.7.4',sourceRevision:null,artifactDigest:null}});
   this.locks=new Map(); }
  /** Trusted composition-only metadata preparation for G-S. Returns the official
   * SessionPersistence snapshot verbatim; this is not a session/v4 wire operation.
@@ -603,7 +603,7 @@ export class WorkshopV3 {
     if(!same(withoutRequest(request),stored.context))fail('TRANSACTION_CONFLICT');
     if(!same(await this.#regionContext(request,state,stored),stored.context))fail('TARGET_FACTS_STALE');
    }else{const facts=await this.#proposalFacts(request,state,stored);C.validateBuildProposalContext(request,facts);}
-   const effects=response=>region&&!response.error?{effectSummary:regionEffectSummary(response.result.build.block,stored.context.intent.confirmedIntent)}:{};
+   const effects=response=>region?(response.error?{}:{effectSummary:regionEffectSummary(response.result.build.block,stored.context.intent.confirmedIntent)}):{effectSummary:cellEffectSummary(request)};
    if(stored.response)return {availability,response:copy(stored.response),...effects(stored.response)};
    if(stored.request&&!same(stored.request,request))fail('REPLAY_MISMATCH');
    const {turn}=this.#turn(state);if(state.builds[turn.turnRef]?.dispatched||state.builds[turn.turnRef]?.region?.dispatched)fail('TRANSACTION_CONFLICT');
