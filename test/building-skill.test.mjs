@@ -15,10 +15,11 @@ const { default: Workshop, WRITE_METHOD_PORTS } = await import(process.env.HW_WO
 // plus the approved v1 edits, 0.5.2 guidance, v1.1 wire identifiers, optional absence and REGION confirmed-binding workflow.
 // Current SHA oracles were derived from the prior exact full content + the two v1.1 difference edits before implementation; formatter/Region branches stay unchanged apart from wire.
 // 0.7.2: derived again from the 0.7.1 full texts + the one bounded step-1 insertion (same reply), before running.
+// 0.7.3: derived from the 0.7.2 full texts + two bounded REGION insertions (effectSummary, VERIFIED meaning), before running.
 // Peer ports advertise fixture handshakes only; the agents service is a fixture.
 // No AgentLoop/model/world/auth/server/profile is created or called.
 const metadata = { name: 'hanaworlds-building' };
-const expectedSha = {"object-available": "f8f5ab8289471b9d92e3fc80d23fab7981d48cd6c3b70f8d1e58cfe3aa96bd3c", "object-unavailable": "fc9f0a0ff655b49b8f58c73ee21435a89bd76afd00c722f34fa4ccb1a9686dee", "rejected-catch-null": "e73b9e1bc798f9151399ebd0d645430b4c2d7d3ce286af47b5ec10e8580bbba3", "resolved-null": "e73b9e1bc798f9151399ebd0d645430b4c2d7d3ce286af47b5ec10e8580bbba3", "config-undefined": "e73b9e1bc798f9151399ebd0d645430b4c2d7d3ce286af47b5ec10e8580bbba3"};
+const expectedSha = {"object-available": "14e852da0587ccf77de7299f440f5b2155a8bcbc1480bd4696c4a59c7df0cea3", "object-unavailable": "cbe6a19a55edea6f89ff9bd200341c9a208dfa1b41c92753c0b267547d3de559", "rejected-catch-null": "0cc80a52fd10533b30601bcc838e8d61f30abf1b8d1e67d30f2be111a219894c", "resolved-null": "0cc80a52fd10533b30601bcc838e8d61f30abf1b8d1e67d30f2be111a219894c", "config-undefined": "0cc80a52fd10533b30601bcc838e8d61f30abf1b8d1e67d30f2be111a219894c"};
 const results = [];
 const hash = value => createHash('sha256').update(value).digest('hex');
 function peerPorts() {
@@ -150,7 +151,7 @@ for (const scenario of ['object-available', 'object-unavailable', 'rejected-catc
         configNullishCoalescingPreserved: true, fullContentBytes: Buffer.byteLength(loadedContent),
         fullContentSha256: hash(loadedContent), fullContent: loadedContent, consumedContentSha256: hash(output.content), renderedContentSha256: hash(renderedText), renderedContentBytes: Buffer.byteLength(renderedText),
         runtimeIdentity: { processId: process.pid, workshopEntry: process.env.HW_WORKSHOP_PACKAGE_ENTRY??new URL('../src/index.mjs',import.meta.url).href, skillEntry: process.env.HW_WORKSHOP_BUILDING_SKILL_ENTRY??new URL('../src/building-skill.mjs',import.meta.url).href, codeRuntimeAvailable: !!ctx.get('ptcRuntime'), codeToolExposed: ctx.tools.schemas().some(t=>t.name==='run_code') },
-        originalBaselineEqual: false, authorizedGuidanceEdits: 7, candidateContracts: "1.1.0", afterLoadUnchanged, realModelCalls: 0, worldWrites: 0, productRuntime: false });
+        originalBaselineEqual: false, authorizedGuidanceEdits: 9, candidateContracts: "1.1.0", afterLoadUnchanged, realModelCalls: 0, worldWrites: 0, productRuntime: false });
     } finally { await ctx.fiber.dispose(); }
   });
 }

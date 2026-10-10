@@ -270,6 +270,9 @@ test('REGION fill + explicit-air dig across mapblocks: image brief â†’ Painter â
   assert.equal(context.contractVersion,'painter-region/v2');assert.deepEqual(structuredClone(context.referenceBrief.media),[media]);
   const request={...context,requestId:'region-proposal',proposal:{decision:'REGION',block:regionBlock()}};
   const sent=await r.ws.submitWriteProposal('REGION',request);assert.equal(sent.response.error,null,JSON.stringify(sent.response));
+  const {regionEffectSummary}=await import(entry);
+  assert.deepEqual(sent.effectSummary,regionEffectSummary(sent.response.result.build.block,context.intent.confirmedIntent),'submit returns the decoded effect set of the validated block');
+  assert.equal(sent.effectSummary.totals.cells,sent.effectSummary.size.x*sent.effectSummary.size.y*sent.effectSummary.size.z);assert.deepEqual(sent.effectSummary.confirmedDimensions,context.intent.confirmedIntent.dimensions);
   assert.deepEqual(R.painterMedia,[[media]],'verified image media reaches the region Painter');
   assert.deepEqual(await r.ws.submitWriteProposal('REGION',request),sent);assert.equal(R.calls.filter(c=>c==='ValidateRegionProposal').length,1);
   const cellsAdvance=await r.ws.call('AdvanceCurrentBuild',advance);assert.equal(cellsAdvance.error?.code,'UNSUPPORTED_OPERATION');

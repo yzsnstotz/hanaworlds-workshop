@@ -72,6 +72,8 @@ test('structured A is publicly displayed, confirmed by a new human, retained acr
  const {source,prepared}=await proposeA(r);
  assert.deepEqual(source.inspection,fixture.inspections.view1);assert.deepEqual(prepared.placement,fixture.placements.A);
  assert.ok(prepared.clarification.question.includes(JSON.stringify(fixture.placements.A.target)),'authoritative question shows the exact structured target');
+ assert.ok(prepared.clarification.question.includes('提议内容：first building'),'the question shows the proposed purpose being confirmed');
+ const ys=[...new Set(fixture.placements.A.target.cells.map(c=>c[1]))];assert.ok(prepared.clarification.question.includes(`${fixture.placements.A.target.cells.length}个格子，y=${ys.sort((a,b)=>a-b).join('、')}（${ys.length}层）`));
  assert.equal((await r.tool({action:'confirm'})).isError,true,'model cannot self-confirm');
  await confirm(r);r.f.inspection=clone(fixture.inspections.view2);
  const read=await r.requireTool({action:'read'});assert.deepEqual(read.context.regionInspection,fixture.inspections.view1);assert.equal(C.canonicalJSON(C.confirmedPlacementOf(read.context.intent,read.context.referenceBrief)),C.canonicalJSON(fixture.placements.A));
@@ -88,6 +90,7 @@ test('an anchored extent is confirmed once and permits the published subset effe
  const source=await r.requireTool({action:'placement',...dimensions});r.f.responseCase=fixture.perCell.accept[1];
  const target=r.f.responseCase.request.intent.confirmedIntent.placement.target;
  const prepared=await r.requireTool({action:'prepare',...preparedFields,placementSourceRef:source.placementSourceRef,placementTarget:target});assert.deepEqual(prepared.placement.target,target);
+ const {min,max}=target.bounds;assert.ok(prepared.clarification.question.includes(`y=${min[1]}..${max[1]}（${max[1]-min[1]+1}层）`),'the extent layer count is stated in the question');
  await confirm(r);const read=await r.requireTool({action:'read'});
  const out=await r.ws.submitBuildProposal({...read.context,requestId:read.proposalRef+':proposal',proposal:clone(r.f.responseCase.request.proposal)});assert.equal(out.error,null,JSON.stringify(out));
  const apply=await r.wire('AdvanceCurrentBuild',{requestId:'advance-extent',worldRef:local.worldRef,expectedTurnRevision:read.context.turnRevision,localContext:local});assert.equal(apply.error,null,JSON.stringify(apply));assert.equal(r.f.applies[0].operations.effects.length,2);assert.equal(r.f.applies[0].regionInspectionBinding.confirmedPlacement.placement.target.kind,'ANCHORED_EXTENT');

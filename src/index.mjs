@@ -7,6 +7,8 @@ import { registerImageTool, imageURL, userProvidedURL, downloadImageBytes, uploa
 import { prepareImageAsk } from './image-ask.mjs';
 import { registerContextTool } from './context-tool.mjs';
 export { prepareImageAsk, IMAGE_ASK_ALLOWED_TOOLS } from './image-ask.mjs';
+import { regionEffectSummary } from './region-effects.mjs';
+export { regionEffectSummary } from './region-effects.mjs';
 import { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
 export { WRITE_METHODS, WRITE_METHOD_PORTS, writeToolSkillGuidance, evaluateWriteMethod, describeWriteMethod, peerContractHandshake, peerProtocolHandshake, PER_CELL_BRUSH, PER_CELL_PAINTER, PER_CELL_CANVAS } from './write-tools.mjs';
 const VERSION = 'session/v4', CANVAS = 'canvas/v6';
@@ -23,6 +25,13 @@ const explainPlacement = error => {const f=placementFailure(error);if(f)error.me
 // shown only in prose is not left for the user to "confirm" in the next message (K3 formal run E10/E13).
 const placementNext = ref => ({action:'prepare',placementSourceRef:ref,validUntil:'NEXT_USER_MESSAGE',
  instruction:'Choose placementTarget inside this inspection and call hanaworlds_context action prepare with this placementSourceRef now, in this same reply, before writing to the user. A position described only in prose is not a proposal and cannot be confirmed; this reference is refused once the next user message arrives.'});
+// The player confirms the extent as ranges per world axis (y is up), so a layer count different from the
+// requested height is visible in the question itself (K3 run 01a123a6 E10: 40×4×1 with a y8..9 extent).
+const span = (lo,hi,unit) => `${lo}..${hi}（${hi-lo+1}${unit}）`;
+const placementText = target => {
+ if(target.kind==='ANCHORED_EXTENT'){const {min,max}=target.bounds;return `范围 x=${span(min[0],max[0],'格')}、y=${span(min[1],max[1],'层')}、z=${span(min[2],max[2],'格')}`;}
+ const ys=[...new Set(target.cells.map(c=>c[1]))].sort((a,b)=>a-b);return `${target.cells.length}个格子，y=${ys.join('、')}（${ys.length}层）`;
+};
 const EARLIER_SOURCE = ' This placementSourceRef was inspected for an earlier user message, so no proposal was made then and this reply cannot confirm it. In this reply call action placement again, then prepare with the new placementSourceRef, show the returned question and wait for the next user message.';
 const packet = (wire,id,result,error=null) => ({contractVersion:wire,requestId:id,result,error});
 const pub = error => error?.publicError ?? C.publicError(error);
@@ -53,7 +62,7 @@ export class WorkshopV3 {
  constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;
   this.protocolHandshake=C.validateType('ProtocolHandshake',{profileVersion:'protocol-handshake/v1',component:'hanaworlds-workshop',
    protocols:[{protocol:'session',major:4,minor:0}],capabilities:[],
-   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.7.2',sourceRevision:null,artifactDigest:null}});
+   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.7.3',sourceRevision:null,artifactDigest:null}});
   this.locks=new Map(); }
  /** Trusted composition-only metadata preparation for G-S. Returns the official
   * SessionPersistence snapshot verbatim; this is not a session/v4 wire operation.
@@ -420,8 +429,9 @@ export class WorkshopV3 {
     placementInspection=copy(source.inspection);
    }
    const turn={turnRef:body.turnRef,turnRevision:revision(),text:body.text,media,referenceBriefDigest:null,intentDigest:null,actionReceiptDigest:null};state.turns.push(turn);
-   const positionText=body.controls.placement===undefined?'':`；已提议位置（世界${body.controls.placement.worldRef}）：${JSON.stringify(body.controls.placement.target)}`;
-   const question=complete?`请确认建造${body.text}，尺寸${dims.width}×${dims.depth}×${dims.height}个节点；场地规则：${siteRulesText(rules)}${positionText}。回复“确认”或修改。`:
+   const positionText=body.controls.placement===undefined?'':`；已提议位置（世界${body.controls.placement.worldRef}）：${placementText(body.controls.placement.target)} ${JSON.stringify(body.controls.placement.target)}`;
+   const proposalText=`；提议内容：${body.controls.purpose}${body.controls.styleText?`；样式：${body.controls.styleText}`:''}`;
+   const question=complete?`请确认建造${body.text}，尺寸${dims.width}×${dims.depth}×${dims.height}个节点${proposalText}；场地规则：${siteRulesText(rules)}${positionText}。回复“确认”或修改。`:
     rules===null?'请由当前skill提出入口、危险物、光照规则选项并补齐用途和节点尺寸后重新提交。':'请由当前skill补齐用途、节点尺寸和所需入口净空后重新提交。';
    state.pending={sessionRef:body.sessionRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,invocationId:body.requestId,clarificationId:revision(),question,complete:!!complete,controls:body.controls,placementInspection,afterSeq:core.events.length-1};
    state.details[turn.turnRef]={resultText:question,confirmedBrief:null};
@@ -536,7 +546,7 @@ export class WorkshopV3 {
   * envelope around the exact painter/v5 or painter-region/v2 response; unmet needs
   * are explained and nothing is sent to Painter. No method switch, truncation or
   * target rewrite. */
- async submitWriteProposal(method,raw) {const {availability,response}=await this.#submit(raw,method);return {method,availability,response};}
+ async submitWriteProposal(method,raw) {const {availability,response,effectSummary}=await this.#submit(raw,method);return {method,availability,response,...(effectSummary?{effectSummary}:{})};}
  #writeFacts() {return {ports:{painter:this.painter,brush:this.brush,canvas:this.canvas,painterRegion:this.painterRegion,brushRegion:this.brushRegion,canvasRegion:this.canvasRegion}};}
  #gate(method) {const availability=evaluateWriteMethod(method,this.#writeFacts());if(!availability.available)fail('CAPABILITY_UNAVAILABLE');return availability;}
  /** Contract WriteMethodDescriptors plus current availability; read-only. */
@@ -593,7 +603,8 @@ export class WorkshopV3 {
     if(!same(withoutRequest(request),stored.context))fail('TRANSACTION_CONFLICT');
     if(!same(await this.#regionContext(request,state,stored),stored.context))fail('TARGET_FACTS_STALE');
    }else{const facts=await this.#proposalFacts(request,state,stored);C.validateBuildProposalContext(request,facts);}
-   if(stored.response)return {availability,response:copy(stored.response)};
+   const effects=response=>region&&!response.error?{effectSummary:regionEffectSummary(response.result.build.block,stored.context.intent.confirmedIntent)}:{};
+   if(stored.response)return {availability,response:copy(stored.response),...effects(stored.response)};
    if(stored.request&&!same(stored.request,request))fail('REPLAY_MISMATCH');
    const {turn}=this.#turn(state);if(state.builds[turn.turnRef]?.dispatched||state.builds[turn.turnRef]?.region?.dispatched)fail('TRANSACTION_CONFLICT');
    const painter=region?this.painterRegion:this.#protocolPeer(this.painter,PER_CELL_PAINTER);stored.request=copy(request);await this.#save(request.sessionRef,core,state);
@@ -602,7 +613,7 @@ export class WorkshopV3 {
    else C.validateBuildProposalContext(request,await this.#proposalFacts(request,state,stored));
    if(painter!==(region?this.painterRegion:this.painter))fail('CURRENT_WORLD_MISMATCH');
    if(!response.error){stored.response=copy(response);state.builds[turn.turnRef]={contextId:state.currentContextId,method,plan:response.result,compiled:null,submission:null,dispatched:false,outcome:null,...(region?{region:{compiled:null,commitRequest:null,dispatched:false,result:null,undo:null}}:{})};await this.#save(request.sessionRef,core,state);}
-   return {availability,response:copy(response)};
+   return {availability,response:copy(response),...effects(response)};
   });}catch(error){return {availability,response:packet(region?'painter-region/v2':'painter/v5',request?.requestId??raw?.requestId??null,null,pub(error))};}
  }
  /** REGION Advance: validated plan → Brush CompileRegionBuild → Canvas

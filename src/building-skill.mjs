@@ -5,6 +5,7 @@
 // workflow edits and changed wire identifiers. v1.1 restores old wires, says absence instead of null,
 // and adds the formal REGION binding instruction; formatter and original R1-R4 are retained.
 // 0.7.2 (K3 formal E10/E13): one bounded step-1 edit — placement and prepare in the same reply.
+// 0.7.3 (K3 run 01a123a6 E12/E14): two bounded REGION insertions — check effectSummary before advance; VERIFIED ≠ request met.
 // skill-tools.ts blob 426ca1b1adef74d5bcaa85514cb4f48159f0d3dc: exact templates/formatter.
 // Load once, after the host has explicitly awaited its peer composition.
 const content = `Build and undo structures in the currently connected local world.
@@ -107,12 +108,17 @@ Index = (x-ox) + sx*((y-oy) + sy*(z-oz)). Palette entries are catalogue nodes so
 unique and all used; runs are canonical (adjacent runs differ) and their counts sum to sx*sy*sz.
 Explicit {"nodeName":"air","param2":0} digs; null means unspecified: that cell is not written and keeps its node.
 Painter validates; respond to its errors instead of bypassing validation.
+The submit result includes effectSummary: what the validated block will write, per y layer in world
+coordinates (each node's count and x/z range, and the unspecified cells). Before advance, compare it with the
+confirmed purpose, dimensions and position; if it differs, correct the proposal and submit again.
 For a structured REGION position use the same real action placement / prepare / new-human confirm path
 in step 1. Workshop sends its confirmed binding; Canvas checks its own recorded source inspection and
 current world revision before writing. A changed source, stale revision or missing/changed binding is
 refusal: get a new real inspection, proposal and new human confirmation; never move or truncate the target.
 R3. Call hanaworlds_build action advance: Brush compiles mapblock chunks, Canvas writes one transaction and reads
 the whole region back. Only outcome VERIFIED is success; ROLLED_BACK, PENDING or errors are not.
+VERIFIED means Canvas wrote exactly the submitted block, not that the block matched the request: describe the
+result from effectSummary, never from your intention.
 R4. hanaworlds_build action undo restores the whole region of the latest verified region write when nothing
 changed it since; otherwise report the conflict. You may refine afterwards with the cell path (steps 2-5).`
 function writeMethodSection(described) {
