@@ -156,4 +156,28 @@ test('v1.1 explicit null placement on the public Append wire is refused before a
  assert.equal(rejected.error?.code,'SCHEMA_INVALID');const after=await r.wire('StartOrResumeSession',{requestId:'after-null',expectedRevision:null});assert.equal(after.result.turns.length,0);assert.equal(r.f.applies.length,0);
 }));
 
+test('placement tells the model to prepare in the same reply; a prose-only position cannot be confirmed later and recovers only by a new proposal and a new human confirmation',async()=>setup(async r=>{
+ // K3 formal E10/E13: placement, then a prose position and no prepare; the reply "confirm" carried the old ref.
+ await r.bind();await r.append('s1',user('ask-prose','先查看位置并告诉我准确方案，等我确认后再执行'));
+ const source=await r.requireTool({action:'placement',...dimensions});
+ assert.deepEqual(source.next,{action:'prepare',placementSourceRef:source.placementSourceRef,validUntil:'NEXT_USER_MESSAGE',instruction:source.next.instruction});
+ assert.match(source.next.instruction,/same reply/);assert.match(source.next.instruction,/not a proposal/);
+ await r.append('s1',user('prose-yes','确认按上述准确位置执行'));
+ const stale=await r.tool({action:'prepare',...preparedFields,placementSourceRef:source.placementSourceRef,placementTarget:fixture.placements.A.target});
+ assert.equal(stale.isError,true);assert.match(stale.text,/PLACEMENT_BINDING_CHANGED/);assert.match(stale.text,/earlier user message/);assert.match(stale.text,/action placement again/);
+ assert.equal((await r.tool({action:'confirm'})).isError,true,'nothing was proposed, so nothing can be confirmed');
+ const before=await r.wire('StartOrResumeSession',{requestId:'snapshot-prose',expectedRevision:null});assert.equal(before.result.turns.length,0,'refused stale prepare leaves no turn');
+ const fresh=await r.requireTool({action:'placement',...dimensions});assert.notEqual(fresh.placementSourceRef,source.placementSourceRef);
+ const prepared=await r.requireTool({action:'prepare',...preparedFields,placementSourceRef:fresh.placementSourceRef,placementTarget:fixture.placements.A.target});
+ assert.deepEqual(prepared.placement,fixture.placements.A);assert.ok(prepared.clarification.question.includes(JSON.stringify(fixture.placements.A.target)));
+ assert.equal((await r.tool({action:'confirm'})).isError,true,'the reply that carried the old ref cannot confirm the new proposal');
+ await confirm(r,'yes-new');
+ const old=await r.tool({action:'prepare',...preparedFields,placementSourceRef:fresh.placementSourceRef,placementTarget:fixture.placements.A.target});assert.equal(old.isError,true,'a ref from before the confirmation is an older human message');assert.match(old.text,/earlier user message/);
+ const read=await r.requireTool({action:'read'});assert.equal(C.canonicalJSON(C.confirmedPlacementOf(read.context.intent,read.context.referenceBrief)),C.canonicalJSON(fixture.placements.A));
+ const request={...read.context,requestId:read.proposalRef+':proposal',proposal:clone(sample.request.proposal)};
+ const out=await r.ws.submitBuildProposal(request);assert.equal(out.error,null,JSON.stringify(out));assert.deepEqual(await r.ws.submitBuildProposal(request),out);assert.equal(r.f.painterRequests.length,1);
+ const apply=await r.wire('AdvanceCurrentBuild',{requestId:'advance-recovered',worldRef:local.worldRef,expectedTurnRevision:read.context.turnRevision,localContext:local});assert.equal(apply.error,null,JSON.stringify(apply));assert.equal(r.f.applies.length,1);
+ assert.equal(C.canonicalJSON(r.f.applies[0].regionInspectionBinding.confirmedPlacement),C.canonicalJSON(C.confirmedPlacementBinding(read.context.intent)));
+}));
+
 test.after(async()=>{if(process.env.HW_PLACEMENT_EVIDENCE_PATH)await writeFile(process.env.HW_PLACEMENT_EVIDENCE_PATH,JSON.stringify(observations,null,2)+'\n');});

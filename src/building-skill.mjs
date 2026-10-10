@@ -4,6 +4,7 @@
 // and generic PER_CELL coordinate/empty-space preflight. v2 adds two bounded structured-placement
 // workflow edits and changed wire identifiers. v1.1 restores old wires, says absence instead of null,
 // and adds the formal REGION binding instruction; formatter and original R1-R4 are retained.
+// 0.7.2 (K3 formal E10/E13): one bounded step-1 edit — placement and prepare in the same reply.
 // skill-tools.ts blob 426ca1b1adef74d5bcaa85514cb4f48159f0d3dc: exact templates/formatter.
 // Load once, after the host has explicitly awaited its peer composition.
 const content = `Build and undo structures in the currently connected local world.
@@ -28,6 +29,9 @@ the tool creates the official PlacementProposal, returns placement and includes 
 confirmation question. Show that returned question and structured position unchanged. A promise in prose
 alone does not bind a position. Omit both placement fields only when no structured position is proposed;
 the placement field is then omitted (never null) and the ordinary CURRENT_VIEW path applies. Do not show guessed coordinates as confirmed.
+Call placement and prepare in the same reply, before writing to the user: placementSourceRef is refused after the
+next user message, and a position described before prepare returns is not a proposal the user can confirm. When the
+user asks to see the position first, the question prepare returns is that display.
 Call hanaworlds_context with action prepare and complete purpose, width, depth, height, siteRules and optional
 styleText and relevant imageRefs. siteRules is your proposal for this site: whether the entrance must stay
 connected (with its design clearance in whole nodes), the hazard policy (liquids, maximum damage per second)

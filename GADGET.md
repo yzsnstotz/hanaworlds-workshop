@@ -1,4 +1,4 @@
-# Workshop 0.7.1 — local-world skill business component
+# Workshop 0.7.2 — local-world skill business component
 
 Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.1.0` (formal contracts 1.1.0, lock 5177522d; same content as candidate 1.1.0-rc.1) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
@@ -48,7 +48,11 @@ Before displaying world positions to confirm, the native `hanaworlds_context` to
 `action:placement` with proposed `width`, `depth`, `height`. Workshop invokes the normal
 Canvas `InspectPlacementRegion` CURRENT_VIEW port and retains its actual inspection in its
 own fresh domain, bound to this Core Session/latest human request/current localContext.
-It returns `{placementSourceRef, inspection}`. No confirmation or write occurs.
+It returns `{placementSourceRef, inspection, next}`. No confirmation or write occurs. `next`
+names the one legal step: `prepare` with this `placementSourceRef` in the same reply
+(`validUntil: NEXT_USER_MESSAGE`). A position shown only in prose is not a proposal; a later
+`prepare` with a source from an earlier user message is refused (`PLACEMENT_BINDING_CHANGED`)
+with that cause named, and recovers only by a new placement/prepare and a new human confirmation.
 
 Choose `PlacementTarget` from that inspection: sorted unique `EXACT_CELLS.cells` in absolute
 world coordinates, or `ANCHORED_EXTENT.bounds`. Call `action:prepare` with complete ordinary
