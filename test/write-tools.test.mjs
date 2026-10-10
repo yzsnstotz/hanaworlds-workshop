@@ -350,6 +350,11 @@ test('PER_CELL chain on formal 0.5.3: image brief → Painter → Brush → Canv
   assert.equal(described.tools[0].availability.available,true,JSON.stringify(described.tools[0].availability));assert.deepEqual(codes(described.tools[1].availability),['PEER_UNAVAILABLE','PEER_UNAVAILABLE','PEER_UNAVAILABLE']);
   const context=await r.ws.readWriteProposalContext('PER_CELL',{...advance,requestId:'read-context'});
   const sent=await r.ws.submitWriteProposal('PER_CELL',{...context,requestId:'proposal',proposal:clone(sample.request.proposal)});assert.equal(sent.response.error,null,JSON.stringify(sent));
+  {const {cellEffectSummary}=await import(entry);const request={...context,requestId:'proposal',proposal:clone(sample.request.proposal)};
+   assert.equal(C.canonicalJSON(sent.effectSummary),C.canonicalJSON(cellEffectSummary(C.validateBuildProposalRequest(request))),'PER_CELL envelope returns the decoded proposal');
+   assert.equal(sent.effectSummary.totals.written,sent.effectSummary.layers.reduce((a,l)=>a+l.nodes.reduce((b,n)=>b+n.count,0),0));
+   assert.deepEqual(await r.ws.submitWriteProposal('PER_CELL',request),sent,'exact replay returns the same envelope');
+   const packet=await r.ws.submitBuildProposal(request);assert.equal(Object.hasOwn(packet,'effectSummary'),false,'painter/v5 wire packet unchanged');assert.deepEqual(packet,sent.response);}
   assert.deepEqual(structuredClone(f.painterContexts[0].referenceBrief.media),[media]);
   const built=await call(r,'AdvanceCurrentBuild',advance);assert.equal(built.outcome,'VERIFIED');assert.equal(f.writes,1);
   assert.deepEqual((await r.ws.describeWriteTools('s1')).currentBuild,{turnRef:'image-turn',method:'PER_CELL',outcome:'VERIFIED',undo:null});

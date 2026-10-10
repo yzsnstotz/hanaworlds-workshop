@@ -41,3 +41,32 @@ export function regionEffectSummary(block, confirmedIntent = null) {
   confirmedDimensions: confirmedIntent?.dimensions ?? null,
   layers: sorted};
 }
+
+// The same facts for a PER_CELL proposal, before or regardless of Painter's verdict. I-K2-IMAGE-01 run
+// 01a123a8 (E19 seq51/52): a confirmed 7×6×5 gable house came back as a 4-layer flat roof and Painter
+// refused with INVALID_GEOMETRY and no cause; nothing told the model what its boxes actually covered.
+// Translation and overlap follow contracts build-proposal: world = sampledBounds.min + local, last box wins.
+// Only cells of the finite sampled inspection are enumerated; boxes reaching outside it are counted.
+export function cellEffectSummary(request) {
+ const {proposal, targetFacts: facts} = request, {min, max} = facts.sampledBounds;
+ const boxes = proposal.boxes.map(box => ({min: box.min.map((v, i) => v + min[i]), max: box.max.map((v, i) => v + min[i]), spec: proposal.materials[box.materialRef]}));
+ const key = p => p.join(','), occupied = new Set(facts.occupiedCells.map(c => key(c.position))), empty = new Set(facts.knownEmptyCells.map(key));
+ const layers = new Map();let written = 0, writesOccupied = 0, writesUnknown = 0, lo = null, hi = null;
+ for (let y = min[1]; y <= max[1]; y++) for (let z = min[2]; z <= max[2]; z++) for (let x = min[0]; x <= max[0]; x++) {
+  const box = boxes.findLast(b => x >= b.min[0] && x <= b.max[0] && y >= b.min[1] && y <= b.max[1] && z >= b.min[2] && z <= b.max[2]);
+  if (!box) continue;
+  const p = [x, y, z];written++;if (occupied.has(key(p))) writesOccupied++;else if (!empty.has(key(p))) writesUnknown++;
+  lo = lo ? lo.map((v, i) => Math.min(v, p[i])) : p;hi = hi ? hi.map((v, i) => Math.max(v, p[i])) : p;
+  if (!layers.has(y)) layers.set(y, new Map());
+  const nodes = layers.get(y), k = `${box.spec?.nodeName}\u0000${box.spec?.param2}`;
+  if (!nodes.has(k)) nodes.set(k, {nodeName: box.spec?.nodeName ?? null, param2: box.spec?.param2 ?? null, count: 0});
+  const n = nodes.get(k);n.count++;n.x = widen(n.x, x, x);n.z = widen(n.z, z, z);
+ }
+ const outside = boxes.filter(b => b.min.some((v, i) => v < min[i]) || b.max.some((v, i) => v > max[i])).length;
+ const sorted = [...layers.entries()].sort((a, b) => a[0] - b[0]).map(([y, nodes]) => ({y,
+  nodes: [...nodes.values()].sort((a, b) => a.nodeName < b.nodeName ? -1 : a.nodeName > b.nodeName ? 1 : a.param2 - b.param2)}));
+ return {profileVersion: 'workshop-cell-effects/v1', frameOrigin: [...min],
+  bounds: lo ? {min: lo, max: hi} : null, size: lo ? {x: hi[0] - lo[0] + 1, y: hi[1] - lo[1] + 1, z: hi[2] - lo[2] + 1} : null,
+  totals: {written, writesOccupied, writesUnknown, boxesOutsideSampledBounds: outside},
+  writtenLayers: sorted.map(l => l.y), confirmedDimensions: request.intent?.confirmedIntent?.dimensions ?? null, layers: sorted};
+}

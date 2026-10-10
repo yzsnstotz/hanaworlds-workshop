@@ -1,4 +1,4 @@
-# Workshop 0.7.3 — local-world skill business component
+# Workshop 0.7.4 — local-world skill business component
 
 Fresh profile only. Contracts from the contracts source by Git range `#semver:^1.1.0` (formal contracts 1.1.0, lock 5177522d; same content as candidate 1.1.0-rc.1) (same major via the package's `checkContractsVersion`; the lock records the resolved commit); root import `hanaworlds-contracts`. No old wire or profile adapter and no construction permission/grant provider.
 
@@ -254,6 +254,14 @@ count and x/z range and the unspecified cells — plus `writtenLayers` and the c
 world equals the submitted block, not that the block matches the request; the skill compares
 `effectSummary` with the confirmed purpose before advance and reports from it. The confirmation
 question also states the proposed purpose and the placement as per-axis ranges (y in layers).
+
+`submitWriteProposal('PER_CELL', request)` returns `effectSummary` (`workshop-cell-effects/v1`,
+exported as `cellEffectSummary(request)`) whatever Painter answers: the boxes translated by the
+contract rule (world = sampledBounds.min + local, last box wins) over the finite sampled inspection —
+bounds, size, `writtenLayers`, per y layer each material's count and x/z range, the confirmed
+`dimensions`, and counts of writes on occupied/unknown cells and boxes reaching outside the sample.
+Facts only. `submitBuildProposal` still returns the unchanged `painter/v5` packet; a Host that wants
+these facts for the model forwards the `submitWriteProposal('PER_CELL', …)` envelope instead.
 
 Compatibility: REGION requires each region port to advertise a contracts
 `ProtocolHandshake` and pass `checkProtocolCompatibility` for its wire and the

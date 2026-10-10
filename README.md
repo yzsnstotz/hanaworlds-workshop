@@ -1,6 +1,6 @@
 # hanaworlds-workshop
 
-HanaWorlds Stage 1 Workshop 0.7.3 component (contracts 1.1.0). See [GADGET.md](GADGET.md)
+HanaWorlds Stage 1 Workshop 0.7.4 component (contracts 1.1.0). See [GADGET.md](GADGET.md)
 for its host ports, Session flow, installation and recovery boundary. Product
 composition and human acceptance remain unproven.
 
