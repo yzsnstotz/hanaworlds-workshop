@@ -1,6 +1,7 @@
 import test from 'node:test';
+import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
-import { readFile, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { readFile, mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { Context } from '@deepseek-ai/cordis';
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
 import Jsonl from '@deepseek-ai/dsh-session-persistence-jsonl';
@@ -18,7 +19,7 @@ const header=id=>({version:SESSION_FORMAT_VERSION,id,createdAt:100,cwd:'/placeme
 const user=(id,text)=>({type:'user/message',time:100,surfaceOp:'append',data:{id,role:'user',source:{kind:'user'},content:[{type:'text',text}]}});
 const handshake=(component,protocol,major,capabilities=[])=>({profileVersion:'protocol-handshake/v1',component,protocols:[{protocol,major,minor:0}],capabilities,provenance:{packageName:component,packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}});
 async function setup(fn){
- const base=process.env.HW_RUNTIME_ROOT;if(!base)throw Error('own HW_RUNTIME_ROOT required');await mkdir(base,{recursive:true});const root=await mkdtemp(base+'/placement-');
+ const base=process.env.HW_RUNTIME_ROOT??tmpdir();await mkdir(base,{recursive:true});const root=await mkdtemp(base+'/placement-');
  const ctx=new Context();const f={inspection:clone(fixture.inspections.view1),calls:[],painterRequests:[],applies:[],worldRevision:fixture.inspections.view1.targetFacts.worldRevision,responseCase:sample,recordedInspections:{}};let ws;
  try{
   await ctx.plugin(Jsonl,{root:root+'/core',compression:'none'}).await();await ctx.plugin(Storage).await();await ctx.plugin(StorageJson,{root:root+'/projection'}).await();await ctx.plugin(StorageDomain,{backend:'json'}).await();await ctx.plugin(SystemPrompt).await();await ctx.plugin(Tools).await();
@@ -60,7 +61,7 @@ async function setup(fn){
   const requireTool=async(args,id='s1')=>{const a=await tool(args,id);assert.equal(a.isError,false,a.text);return a.json;};
   await fn({ctx,ws,f,wire,bind,append,tool,requireTool,root});
   observations.push({runtimeRoot:root,calls:f.calls,painterRequests:f.painterRequests,fixtureApplies:f.applies,scope:'SOURCE/FIXTURE; actual official Core/Tools/storage/Workshop, peer fixtures; no model/native/real World writes'});
- }finally{await ws?.projectionStore.close();await ctx.fiber.dispose();}
+ }finally{await ws?.projectionStore.close();await ctx.fiber.dispose();await rm(root,{recursive:true,force:true});}
 }
 const dimensions={width:3,depth:1,height:1};
 const preparedFields={purpose:'first building',...dimensions,siteRules:sample.request.referenceBrief.controls.siteRules,imageRefs:[]};

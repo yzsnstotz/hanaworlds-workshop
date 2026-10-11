@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
 import { access, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
@@ -10,8 +11,7 @@ const installed = dirname(fileURLToPath(import.meta.resolve('hanaworlds-contract
 const spec = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#v2.0.0';
 
 async function scratch(t, name) {
-  const base = process.env.HW_RUNTIME_ROOT;
-  assert.ok(base, 'isolated HW_RUNTIME_ROOT required');
+  const base = process.env.HW_RUNTIME_ROOT ?? tmpdir();
   await mkdir(base, {recursive:true});
   const temp = await mkdtemp(join(base, name));
   t.after(() => rm(temp, {recursive:true,force:true}));
