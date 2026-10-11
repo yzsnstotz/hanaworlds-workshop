@@ -33,6 +33,7 @@ async function setup(fn){
   if(op==='InspectPlacementRegion')return {...response({outcome:'REGION_INSPECTED',inspection:f.inspection??clone(sample.request.regionInspection)}),unavailableSettings:null};
   f.writes++;throw Error(`context tool must not reach ${op}`);}});
  ctx.provide('hanaworldsCatalogue',{read:async()=>clone(sample.request.catalogue)});
+ ctx.provide('agentDefaultModel',{currentSelection:()=>({provider:'fixture',model:'fixture-host-selected'})});
  await ctx.plugin(plugin).await();const ws=ctx.get('hanaworldsWorkshop');
  const append=async(id,...events)=>{const w=await ctx.sessionPersistence.open(id,'write');try{const log=await w.read();await w.append(events.map((e,i)=>({...e,seq:log.events.length+i})));}finally{await w.close();}};
  const tool=async(args,id='s1')=>{const out=await ctx.tools.execute({name:'hanaworlds_context',callId:`ctx-${Math.random()}`,arguments:args,signal:new AbortController().signal,agent:{ctx,session:{header:header(id)}}});return {...out,json:out.isError?null:JSON.parse(out.value.result),text:out.content.map(p=>p.text).join('')};};

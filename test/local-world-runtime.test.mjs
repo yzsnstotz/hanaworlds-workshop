@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Context } from '@deepseek-ai/cordis';
-import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
+import { Session, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl';
 import Storage from '@deepseek-ai/dsh-storage';
 import * as StorageJson from '@deepseek-ai/dsh-storage-json';
@@ -59,6 +59,8 @@ async function mount(root,f) {
  const ctx=new Context(); await ctx.plugin(JsonlSessionPersistence,{root:join(root,'core'),compression:'none'}).await();
  await ctx.plugin(Storage).await();await ctx.plugin(StorageJson,{root:join(root,'projection')}).await();await ctx.plugin(StorageDomain,{backend:'json'}).await();
  for(const [k,v] of Object.entries({hanaworldsCanvasV5:f.canvas,hanaworldsPainterV2PictureBlocks:f.painter,hanaworldsBrushV3:f.brush,hanaworldsCatalogue:{read:async()=>clone(sample.request.catalogue)},hanaworldsCompilerConfig:{read:async()=>({compilationConfig:config,compilerRevision:'fixture-compiler'})},hanaworldsCapabilities:f.capabilities,llm:{async *stream(){f.modelCalls++;throw Error('second model forbidden');}}}))ctx.provide(k,v);
+ ctx.provide('agentDefaultModel',{currentSelection:()=>f.modelUnavailable?undefined:({provider:'fixture',model:'fixture-host-selected'})});
+ if(f.liveSession)ctx.provide('sessions',{get:id=>id==='s1'?f.liveSession:undefined});
  await ctx.plugin(plugin).await();const workshop=ctx.get('hanaworldsWorkshop');f.readFacts=q=>workshop.readBuildProposalProviderFacts(q);
  return {ctx,workshop,async close(){await workshop.projectionStore.close();await ctx.fiber.dispose();}};
 }
@@ -69,16 +71,45 @@ async function ready(r,f){
  const writer=await r.ctx.sessionPersistence.create({version:SESSION_FORMAT_VERSION,id:'s1',createdAt:100,cwd:'/isolated/local-world',isSeeded:false});await writer.append([{type:'turn/start',seq:0,time:101,data:{turn:1}}]);await writer.close();
  const s=await call(r,'StartOrResumeSession',start);
  const switched=await call(r,'SwitchWorldContext',{contractVersion:'session/v5',sessionRef:'s1',requestId:'switch',expectedRevision:s.context.sessionRevision,worldRef:f.local.worldRef,selectionRevision:f.local.selectionRevision,localContext:f.local});
+ if(f.requestModel){const w=await r.ctx.sessionPersistence.open('s1','write');try{const log=await w.read();await w.append([
+  {type:'request/header',seq:log.events.length,time:101,data:{reason:'initial',header:{config:{provider:'fixture',model:f.requestModel}}}},
+  {type:'model/selection',seq:log.events.length+1,time:101,data:{provider:'fixture',model:'fixture-next-model'}}
+ ]);}finally{await w.close();}}
  const turn=await call(r,'AppendMultimodalTurn',{...start,requestId:'input',expectedRevision:switched.context.sessionRevision,turnRef:'turn-1',text:'建一块石头',media:[],controls:{purpose:'first building',dimensions:{width:1,depth:1,height:1,unit:'node'},entrancePortalRefs:[],styleText:null,siteRules:{requireEntranceConnectivity:false,entranceClearance:null,hazardPolicy:{forbidLiquid:true,maximumDamagePerSecond:0},optionalLightRule:null}},localContext:f.local});
  const current=await call(r,'StartOrResumeSession',start);
- const writer2=await r.ctx.sessionPersistence.open('s1','write');await writer2.append([{type:'user/message',seq:1,time:102,surfaceOp:'append',data:{id:'confirm',role:'user',source:{kind:'user'},content:[{type:'text',text:'确认'}]}}]);await writer2.close();
- await call(r,'AnswerClarification',{...start,requestId:'confirm',expectedRevision:current.context.sessionRevision,turnRef:'turn-1',clarificationId:turn.clarification.clarificationId,answer:'确认',localContext:f.local});
+ const writer2=await r.ctx.sessionPersistence.open('s1','write');await writer2.append([{type:'user/message',seq:(await writer2.read()).events.length,time:102,surfaceOp:'append',data:{id:'confirm',role:'user',source:{kind:'user'},content:[{type:'text',text:'确认'}]}}]);await writer2.close();
+ const confirmed=await call(r,'AnswerClarification',{...start,requestId:'confirm',expectedRevision:current.context.sessionRevision,turnRef:'turn-1',clarificationId:turn.clarification.clarificationId,answer:'确认',localContext:f.local});
  const advance={contractVersion:'session/v5',sessionRef:'s1',requestId:'advance',worldRef:f.local.worldRef,expectedTurnRevision:turn.turnRevision,localContext:f.local};
  const context=await r.workshop.readBuildProposalContext({...advance,requestId:'read-context'});
  const proposal={...context,requestId:'proposal',proposal:clone(sample.request.proposal)};
  const submitted=await r.workshop.submitBuildProposal(proposal);assert.equal(submitted.error,null,JSON.stringify(submitted));
- return {advance,proposal};
+ return {advance,proposal,turn,confirmed};
 }
+test('session/v5 receipts name the Core request model even when the next model has changed',async()=>{
+ const f=fixture();f.requestModel='fixture-actual-request-model';await withRuntime(f,async r=>{
+  const {turn,confirmed}=await ready(r,f);
+  assert.equal(turn.model,f.requestModel);assert.equal(confirmed.model,f.requestModel);
+  C.validateType('TurnReceipt',turn);C.validateType('TurnReceipt',confirmed);
+ });
+});
+test('receipts read the same live Core header when JSONL still contains an older request',async()=>{
+ const f=fixture();f.requestModel='fixture-durable-old';
+ f.liveSession=Session.create('s1',[
+  {type:'turn/start',seq:0,time:101,data:{turn:1}},
+  {type:'request/header',seq:1,time:101,data:{reason:'initial',header:{config:{provider:'fixture',model:'fixture-live-current'}}}}
+ ],{version:SESSION_FORMAT_VERSION,id:'s1',createdAt:100,cwd:'/isolated/local-world',isSeeded:false});
+ await withRuntime(f,async r=>{const {turn,confirmed}=await ready(r,f);assert.equal(turn.model,'fixture-live-current');assert.equal(confirmed.model,'fixture-live-current');});
+});
+test('a Host without a selected model returns CAPABILITY_UNAVAILABLE before creating a turn',async()=>{
+ const f=fixture();f.modelUnavailable=true;await withRuntime(f,async r=>{
+  const w=await r.ctx.sessionPersistence.create({version:SESSION_FORMAT_VERSION,id:'s1',createdAt:100,cwd:'/isolated/local-world',isSeeded:false});await w.append([{type:'turn/start',seq:0,time:101,data:{turn:1}}]);await w.close();
+  const s=await call(r,'StartOrResumeSession',start);
+  const switched=await call(r,'SwitchWorldContext',{contractVersion:'session/v5',sessionRef:'s1',requestId:'switch',expectedRevision:s.context.sessionRevision,worldRef:f.local.worldRef,selectionRevision:f.local.selectionRevision,localContext:f.local});
+  const response=await r.workshop.call('AppendMultimodalTurn',{...start,requestId:'unconfigured',expectedRevision:switched.context.sessionRevision,turnRef:'turn-1',text:'你好',media:[],controls:{purpose:null,dimensions:null,entrancePortalRefs:[],styleText:null,siteRules:null},localContext:f.local});
+  assert.equal(response.error.code,'CAPABILITY_UNAVAILABLE');assert.equal(response.result,null);
+  assert.deepEqual((await call(r,'StartOrResumeSession',start)).turns,[]);
+ });
+});
 test('local text proposal → build → durable duplicate → original Undo uses real Core and zero second model',async()=>{
  const f=fixture();await withRuntime(f,async(r,root)=>{const {advance}=await ready(r,f);const built=await call(r,'AdvanceCurrentBuild',advance);assert.equal(built.outcome,'VERIFIED');assert.equal(f.writes,1);assert.equal(f.modelCalls,0);
  await r.close();const reopened=await mount(root,f);try{

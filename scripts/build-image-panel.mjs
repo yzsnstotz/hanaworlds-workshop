@@ -7,4 +7,4 @@ const output=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.
 if(output.diagnostics?.some(d=>d.category===ts.DiagnosticCategory.Error))throw Error('Panel decorator compilation failed');
 await mkdir(new URL('../lib/',import.meta.url),{recursive:true});
 await writeFile(new URL('../lib/panel-host.mjs',import.meta.url),output.outputText);
-console.log(JSON.stringify({route:'SRC_ONLY_NEW_ENDPOINTS',namespace:'hanaworldsWorkshopImageLinks',compiler:ts.version,outputs:1}));
+console.log(JSON.stringify({route:'SRC_ONLY_NEW_ENDPOINTS',namespaces:['hanaworldsWorkshopImageLinks','hanaworldsWorkshopConversation'],compiler:ts.version,outputs:1}));

@@ -156,3 +156,10 @@ Official @deepseek-ai/dsh-skill@0.2.0-rc.2 (runtime) and
 separately installed public npm packages from deepseek-ai/deepseek-harness,
 packages/skill/skill and packages/skill/tool-skill. Their implementations and
 licenses are not copied or bundled. Existing dependencies stay pinned.
+workshop-03 (0.7.5): no new runtime package and no open-source usage change (D-3).
+@deepseek-ai/dsh-session 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · public Core request/header and model/selection facts, user/assistant transcript and same-session flush.
+@deepseek-ai/dsh-agent 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · Host AgentRegistry port and public Agent.followup/whenIdle/cancel; native installModelSelection in the runtime test, not bundled.
+@deepseek-ai/dsh-agent-loop 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · existing Host native driver; dev runtime verification with an explicitly labelled FIXTURE adapter.
+@deepseek-ai/dsh-typert-protocol 0.2.0-rc.2 · MIT · https://registry.npmjs.org/ · source-mode conversation remote on the existing Host API.
+@deepseek-ai/cordis 4.0.4 · MIT · https://registry.npmjs.org/ · existing plugin, live services and scoped error subscription.
+Upstream source for these packages: https://github.com/deepseek-ai/deepseek-harness.

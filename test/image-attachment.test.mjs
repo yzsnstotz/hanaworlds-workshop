@@ -31,6 +31,7 @@ async function mount(root){
  ctx.provide('hanaworldsCapabilities',caps);
  ctx.provide('hanaworldsCanvasV5',{contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-canvas',protocols:[{protocol:'canvas',major:7,minor:0}],capabilities:[],provenance:{packageName:'hanaworlds-canvas',packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}},async call(op,q){assert.equal(op,'ReadWorldSelectionContext','image tool must never write world');return {contractVersion:'canvas/v7',requestId:q.requestId,result:{sessionRef:q.sessionRef,worldRef:q.worldRef,inventory:{capabilityRevision:'cap1',connections:[]},selection:{status:'BOUND',connectionRef:local.connectionRef,context:{currentSession:q.sessionRef,activeWorldRef:local.worldRef,orderedSelectedObjectRefs:[],sessionRevision:'c1',selectionRevision:local.selectionRevision,localContext:local}}},error:null};}});
  ctx.provide('llm',{async stream(){assert.fail('no model calls');}});
+ ctx.provide('agentDefaultModel',{currentSelection:()=>({provider:'fixture',model:'fixture-host-selected'})});
  await ctx.plugin(plugin).await();const ws=ctx.get('hanaworldsWorkshop');
  return {ctx,ws,async append(id,event){const w=await ctx.sessionPersistence.open(id,'write');try{const log=await w.read();await w.append([{...event,seq:log.events.length}]);}finally{await w.close();}},async close(){await ws.projectionStore.close();await ctx.fiber.dispose();}};
 }

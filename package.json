@@ -1,6 +1,6 @@
 {
   "name": "hanaworlds-workshop",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -23,6 +23,7 @@
   },
   "files": [
     "src/index.mjs",
+    "src/conversation.mjs",
     "src/building-skill.mjs",
     "src/image-attachment.mjs",
     "src/image-ask.mjs",
@@ -56,8 +57,8 @@
   },
   "scripts": {
     "test:session-metadata": "node --test test/session-metadata.test.mjs",
-    "build": "node scripts/verify-contracts.mjs && node --check src/index.mjs && node --check src/building-skill.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/image-ask.mjs && node --check src/context-tool.mjs && node --check src/write-tools.mjs && node scripts/build-image-panel.mjs",
-    "test": "node --test test/client-entry.test.mjs test/runtime-version.test.mjs test/context-tool.test.mjs test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/image-panel-new-session.test.mjs test/image-ask.test.mjs test/write-tools.test.mjs test/placement-lifecycle.test.mjs",
+    "build": "node scripts/verify-contracts.mjs && node --check src/index.mjs && node --check src/conversation.mjs && node --check src/building-skill.mjs && node --check client.cjs && node --check src/image-attachment.mjs && node --check src/image-ask.mjs && node --check src/context-tool.mjs && node --check src/write-tools.mjs && node scripts/build-image-panel.mjs",
+    "test": "node --test test/client-entry.test.mjs test/runtime-version.test.mjs test/conversation-runtime.test.mjs test/conversation-client.test.mjs test/context-tool.test.mjs test/local-world-runtime.test.mjs test/image-attachment.test.mjs test/image-panel-new-session.test.mjs test/image-ask.test.mjs test/write-tools.test.mjs test/placement-lifecycle.test.mjs",
     "test:image": "node --test test/image-attachment.test.mjs test/image-panel-new-session.test.mjs",
     "test:new-session": "node --test test/image-panel-new-session.test.mjs",
     "test:ask": "node --test test/image-ask.test.mjs test/ask-web.test.mjs test/account-allowance.test.mjs",

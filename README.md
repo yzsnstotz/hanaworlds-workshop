@@ -120,3 +120,22 @@ persistence, an explicit Canvas fixture and no auth/model/world writer.
 `npm run typecheck:contracts` checks the exact public consumer types. These
 checks do not establish real image understanding, native world behavior,
 product UI readiness or owner acceptance.
+# Workshop 03 · 宿主模型与工坊对话
+
+工坊对话复用宿主已打开的 Core Session 和 live Agent。订阅登录、模型目录、
+模型选择继续由宿主的 DSH 设置负责；Workshop 不创建独立登录页或登录存储。
+对话框显示该 Session 下一次请求选择的 provider/model，每条回复另保留实际模型名。
+发送文字通过原生 `Agent.followup` → AgentLoop → 宿主模型适配器，回复与输入留在
+同一个 Core JSONL 中。`model/selection` 表示下一次选择，`request/header` 表示已用模型；
+`session/v5` 的 TurnReceipt.model 从实际请求取值，不再写死 Luna。
+
+宿主需提供 `sessions`、`agents`；初次请求前模型来自原生
+`agentDefaultModel.currentSelection()`（或显式 AgentOptions）。已使用模型和后续选择
+直接读 Core。模型未选、live Agent 缺失、调用失败或本轮无文本回复都会明确拒绝。
+业务工具仍由现有 building skill 调用，面板不自行填建造参数或确认意图。
+面板使用已有 Typert source remote，在宿主 API 下提供
+`hanaworldsWorkshopConversation/read` 和 `/send`，不添加独立网页入口。
+
+`npm test` 包含真实 DSH Core/AgentLoop 上的模型切换、持久化、失败不复用旧回复、
+重复发送及切换会话检查。该套件的模型适配器明确为 FIXTURE；订阅模型真实回复和
+宿主 UI 验证须分别记录，不能由测试通过推定。

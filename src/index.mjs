@@ -1,4 +1,5 @@
-import { WorkshopImageLinkPanelService } from '../lib/panel-host.mjs';
+import { WorkshopImageLinkPanelService, WorkshopConversationPanelService } from '../lib/panel-host.mjs';
+import { sessionModel, conversationView, sendConversation } from './conversation.mjs';
 import packageManifest from '../package.json' with { type: 'json' };
 import { createHash, randomUUID } from 'node:crypto';
 import { symbols } from '@deepseek-ai/cordis';
@@ -64,7 +65,20 @@ export class WorkshopV3 {
   this.protocolHandshake=C.validateType('ProtocolHandshake',{profileVersion:'protocol-handshake/v1',component:'hanaworlds-workshop',
    protocols:[{protocol:'session',major:5,minor:0}],capabilities:[],
    provenance:{packageName:packageManifest.name,packageVersion:packageManifest.version,sourceRevision:null,artifactDigest:null}});
-  this.locks=new Map(); }
+  this.locks=new Map();this.conversationSends=new Set(); }
+ /** Only a live Host-owned Agent can drive this exact Core Session. */
+ conversationAgent(session) {
+  const id=session?.header?.id;
+  if(!id||this.sessions?.get(id)!==session)throw Error('SESSION_MISMATCH');
+  const agent=this.agents?.get(id);
+  if(!agent||agent.session!==session)throw Error('CONVERSATION_AGENT_REQUIRED');
+  return agent;
+ }
+ async readConversationForPanel(session,signal) {
+  signal.throwIfAborted();const agent=this.conversationAgent(session);
+  return conversationView(session,agent,()=>this.defaultModel?.currentSelection?.()??agent.options);
+ }
+ async sendConversationForPanel(session,text,signal) {return sendConversation(this,session,text,signal);}
  status() {
   return {component:packageManifest.name,version:packageManifest.version,
    contractHandshake:copy(this.contractHandshake),protocolHandshake:copy(this.protocolHandshake)};
@@ -412,6 +426,17 @@ export class WorkshopV3 {
   return accepted;
  }
  async #dispatch(operation,body,core,state) {
+  // Tool receipts describe the native request already in Core, never a model
+  // claimed by a tool caller. A pre-request fixture/Host uses its selected default.
+  let model=null;
+  if(['AppendMultimodalTurn','AnswerClarification'].includes(operation)){
+   const live=this.sessions?.get(body.sessionRef);
+   if(live&&!same(core.identity,coreIdentity(live.header,body.sessionRef)))fail('SESSION_NOT_FOUND');
+   // Native tools may run before the asynchronous JSONL writer has flushed the
+   // current header; the same live Core Session is authoritative at that point.
+   try{model=sessionModel(live?.snapshotEvents?.()??core.events,{initial:()=>this.defaultModel?.currentSelection?.()??this.agents?.get(body.sessionRef)?.options}).model;}
+   catch(error){if(error.message==='MODEL_SELECTION_UNAVAILABLE')fail('CAPABILITY_UNAVAILABLE');throw error;}
+  }
   if(operation==='SwitchWorldContext'){
    if(Object.values(state.builds).some(b=>b.dispatched&&!b.outcome&&!b.terminal))fail('RECOVERY_PENDING');
    const context=await this.#selection(body);if(body.selectionRevision!==context.selectionRevision)fail('CURRENT_WORLD_MISMATCH');
@@ -440,7 +465,7 @@ export class WorkshopV3 {
     rules===null?'请由当前skill提出入口、危险物、光照规则选项并补齐用途和节点尺寸后重新提交。':'请由当前skill补齐用途、节点尺寸和所需入口净空后重新提交。';
    state.pending={sessionRef:body.sessionRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,invocationId:body.requestId,clarificationId:revision(),question,complete:!!complete,controls:body.controls,placementInspection,afterSeq:core.events.length-1};
    state.details[turn.turnRef]={resultText:question,confirmedBrief:null};
-   return this.#turnReceipt(body,state,turn,question,this.#clarification(state.pending));
+   return this.#turnReceipt(body,state,turn,question,this.#clarification(state.pending),model);
   }
   if(operation==='AnswerClarification'){
    const pending=state.pending,turn=state.turns.at(-1);
@@ -450,7 +475,7 @@ export class WorkshopV3 {
    if(inputs.length!==1||e.surfaceOp!=='append'||message?.role!=='user'||message?.source?.kind!=='user'||message.id!==body.requestId||message.content?.length!==1||message.content[0].type!=='text'||message.content[0].text!==body.answer)fail('INTENT_UNCONFIRMED');
    if(!pending.complete||!['确认','yes','YES'].includes(body.answer.trim())){
     pending.complete=false;pending.afterSeq=core.events.length-1;pending.clarificationId=revision();pending.question='请更新建造参数并重新提交，之后再确认。';
-    return this.#turnReceipt(body,state,turn,pending.question,this.#clarification(pending));
+    return this.#turnReceipt(body,state,turn,pending.question,this.#clarification(pending),model);
    }
    const brief=C.validateType('BriefProjection',{contractVersion:'ReferenceBrief/v5',sessionRef:body.sessionRef,turnRevision:turn.turnRevision,briefRevision:revision(),media:await this.#media(turn.media,core,state),text:turn.text,controls:pending.controls});
    const briefDigest=digest('reference-brief',brief);
@@ -458,7 +483,7 @@ export class WorkshopV3 {
    C.confirmedPlacementOf(intent,brief);
    turn.referenceBriefDigest=briefDigest;turn.intentDigest=digest('intent',intent);
    state.confirmed[turn.turnRef]={brief,intent,confirmationInputId:message.id,localContext:copy(body.localContext),placementInspection:copy(pending.placementInspection)};state.pending=null;
-   state.details[turn.turnRef]={resultText:'已确认建造意图。',confirmedBrief:brief};return this.#turnReceipt(body,state,turn,'已确认建造意图。',null);
+   state.details[turn.turnRef]={resultText:'已确认建造意图。',confirmedBrief:brief};return this.#turnReceipt(body,state,turn,'已确认建造意图。',null,model);
   }
   if(operation==='ReadSessionTurnDetails')return {sessionRef:body.sessionRef,sessionRevision:state.context.sessionRevision,turns:state.turns.map(t=>({turnRef:t.turnRef,turnRevision:t.turnRevision,userText:t.text,...state.details[t.turnRef]}))};
   if(operation==='AdvanceCurrentBuild')return this.#advance(body,core,state);
@@ -467,7 +492,7 @@ export class WorkshopV3 {
   fail('CAPABILITY_UNAVAILABLE');
  }
  #clarification(p){return {sessionRef:p.sessionRef,turnRevision:p.turnRevision,invocationId:p.invocationId,clarificationId:p.clarificationId,code:'AMBIGUOUS_INTENT',question:p.question};}
- #turnReceipt(body,state,turn,text,clarification){return {sessionRef:body.sessionRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,briefDigest:turn.referenceBriefDigest,model:'gpt-5.6-luna',resultText:text,clarification};}
+ #turnReceipt(body,state,turn,text,clarification,model){return {sessionRef:body.sessionRef,turnRef:turn.turnRef,turnRevision:turn.turnRevision,briefDigest:turn.referenceBriefDigest,model,resultText:text,clarification};}
  async #context(body,state,stored) {
   const {turn,saved}=this.#turn(state);await this.#current(body,state);
   if(body.expectedTurnRevision&&body.expectedTurnRevision!==turn.turnRevision)fail('TURN_REVISION_MISMATCH');
@@ -774,9 +799,10 @@ export function apply(ctx) {
  const projectionStore=new WorkshopProjectionStore(()=>ctx.get('storageDomain'));
  ctx.effect?.(()=>()=>projectionStore.close(),'hanaworlds-workshop.projection-close');
  const service=new WorkshopV3({projectionStore});
- for(const [field,port] of Object.entries({sessions:'sessions',agents:'agents',attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities',painterRegion:'hanaworldsPainterRegionV1',brushRegion:'hanaworldsBrushRegionV1',canvasRegion:'hanaworldsCanvasRegionV1'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
+ for(const [field,port] of Object.entries({sessions:'sessions',agents:'agents',defaultModel:'agentDefaultModel',attachments:'attachments',sessionPersistence:'sessionPersistence',canvas:'hanaworldsCanvasV5',painter:'hanaworldsPainterV2PictureBlocks',brush:'hanaworldsBrushV3',catalogue:'hanaworldsCatalogue',compilerConfig:'hanaworldsCompilerConfig',capabilities:'hanaworldsCapabilities',painterRegion:'hanaworldsPainterRegionV1',brushRegion:'hanaworldsBrushRegionV1',canvasRegion:'hanaworldsCanvasRegionV1'}))Object.defineProperty(service,field,{get:()=>ctx.get(port)});
  registerImageTool(ctx,service);registerContextTool(ctx,service);
  ctx.provide('hanaworldsWorkshop',service);ctx.provide('hanaworldsWorkshopV3',service);
  new WorkshopImageLinkPanelService(ctx);
+ new WorkshopConversationPanelService(ctx);
 }
 export default {name,inject,apply};

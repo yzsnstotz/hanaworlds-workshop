@@ -28,3 +28,24 @@ export class WorkshopImageLinkPanelService extends TypertRemoteService {
   }
  }
 }
+
+/** Conversation calls retain the Host's current Agent, model route and login. */
+export class WorkshopConversationPanelService extends TypertRemoteService {
+ constructor(ctx: Context) { super(ctx,'hanaworldsWorkshopConversation'); }
+ private session(sessionRef: string) {
+  if(typeof sessionRef!=='string'||!sessionRef)throw Error('SESSION_REQUIRED');
+  const session=(this.ctx.get('sessions') as SessionStore).get(sessionRef as never);
+  if(!session)throw Error('LIVE_SESSION_NOT_FOUND');
+  return session;
+ }
+ @Remote
+ async read(sessionRef: string,signal: AbortSignal): Promise<unknown> {
+  try {return await this.ctx.get('hanaworldsWorkshop').readConversationForPanel(this.session(sessionRef),signal);}
+  catch(error){throw new RemoteError('workshop-conversation/read-failed',(error as Error).message,{sessionRef});}
+ }
+ @Remote
+ async send(sessionRef: string,text: string,signal: AbortSignal): Promise<unknown> {
+  try {return await this.ctx.get('hanaworldsWorkshop').sendConversationForPanel(this.session(sessionRef),text,signal);}
+  catch(error){throw new RemoteError('workshop-conversation/send-failed',(error as Error).message,{sessionRef});}
+ }
+}

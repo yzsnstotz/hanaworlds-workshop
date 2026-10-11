@@ -352,3 +352,26 @@ This is a reviewable instruction improvement prompted by recorded TEXT refusals,
 
 
 workshop-01 archives historical evidence, deferred implementations, legacy history, standalone web hosts and gate/probe scripts under `archive/workshop-01/`. These paths are excluded from published package files. The client receives transport solely through `ctx.get('hanaworldsWorkshopTransport')`. Material references and neutral orientation indices pass unchanged through Painter → Brush → Canvas; geometry and partition are declared by the world source.
+# workshop-03 · Native Host conversation
+
+`hanaworldsWorkshop.readConversationForPanel(session, signal)` and
+`sendConversationForPanel(session, text, signal)` require the exact live Core
+Session and its Host AgentRegistry entry. The source-mode Typert namespace
+`hanaworldsWorkshopConversation` exposes `read(sessionRef)` / `send(sessionRef,text)`
+on the existing API gateway. The web client derives that reference from the
+single `mainView` retention owner; it does not accept player-entered references.
+Sending wakes the existing native AgentLoop and waits for a text reply from the
+submitted prompt's own turn, then flushes the same Session. No Workshop-owned
+model loop, login storage or standalone page is added.
+
+The initial model comes from the Host `agentDefaultModel.currentSelection()` or
+explicit AgentOptions. The next selection follows the public Core
+`model/selection` event; the actual used model follows `request/header.header.config`.
+Tool `TurnReceipt.model` names that actual request even when a newer model choice
+is pending. Missing selection returns `CAPABILITY_UNAVAILABLE` on session/v5
+before a new domain turn is created. The panel displays native replies separately
+from the confirmed construction projection. Login/model settings remain Host-owned.
+
+`npm test` verifies the native Loop, source Gateway and same-session persistence
+with an explicit FIXTURE provider; it does not establish a subscription login,
+real model reply, integrated Host UI or owner acceptance.

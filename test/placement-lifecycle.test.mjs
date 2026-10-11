@@ -52,6 +52,7 @@ async function setup(fn){
   ctx.provide('hanaworldsPainterV2PictureBlocks',{contractHandshake:C.contractHandshake,protocolHandshake:handshake('fixture-painter','painter',6),async call(op,q){
    assert.equal(op,'ValidateBuildProposal');C.validateBuildProposalRequest(q);const facts=await ws.readBuildProposalProviderFacts(q);C.validateBuildProposalContext(q,facts);f.painterRequests.push({request:clone(q),facts:clone(facts)});const result=clone(f.responseCase.response.result);result.invocationId=q.invocationId;return {contractVersion:'painter/v6',requestId:q.requestId,result,error:null};
   }});
+ ctx.provide('agentDefaultModel',{currentSelection:()=>({provider:'fixture',model:'fixture-host-selected'})});
   await ctx.plugin(Workshop).await();ws=ctx.get('hanaworldsWorkshop');
   for(const id of ['s1','s2']){const w=await ctx.sessionPersistence.create(header(id));await w.append([{type:'turn/start',seq:0,time:99,data:{turn:1}}]);await w.close();}
   const append=async(id,event)=>{const w=await ctx.sessionPersistence.open(id,'write');try{const log=await w.read();await w.append([{...event,seq:log.events.length}]);}finally{await w.close();}};

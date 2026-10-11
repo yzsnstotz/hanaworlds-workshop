@@ -8,7 +8,7 @@ window.__ModuleLoader__.load({
     const h = React.createElement;
     const PANEL_ID = 'hanaworlds-workshop';
 
-    function createWorkshopFlow({ invoke, legacyHistory, currentSessionRef, newId }) {
+    function createWorkshopFlow({ invoke, legacyHistory, currentSessionRef, newId, conversation }) {
       const listeners = new Set();
       let state = { ready: false, busy: false, error: '', turns: [], reply: '',
         sessionRef: null, worldRef: null, revision: null, clarification: null,
@@ -212,48 +212,13 @@ window.__ModuleLoader__.load({
       }
       async function submit(text) {
         if (!state.ready || state.busy) return false;
-        if (typeof text !== 'string' || !text.trim()) {
-          publish({ error: '请输入要发送的内容。' });
-          return false;
+        if (!conversation || conversation.snapshot().sessionRef !== state.sessionRef) {
+          publish({ error: '请打开与当前工作坊相同的宿主对话。' }); return false;
         }
-        const { sessionRef, revision } = state;
-        publish({ busy: true, error: '', undoStatus: null, undoResult: null,
-          undoError: '', buildOutcome: null, buildError: '' });
-        let committed = false;
-        try {
-          const body = state.clarification
-            ? { requestId: id(), turnRef: state.clarification.turnRef,
-              expectedRevision: revision,
-              clarificationId: state.clarification.clarificationId, answer: text }
-            : { requestId: id(), turnRef: id(), expectedRevision: revision,
-              text, media: [], controls: { purpose: null, dimensions: null,
-                entrancePortalRefs: [], styleText: null } };
-          const receipt = await workshop(sessionRef,
-            state.clarification ? 'AnswerClarification' : 'AppendMultimodalTurn', body);
-          committed = true;
-          publish({ reply: receipt.resultText, clarification: receipt.clarification
-            ? { turnRef: receipt.turnRef,
-              clarificationId: receipt.clarification.clarificationId } : null });
-          const session = await workshop(sessionRef, 'StartOrResumeSession', {
-            requestId: id(), expectedRevision: null,
-          });
-          const details = await readDetails(sessionRef,
-            session.context.sessionRevision, session.turns);
-          const undoStatus = await readUndoStatus(sessionRef, state.worldRef,
-            session.turns);
-          if (session.context.currentSession !== sessionRef)
-            throw Error('当前 Session 已切换，请刷新工作坊。');
-          publish({ turns: session.turns, details, undoStatus,
-            revision: session.context.sessionRevision });
-          return true;
-        } catch (error) {
-          const lost = bindingLost(error);
-          publish({ error: committed ?
-            `本轮已发送，但历史读回失败：${String(error?.message ?? error)}${lost ? '。受信绑定已失效，请在管理页面重新绑定后刷新连接。' : ''}` :
-            `${String(error?.message ?? error)}${lost ? '。受信绑定已失效，请在管理页面重新绑定后刷新连接。' : ''}`,
-          ...(lost ? { ready: false, clarification: null } : {}) });
-          return committed;
-        } finally { publish({ busy: false }); }
+        const sent = await conversation.submit(text);
+        if (!sent) { publish({ error: conversation.snapshot().error }); return false; }
+        await open(state.sessionRef);
+        return true;
       }
       async function undoCurrentBuild() {
         const before = state.undoStatus;
@@ -417,13 +382,82 @@ window.__ModuleLoader__.load({
           ? h('p', null, '也可以在游戏中选点。') : null);
     }
 
-    function WorkshopPanel({ flow }) {
+    function createConversationFlow({ rpc, currentSessionRef }) {
+      const listeners = new Set();
+      let generation = 0, controller, disposed = false;
+      let state = { sessionRef: null, ready: false, busy: false, model: null, items: [], error: '' };
+      const snapshot = () => ({ ...state, items: [...state.items] });
+      const publish = patch => { state = { ...state, ...patch }; for (const listener of listeners) listener(snapshot()); };
+      const subscribe = listener => { listeners.add(listener); return () => listeners.delete(listener); };
+      const accept = (value, sessionRef) => {
+        if (value?.sessionRef !== sessionRef || !Array.isArray(value.items) ||
+            typeof value.model?.model !== 'string' || !value.model.model ||
+            typeof value.model?.provider !== 'string' || !value.model.provider)
+          throw Error('CONVERSATION_READBACK_MISMATCH');
+        publish({ ready: true, model: value.model, items: value.items });
+      };
+      async function refreshSession() {
+        if (disposed) return;
+        const sessionRef = currentSessionRef();
+        const changed = sessionRef !== state.sessionRef;
+        if (state.busy && !changed) return;
+        const token = ++generation; controller?.abort(); controller = new AbortController();
+        if (changed) publish({ sessionRef, ready: false, model: null, items: [], error: '' });
+        if (!sessionRef) { publish({ ready: false, busy: false, error: '请先在宿主打开一个对话。' }); return; }
+        publish({ busy: true, error: '' });
+        try {
+          const value = await rpc('hanaworldsWorkshopConversation/read', { sessionRef }, controller.signal);
+          if (token === generation && currentSessionRef() === sessionRef) accept(value, sessionRef);
+        } catch (error) {
+          if (token === generation) publish({ ready: false, model: null, error: String(error?.message ?? error) });
+        } finally { if (token === generation) publish({ busy: false }); }
+      }
+      async function submit(text) {
+        if (disposed || !state.ready || state.busy || !text?.trim()) return false;
+        const sessionRef = currentSessionRef();
+        if (sessionRef !== state.sessionRef) { await refreshSession(); return false; }
+        const token = ++generation; controller?.abort(); controller = new AbortController();
+        publish({ busy: true, error: '' });
+        try {
+          const value = await rpc('hanaworldsWorkshopConversation/send', { sessionRef, text: text.trim() }, controller.signal);
+          if (token !== generation || currentSessionRef() !== sessionRef) return false;
+          accept(value, sessionRef); return true;
+        } catch (error) {
+          if (token === generation) publish({ error: String(error?.message ?? error) });
+          return false;
+        } finally { if (token === generation) publish({ busy: false }); }
+      }
+      return { snapshot, subscribe, refreshSession, submit,
+        dispose() { disposed = true; generation++; controller?.abort(); listeners.clear(); } };
+    }
+    function WorkshopConversationPanel({ flow }) {
       const [view, setView] = React.useState(flow.snapshot());
       const [draft, setDraft] = React.useState('');
+      React.useEffect(() => flow.subscribe(setView), [flow]);
+      React.useEffect(() => { void flow.refreshSession(); }, [flow]);
+      return h('section', { 'aria-label': '工坊对话' },
+        h('p', { 'aria-label': '当前模型' }, view.model ? `当前模型：${view.model.model}（${view.model.provider}）` : '当前模型尚未就绪。'),
+        h('p', null, '使用宿主当前对话与模型设置。订阅登录和模型选择在宿主设置中完成。'),
+        h('button', { type: 'button', disabled: view.busy, onClick: () => { void flow.refreshSession(); } }, '刷新当前对话'),
+        h('ol', { 'aria-label': '工坊对话记录' }, ...view.items.map(item => h('li', { key: item.id },
+          h('b', null, item.role === 'assistant' ? `模型 ${item.model}` : '你'), h('p', null, item.text)))),
+        view.error ? h('p', { role: 'alert' }, view.error) : null,
+        view.busy ? h('p', { role: 'status' }, '正在处理当前对话…') : null,
+        h('form', { onSubmit: event => {
+          event.preventDefault();void flow.submit(draft).then(sent => { if (sent) setDraft(''); });
+        } },
+        h('label', { htmlFor: 'hanaworlds-workshop-input' }, '和工坊说句话'),
+        h('input', { id: 'hanaworlds-workshop-input', value: draft, onChange: event => setDraft(event.target.value), disabled: !view.ready || view.busy }),
+        h('button', { type: 'submit', disabled: !view.ready || view.busy || !draft.trim() }, '发送')));
+    }
+
+    function WorkshopPanel({ flow, conversation }) {
+      const [view, setView] = React.useState(flow.snapshot());
       React.useEffect(() => flow.subscribe(setView), [flow]);
       React.useEffect(() => { void flow.open(); }, [flow]);
       return h('main', { style: { padding: 'var(--dsh-frame-top-clearance, 48px) 24px 24px' } },
         h('h1', null, 'HanaWorlds 工作坊'),
+        h(WorkshopConversationPanel, { flow: conversation }),
         h('p', { role: 'status' }, view.busy ? '工作坊处理中。' :
           view.ready ? '已连接当前 Session 和世界。' : '工作坊尚未连接。'),
         view.error ? h('p', { role: 'alert' }, view.error) : null,
@@ -493,19 +527,7 @@ window.__ModuleLoader__.load({
         view.buildOutcome?.outcome === 'VERIFIED' ?
           h('p', { role: 'status', 'aria-label': '建造结果' },
             '建造已验证，并已读回当前 Session。') : null,
-        view.buildError ? h('p', { role: 'alert' }, view.buildError) : null,
-        view.reply ? h('p', { 'aria-label': '本次工作坊回复' }, view.reply) : null,
-        h('form', { onSubmit: event => {
-          event.preventDefault();
-          void flow.submit(draft).then(sent => { if (sent) setDraft(''); });
-        } },
-        h('label', { htmlFor: 'hanaworlds-workshop-input' },
-          view.clarification ? '回复工作坊' : '输入建造请求'),
-        h('input', { id: 'hanaworlds-workshop-input', value: draft,
-          onChange: event => setDraft(event.target.value),
-          disabled: !view.ready || view.busy }),
-        h('button', { type: 'submit', disabled: !view.ready || view.busy || !draft.trim() },
-          '发送')));
+        view.buildError ? h('p', { role: 'alert' }, view.buildError) : null);
     }
 
     const IMAGE_PANEL_ID = 'hanaworlds-workshop-image-links';
@@ -627,37 +649,39 @@ window.__ModuleLoader__.load({
         const entries = Object.entries(catalog.byId).filter(([,row]) => (row.retainedBy?.mainView ?? 0) > 0);
         return entries.length === 1 ? entries[0] : null;
       };
+      const rpc = async (endpoint, args, signal) => {
+        const response = await ctx.connection.rpc.call('/api', endpoint, { args }, signal);
+        if (!response.ok) throw Error(`${response.error.code}: ${response.error.message}`);
+        return response.value;
+      };
+      const conversation = createConversationFlow({ rpc,
+        currentSessionRef: () => selectedSession()?.[0] ?? null });
       const imageFlow = createImageLinkFlow({
         currentSessionRef: () => selectedSession()?.[0] ?? null,
         currentSessionTitle: () => selectedSession()?.[1]?.title ?? '',
-        rpc: async (endpoint, args, signal) => {
-          const response = await ctx.connection.rpc.call('/api', endpoint, { args }, signal);
-          if (!response.ok) throw Error(`${response.error.code}: ${response.error.message}`);
-          return response.value;
-        },
+        rpc,
       });
-      const unsubscribeImages = ctx.sessions.list.subscribe(() => imageFlow.refreshSession());
+      const unsubscribeImages = ctx.sessions.list.subscribe(() => {
+        imageFlow.refreshSession();void conversation.refreshSession();
+      });
       let imagesDisposed = false;
       const disposeImages = keep(() => {
         if (imagesDisposed) return;
         imagesDisposed = true;
-        unsubscribeImages(); imageFlow.dispose();
+        unsubscribeImages(); imageFlow.dispose();conversation.dispose();
       });
       ctx.effect(() => disposeImages, 'workshop.image-panel');
       keep(ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: IMAGE_PANEL_ID }, () => h(ImageLinkPanel, { flow: imageFlow }))));
       keep(ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: IMAGE_PANEL_ID, order: 31, label: () => 'Workshop 开发面板' }, WorkshopIcon)));
-      const flow = createWorkshopFlow({ invoke,
+      const flow = createWorkshopFlow({ invoke, conversation,
         legacyHistory: typeof transport?.legacyHistory === 'function'
           ? (action, input) => transport.legacyHistory(action, input) : null,
-        currentSessionRef: () => {
-          try { return ctx.sessions?.list?.getSnapshot?.()?.current ?? null; }
-          catch { return null; }
-        },
+        currentSessionRef: () => selectedSession()?.[0] ?? null,
         newId: () => window.crypto?.randomUUID?.(),
       });
       keep(ctx.slots.inject('main', () => ctx.slots.register({
         name: 'main', key: PANEL_ID,
-      }, () => h(WorkshopPanel, { flow }))));
+      }, () => h(WorkshopPanel, { flow, conversation }))));
       keep(ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
         name: 'sidebar.panellist', id: PANEL_ID, order: 30,
         label: () => '工作坊',
@@ -666,6 +690,7 @@ window.__ModuleLoader__.load({
 
     module.exports = { name: PANEL_ID, inject: ['slots', 'layout', 'sessions', 'connection'], apply,
       createImageLinkFlow, ImageLinkPanel,
+      createConversationFlow, WorkshopConversationPanel,
       WorkshopChoiceFrame, createWorkshopFlow, WorkshopPanel };
     return module.exports;
   },
