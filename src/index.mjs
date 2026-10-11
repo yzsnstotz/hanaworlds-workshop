@@ -1,4 +1,5 @@
 import { WorkshopImageLinkPanelService } from '../lib/panel-host.mjs';
+import packageManifest from '../package.json' with { type: 'json' };
 import { createHash, randomUUID } from 'node:crypto';
 import { symbols } from '@deepseek-ai/cordis';
 import { WorkshopProjectionStore, coreIdentity } from './projection-store.mjs';
@@ -62,8 +63,12 @@ export class WorkshopV3 {
  constructor(ports={}) { Object.assign(this,ports);this.contractHandshake=C.contractHandshake;
   this.protocolHandshake=C.validateType('ProtocolHandshake',{profileVersion:'protocol-handshake/v1',component:'hanaworlds-workshop',
    protocols:[{protocol:'session',major:5,minor:0}],capabilities:[],
-   provenance:{packageName:'hanaworlds-workshop',packageVersion:'0.7.4',sourceRevision:null,artifactDigest:null}});
+   provenance:{packageName:packageManifest.name,packageVersion:packageManifest.version,sourceRevision:null,artifactDigest:null}});
   this.locks=new Map(); }
+ status() {
+  return {component:packageManifest.name,version:packageManifest.version,
+   contractHandshake:copy(this.contractHandshake),protocolHandshake:copy(this.protocolHandshake)};
+ }
  /** Trusted composition-only metadata preparation for G-S. Returns the official
   * SessionPersistence snapshot verbatim; this is not a session/v5 wire operation.
   * No World selection, Workshop projection, full log read or Session creation. */
