@@ -574,7 +574,45 @@ window.__ModuleLoader__.load({
       return h('span', { 'aria-hidden': 'true' }, '✿');
     }
 
+    function WorkshopFailureCard({ message }) {
+      return h('main', { style: { padding: 'var(--dsh-frame-top-clearance, 48px) 24px 24px' } },
+        h('section', { role: 'alert', 'aria-label': 'hanaworlds-workshop 故障' },
+          h('h1', null, 'hanaworlds-workshop 工作坊初始化失败'),
+          h('p', null, message)));
+    }
+
     function apply(ctx) {
+      const disposers = [];
+      const keep = dispose => {
+        if (typeof dispose === 'function') disposers.push(dispose);
+        return dispose;
+      };
+      try { initializeWorkshop(ctx, keep); }
+      catch (error) {
+        console.error('hanaworlds-workshop apply failed', error);
+        for (const dispose of disposers.reverse()) {
+          try { dispose(); }
+          catch (cleanupError) { console.error('hanaworlds-workshop cleanup failed', cleanupError); }
+        }
+        const message = String(error?.message ?? error);
+        // Use only the host's declared slots: no Session or transport is needed
+        // to name the failed plugin and preserve the rest of the host page.
+        try {
+          ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID },
+            () => h(WorkshopFailureCard, { message })));
+          ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+            name: 'sidebar.panellist', id: PANEL_ID, order: 30,
+            label: () => '工作坊 · hanaworlds-workshop 故障',
+          }, WorkshopIcon));
+        } catch (displayError) {
+          // If the host slot service itself is broken, keep both causes in the
+          // console without propagating Workshop's initialization to the page.
+          console.error('hanaworlds-workshop fault card could not mount', displayError);
+        }
+      }
+    }
+
+    function initializeWorkshop(ctx, keep) {
       // The desktop host provides the request boundary as the client service
       // hanaworldsWorkshopTransport; there is no window global or Tauri fallback.
       // The host remains responsible for every live Core Session and local world
@@ -599,9 +637,15 @@ window.__ModuleLoader__.load({
         },
       });
       const unsubscribeImages = ctx.sessions.list.subscribe(() => imageFlow.refreshSession());
-      ctx.effect(() => () => { unsubscribeImages(); imageFlow.dispose(); }, 'workshop.image-panel');
-      ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: IMAGE_PANEL_ID }, () => h(ImageLinkPanel, { flow: imageFlow })));
-      ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: IMAGE_PANEL_ID, order: 31, label: () => 'Workshop 开发面板' }, WorkshopIcon));
+      let imagesDisposed = false;
+      const disposeImages = keep(() => {
+        if (imagesDisposed) return;
+        imagesDisposed = true;
+        unsubscribeImages(); imageFlow.dispose();
+      });
+      ctx.effect(() => disposeImages, 'workshop.image-panel');
+      keep(ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: IMAGE_PANEL_ID }, () => h(ImageLinkPanel, { flow: imageFlow }))));
+      keep(ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: IMAGE_PANEL_ID, order: 31, label: () => 'Workshop 开发面板' }, WorkshopIcon)));
       const flow = createWorkshopFlow({ invoke,
         legacyHistory: typeof transport?.legacyHistory === 'function'
           ? (action, input) => transport.legacyHistory(action, input) : null,
@@ -611,13 +655,13 @@ window.__ModuleLoader__.load({
         },
         newId: () => window.crypto?.randomUUID?.(),
       });
-      ctx.slots.inject('main', () => ctx.slots.register({
+      keep(ctx.slots.inject('main', () => ctx.slots.register({
         name: 'main', key: PANEL_ID,
-      }, () => h(WorkshopPanel, { flow })));
-      ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+      }, () => h(WorkshopPanel, { flow }))));
+      keep(ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
         name: 'sidebar.panellist', id: PANEL_ID, order: 30,
         label: () => '工作坊',
-      }, WorkshopIcon));
+      }, WorkshopIcon)));
     }
 
     module.exports = { name: PANEL_ID, inject: ['slots', 'layout', 'sessions', 'connection'], apply,
