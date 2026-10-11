@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 let supply = {};
-try { supply = await import('../web/c4-supply.mjs'); }
+try { supply = await import('../archive/workshop-01/web/c4-supply.mjs'); }
 catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
 function create(getWorkshop) {
  assert.equal(typeof supply.createPainterLocalFactsPort, 'function', 'missing public Host callback bridge');

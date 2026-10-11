@@ -20,8 +20,8 @@ const capabilities = { providerRef: 'contracts-FIXTURE', capabilityRevision: 'ca
     metadataMode: 'exact', inventoryMode: 'exact', timerMode: 'exact', derivedLightMode: 'recompute-with-readback' },
   sessionDeleteSupported: false, imageMediaTypes: [], model: null,engineGuards:null };
 const request = (operation, sessionRef = 's1') => operation === 'ListSessions'
-  ? { contractVersion: 'session/v4', requestId: 'list' }
-  : { contractVersion: 'session/v4', requestId: 'read-' + sessionRef, sessionRef };
+  ? { contractVersion: 'session/v5', requestId: 'list' }
+  : { contractVersion: 'session/v5', requestId: 'read-' + sessionRef, sessionRef };
 async function tree(root, prefix = '') {
   const out = {};
   for (const entry of await readdir(join(root, prefix), { withFileTypes: true })) {
@@ -54,7 +54,7 @@ async function runtime(fn) {
         const id = await ws.call('ReadSessionIdentity', request('ReadSessionIdentity', body.sessionRef));
         assert.equal(id.error, null);
         const local = structuredClone(main.request.localContext);
-        return { contractVersion: 'canvas/v6', requestId: body.requestId, error: null, result: {
+        return { contractVersion: 'canvas/v7', requestId: body.requestId, error: null, result: {
           sessionRef: body.sessionRef, worldRef: body.worldRef,
           inventory: { capabilityRevision: 'cap-1', connections: [] },
           selection: { status: 'BOUND', connectionRef: local.connectionRef, context: {
@@ -65,7 +65,7 @@ async function runtime(fn) {
     ctx.provide('hanaworldsCanvasV5', canvas);
     await ctx.plugin(plugin).await();
     const ws = ctx.get('hanaworldsWorkshop');
-    C.checkProtocolCompatibility(ws.protocolHandshake, [C.protocolRequirement('session/v4', [], 0)]);
+    C.checkProtocolCompatibility(ws.protocolHandshake, [C.protocolRequirement('session/v5', [], 0)]);
     for (const [id, time] of [['s2', 200], ['s1', 100]]) {
       const h = await ctx.sessionPersistence.create({ version: SESSION_FORMAT_VERSION,
         id, createdAt: time, cwd: root, isSeeded: false });
@@ -75,7 +75,7 @@ async function runtime(fn) {
   } finally { await ctx.fiber.dispose(); await rm(root, { recursive: true, force: true }); }
 }
 function success(operation, body, response) {
-  C.validateBoundResponse('session/v4', operation, body, response);
+  C.validateBoundResponse('session/v5', operation, body, response);
   assert.equal(response.error, null, JSON.stringify(response)); return response.result;
 }
 test('installed contracts identity and public fixture validate under the same installed package', () => {
@@ -91,7 +91,7 @@ test('ReadSessionIdentity is world-independent and read-only before StartOrResum
   assert.equal(first.sessionRef, 's1');
   assert.deepEqual(success('ReadSessionIdentity', q, await r.ws.call('ReadSessionIdentity', q)), first);
   assert.deepEqual(await tree(r.root), before, 'readonly identity must not initialize projection or Core');
-  const start = await r.ws.call('StartOrResumeSession', { contractVersion: 'session/v4', sessionRef: 's1', requestId: 'start', expectedRevision: null });
+  const start = await r.ws.call('StartOrResumeSession', { contractVersion: 'session/v5', sessionRef: 's1', requestId: 'start', expectedRevision: null });
   assert.equal(start.error, null);
   assert.equal(start.result.context.activeWorldRef, null);
   assert.equal(start.result.context.sessionRevision, first.sessionRevision);
@@ -111,7 +111,7 @@ test('ListSessions enumerates trusted unbound Sessions in canonical order, with 
 test('unknown trusted Session is rejected and never becomes a Core or Workshop Session', async () => runtime(async r => {
   const before = await tree(r.root), q = request('ReadSessionIdentity', 'unknown');
   const response = await r.ws.call('ReadSessionIdentity', q);
-  C.validateBoundResponse('session/v4', 'ReadSessionIdentity', q, response);
+  C.validateBoundResponse('session/v5', 'ReadSessionIdentity', q, response);
   assert.equal(response.error.code, 'SESSION_NOT_FOUND');
   assert.equal(await r.ctx.sessionPersistence.stat('unknown'), undefined);
   assert.deepEqual(await tree(r.root), before);
@@ -120,9 +120,9 @@ test('fixed provider DeleteSession rejects DELETE_SEAM_ABSENT before any Canvas 
   const read = request('ReadSessionIdentity');
   const identity = success('ReadSessionIdentity', read, await r.ws.call('ReadSessionIdentity', read));
   r.ctx.get('hanaworldsCapabilities').sessionDeleteSupported = true; // Explicit hostile capability FIXTURE.
-  const before = await tree(r.root), q = { contractVersion: 'session/v4', sessionRef: 's1', requestId: 'delete', expectedRevision: identity.sessionRevision };
+  const before = await tree(r.root), q = { contractVersion: 'session/v5', sessionRef: 's1', requestId: 'delete', expectedRevision: identity.sessionRevision };
   const response = await r.ws.call('DeleteSession', q);
-  C.validateBoundResponse('session/v4', 'DeleteSession', q, response);
+  C.validateBoundResponse('session/v5', 'DeleteSession', q, response);
   assert.equal(response.error.code, 'SESSION_DELETE_UNSUPPORTED');
   assert.equal(response.error.reason, 'DELETE_SEAM_ABSENT');
   assert.equal(response.result, null); assert.equal(r.canvasCalls.length, 0);
@@ -130,10 +130,10 @@ test('fixed provider DeleteSession rejects DELETE_SEAM_ABSENT before any Canvas 
   assert.deepEqual(success('ReadSessionIdentity', read, await r.ws.call('ReadSessionIdentity', read)), identity);
 }));
 test('Workshop revision changes consistently after its real projection mutation; Canvas can reenter the readonly identity port', async () => runtime(async r => {
-  const start = await r.ws.call('StartOrResumeSession', { contractVersion: 'session/v4', sessionRef: 's1', requestId: 'start', expectedRevision: null });
+  const start = await r.ws.call('StartOrResumeSession', { contractVersion: 'session/v5', sessionRef: 's1', requestId: 'start', expectedRevision: null });
   assert.equal(start.error, null);
   const local = structuredClone(main.request.localContext);
-  const switched = await r.ws.call('SwitchWorldContext', { contractVersion: 'session/v4', sessionRef: 's1', requestId: 'switch', expectedRevision: start.result.context.sessionRevision,
+  const switched = await r.ws.call('SwitchWorldContext', { contractVersion: 'session/v5', sessionRef: 's1', requestId: 'switch', expectedRevision: start.result.context.sessionRevision,
     worldRef: local.worldRef, selectionRevision: local.selectionRevision, localContext: local });
   assert.equal(switched.error, null, JSON.stringify(switched));
   assert.notEqual(switched.result.context.sessionRevision, start.result.context.sessionRevision);

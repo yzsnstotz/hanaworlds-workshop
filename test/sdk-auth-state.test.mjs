@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as S from '../web/sdk-auth-state.mjs';
+import * as S from '../archive/workshop-01/web/sdk-auth-state.mjs';
 const signal=()=>new AbortController().signal;
 // FIXTURE configuration metadata for refusal/race guards only.
 function fixture(){let calls=0;const credentials={describeRecord:async()=>{calls++;return {configured:true,kind:'grant',writable:true};}};const llm={listProviders:()=>[{id:'openai-codex',name:'declared'}]};const values={credentials,llm};return {values,credentials,llm,ctx:{get:key=>values[key]},calls:()=>calls};}

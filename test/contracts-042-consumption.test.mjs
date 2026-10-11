@@ -34,7 +34,7 @@ function fixture(){
  f.painter={contractHandshake:C.contractHandshake,async call(op,q){f.calls.push(op);C.validateBuildProposalRequest(q);const facts=await f.readFacts(q);C.validateBuildProposalContext(q,facts);f.painterContexts.push(clone(facts.sourceContext));
    const result=clone(sample.response.result);result.invocationId=q.invocationId;return {contractVersion:'painter/v4',requestId:q.requestId,result,error:null};}};
  f.brush={contractHandshake:C.contractHandshake,async compile(q){f.calls.push('BuildDocument');C.validateBoundRequest('BUILD/V3','BuildDocument',q);
-   const effects=[{position:clone(q.build.operations[0].min),...q.build.materials[q.build.operations[0].materialRef]}];
+   const effects=[{geometryProfile:'voxel-grid/v1',position:clone(q.build.operations[0].min),...q.build.materials[q.build.operations[0].materialRef]}];
    const projection={contractVersion:'operations/v3',buildDigest:q.buildDigest,compilerRevision:q.compilerRevision,compilationConfigDigest:q.compilationConfigDigest,worldRef:q.worldRef,frameDigest:q.targetFacts.frameDigest,catalogueDigest:q.catalogueDigest,targetFactsDigest:q.targetFactsDigest,effects};
    return {contractVersion:'BUILD/V3',requestId:q.requestId,result:{projection,operationDigest:D('operations',projection),readBounds:q.targetFacts.sampledBounds,writeBounds:q.build.declaredBounds},error:null};}};
  const row=r=>({transactionId:r.transactionId,originTransactionId:null,affectedObjectRefs:['object-1'],operationDigest:r.operationDigest,beforeImageDigest:'d'.repeat(64),expectedAfterReadbackDigest:r.readbackDigest,receiptDigest:D('receipt',r),historyRevision:'history-1',status:'VERIFIED'});

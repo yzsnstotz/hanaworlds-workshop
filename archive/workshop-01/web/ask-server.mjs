@@ -25,8 +25,8 @@ import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai';
 import { credentialKey } from '@deepseek-ai/dsh-credentials';
 import Skills from '@deepseek-ai/dsh-skill';
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill';
-import Workshop from '../src/index.mjs';
-import BuildingSkill from '../src/building-skill.mjs';
+import Workshop from '../../../src/index.mjs';
+import BuildingSkill from '../../../src/building-skill.mjs';
 
 // Standalone developer Host for Workshop's image-ask step. Real: Cordis, Session
 // store/JSONL, AgentRegistry, the official AgentLoop, system-prompt assembly, tool

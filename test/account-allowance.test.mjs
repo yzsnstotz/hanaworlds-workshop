@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { recordKeyFor } from '@deepseek-ai/dsh-llm-pi-ai';
-import { readCodexAllowance, noCashDecision } from '../web/account-allowance.mjs';
+import { readCodexAllowance, noCashDecision } from '../archive/workshop-01/web/account-allowance.mjs';
 
 // FIXTURE credential service and usage endpoint: shape of the official harness credential seam
 // and of the official Codex client's /wham/usage payload. No network, no real grant.
@@ -38,7 +38,7 @@ test('decision: credits are reported and guarded, never a reason to dispatch; re
  await assert.rejects(readCodexAllowance(ctxOf(credentials(undefined)),{signal:new AbortController().signal,fetchImpl:async()=>assert.fail('no request without a grant')}),e=>e.code==='ROUTE_NOT_SIGNED_IN');
 });
 test('per-call guard: every REAL openai-codex prepareCall re-reads first and refuses by name before dispatch; other providers untouched',async()=>{
- const {guardRealDispatch}=await import('../web/account-allowance.mjs');
+ const {guardRealDispatch}=await import('../archive/workshop-01/web/account-allowance.mjs');
  const prepared=[];const llm={prepareCall:async config=>{prepared.push(config.provider);return {config};}};
  const ctx={get:name=>name==='llm'?llm:undefined};let next=usage();const decisions=[];
  const lift=guardRealDispatch(ctx,{read:async()=>({...await readCodexAllowance(ctxOf(credentials(grant)),{signal:new AbortController().signal,fetchImpl:async()=>new Response(JSON.stringify(next),{status:200})})}),settings:()=>({maxIncludedUsedPercent:97}),record:d=>decisions.push(d.code)});

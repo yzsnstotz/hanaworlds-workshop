@@ -17,10 +17,11 @@ const { default: Workshop, WRITE_METHOD_PORTS } = await import(process.env.HW_WO
 // 0.7.2: derived again from the 0.7.1 full texts + the one bounded step-1 insertion (same reply), before running.
 // 0.7.3: derived from the 0.7.2 full texts + two bounded REGION insertions (effectSummary, VERIFIED meaning), before running.
 // 0.7.4: derived from the 0.7.3 full texts + the same two insertions on the PER_CELL path, before running.
+// v2: reviewed opaque material/orientation examples and world-declared partition guidance; refreshed full-content oracles.
 // Peer ports advertise fixture handshakes only; the agents service is a fixture.
 // No AgentLoop/model/world/auth/server/profile is created or called.
 const metadata = { name: 'hanaworlds-building' };
-const expectedSha = {"object-available": "8049bfe46e49a25224cd4c43e9db1d68fcd99e7e7e6a7b7d48e11d168cff17ef", "object-unavailable": "921ad037ce0676a4bafa469cdb3667d6e66fba9a9b5fd5fa9bd7fb1707de5bf2", "rejected-catch-null": "dc83509fe6e51bedb7ddc4f53eaad35a2ed5eb0ad0701ce9c78977dd08f233f1", "resolved-null": "dc83509fe6e51bedb7ddc4f53eaad35a2ed5eb0ad0701ce9c78977dd08f233f1", "config-undefined": "dc83509fe6e51bedb7ddc4f53eaad35a2ed5eb0ad0701ce9c78977dd08f233f1"};
+const expectedSha = {"object-available": "fc8449b498cd4fcaca7ec0afc561b37910454f028ffe999279aa33db08795327", "object-unavailable": "90e76fa9cf21fc5f5d8ba7958d958c71308c09b4ca56c12ddc2ab58a5c4853e9", "rejected-catch-null": "10139d03aba77c667f5ac4f5d71bfd4e2e5b4ed6641a7e570eb7d08616847a76", "resolved-null": "10139d03aba77c667f5ac4f5d71bfd4e2e5b4ed6641a7e570eb7d08616847a76", "config-undefined": "10139d03aba77c667f5ac4f5d71bfd4e2e5b4ed6641a7e570eb7d08616847a76"};
 const results = [];
 const hash = value => createHash('sha256').update(value).digest('hex');
 function peerPorts() {

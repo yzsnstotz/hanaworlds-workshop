@@ -38,14 +38,14 @@ function adapterFixture(){
  f.records=records;
  f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:['image/png'],model:null,engineGuards:null};
  const projection=(q,positions)=>({worldRef:q.worldRef,coveredPositions:clone(positions),records:records(positions),stateProfile:clone(q.stateProfile??stateProfile)});
- const receipt=(q,payload,operationDigest,before,after)=>({contractVersion:'canvas/v6',transactionId:q.transactionId,operationDigest,transactionPayloadDigest:payload,status:'VERIFIED',previousWorldRevision:before,observedWorldRevision:after,readbackDigest:D('readback',projection(q,q.scope?.checkedPositions??f.original.get(q.originTransactionId).positions)),restoreStatus:'NOT_REQUIRED',error:null,localContext:clone(q.localContext),guardRefusal:null,applyFailure:null});
+ const receipt=(q,payload,operationDigest,before,after)=>({contractVersion:'canvas/v7',transactionId:q.transactionId,operationDigest,transactionPayloadDigest:payload,status:'VERIFIED',previousWorldRevision:before,observedWorldRevision:after,readbackDigest:D('readback',projection(q,q.scope?.checkedPositions??f.original.get(q.originTransactionId).positions)),restoreStatus:'NOT_REQUIRED',error:null,localContext:clone(q.localContext),guardRefusal:null,applyFailure:null});
  // NativeFacts comes only from Canvas0.5.3's complete public fixed provider.
 
  f.adapter={contractHandshake:C.contractHandshake,async call(op,q){
-  f.calls.push({adapter:op,request:clone(q)});C.validateBoundRequest('world-adapter/v7',op,q);
-  const ok=result=>{try{return C.validateBoundResponse('world-adapter/v7',op,q,{contractVersion:'world-adapter/v7',requestId:q.requestId,result,error:null});}catch(e){console.error('ADAPTER_FIXTURE_SCHEMA',op,e,JSON.stringify(result));throw e;}};
-  if(op==='DiscoverConnections')return ok({capabilityRevision:'cap-1',connections:[{adapterId:'fixture-adapter',connectionRef:f.local.connectionRef,worldRef:f.local.worldRef,displayName:'Fixture world',capabilityRevision:'cap-1',payloadVersion:'world-adapter/v7',readiness:'READY',connectionIncarnationRef:f.local.connectionIncarnationRef}]});
-  if(op==='ReadLocalConnection')return ok({connectionRef:f.local.connectionRef,connectionIncarnationRef:f.local.connectionIncarnationRef,worldRef:f.local.worldRef,payloadVersion:'world-adapter/v7',payloadDigest:'a'.repeat(64),capabilities:f.capabilities});
+  f.calls.push({adapter:op,request:clone(q)});C.validateBoundRequest('world-adapter/v8',op,q);
+  const ok=result=>{try{return C.validateBoundResponse('world-adapter/v8',op,q,{contractVersion:'world-adapter/v8',requestId:q.requestId,result,error:null});}catch(e){console.error('ADAPTER_FIXTURE_SCHEMA',op,e,JSON.stringify(result));throw e;}};
+  if(op==='DiscoverConnections')return ok({capabilityRevision:'cap-1',connections:[{adapterId:'fixture-adapter',connectionRef:f.local.connectionRef,worldRef:f.local.worldRef,displayName:'Fixture world',capabilityRevision:'cap-1',payloadVersion:'world-adapter/v8',readiness:'READY',connectionIncarnationRef:f.local.connectionIncarnationRef}]});
+  if(op==='ReadLocalConnection')return ok({connectionRef:f.local.connectionRef,connectionIncarnationRef:f.local.connectionIncarnationRef,worldRef:f.local.worldRef,payloadVersion:'world-adapter/v8',payloadDigest:'a'.repeat(64),capabilities:f.capabilities});
   if(op==='InspectRegion'){
    const targetFacts={...clone(sample.request.targetFacts),worldRevision:q.expectedWorldRevision};
    const inspection={...clone(sample.request.regionInspection),inspectionId:q.inspectionId,anchorKind:q.anchor.kind,targetFacts,targetFactsDigest:D('target-facts',targetFacts),evidence:{...clone(sample.request.regionInspection.evidence),worldRevision:q.expectedWorldRevision},placementSettings:clone(q.placementSettings)};
@@ -59,7 +59,7 @@ function adapterFixture(){
   if(op==='Readback')return ok({projection:projection(q,q.coveredPositions),readbackDigest:D('readback',projection(q,q.coveredPositions)),adapterExecutionRevision:'fixture-execution-1'});
   if(op==='PrepareRecoverableTransaction'){
    const before={...projection(q,q.scope.checkedPositions),worldRevision:f.worldRevision};
-   const beforeImageDigest=D('before-image',before),payload={contractVersion:'world-adapter/v7',transactionId:q.transactionId,worldRef:q.worldRef,operationDigest:q.operationDigest,scopeDigest:q.scopeDigest,beforeImageDigest,localContext:clone(q.localContext)};
+   const beforeImageDigest=D('before-image',before),payload={contractVersion:'world-adapter/v8',transactionId:q.transactionId,worldRef:q.worldRef,operationDigest:q.operationDigest,scopeDigest:q.scopeDigest,beforeImageDigest,localContext:clone(q.localContext)};
    const p={payload,transactionPayloadDigest:D('scoped-transaction-payload',payload),beforeImageDigest,scopeDigest:q.scopeDigest,guarantee:q.guarantee,stateProfile:clone(stateProfile),adapterExecutionRevision:'fixture-execution-1',beforeStateReadbackDigest:D('readback',projection(q,q.scope.checkedPositions))};
    f.prepared.set(q.transactionId,p);f.original.set(q.transactionId,{records:clone(before.records),positions:clone(before.coveredPositions)});return ok(p);
   }
@@ -91,8 +91,8 @@ async function withRuntime(f,fn){
   f.canvas=new V.CanvasV5({store,adapter:f.adapter,nativeFacts:f.native,adapterId:'fixture-adapter'});await f.canvas.ready;assert.equal(f.canvas.status().storage,'READY');
   const realCanvasCall=f.canvas.call.bind(f.canvas);f.canvasCalls=[];
   f.canvas.call=async(op,q)=>{const out=await realCanvasCall(op,q);f.canvasCalls.push({operation:op,request:clone(q),response:clone(out)});return out;};
-  const unbound=await f.canvas.call('ReadWorldSelectionContext',{contractVersion:'canvas/v6',sessionRef:'s1',requestId:'unbound',worldRef:f.local.worldRef});assert.equal(unbound.error,null,JSON.stringify(unbound));
-  const selected=await f.canvas.call('SelectWorldConnection',{contractVersion:'canvas/v6',sessionRef:'s1',requestId:'select',worldRef:f.local.worldRef,connectionRef:f.local.connectionRef,connectionIncarnationRef:f.local.connectionIncarnationRef,expectedRevision:unbound.result.selection.sessionRevision,expectedContext:null});assert.equal(selected.error,null,JSON.stringify(selected));f.local=clone(selected.result.localContext);
+  const unbound=await f.canvas.call('ReadWorldSelectionContext',{contractVersion:'canvas/v7',sessionRef:'s1',requestId:'unbound',worldRef:f.local.worldRef});assert.equal(unbound.error,null,JSON.stringify(unbound));
+  const selected=await f.canvas.call('SelectWorldConnection',{contractVersion:'canvas/v7',sessionRef:'s1',requestId:'select',worldRef:f.local.worldRef,connectionRef:f.local.connectionRef,connectionIncarnationRef:f.local.connectionIncarnationRef,expectedRevision:unbound.result.selection.sessionRevision,expectedContext:null});assert.equal(selected.error,null,JSON.stringify(selected));f.local=clone(selected.result.localContext);
   ctx.provide('hanaworldsPainterLocalFacts',{async read(q,operation){assert.equal(operation,'ValidateBuildProposal');const facts=await ws.readBuildProposalProviderFacts(q);f.painterFacts??=[];f.painterFacts.push(clone(facts));return facts;}});
   await ctx.plugin(P.default).await();f.painter=ctx.get(P.SERVICE);f.brush=new B.BrushV3();
   const services={hanaworldsCanvasV5:f.canvas,hanaworldsBrushV3:f.brush,hanaworldsCatalogue:{read:async()=>clone(sample.request.catalogue)},hanaworldsCompilerConfig:{read:async()=>({compilationConfig:config,compilerRevision:'fixture-compiler'})},hanaworldsCapabilities:f.capabilities,llm:{async *stream(){f.modelCalls++;throw Error('model forbidden');}}};
@@ -105,7 +105,7 @@ async function withRuntime(f,fn){
   if(ws)await ws.projectionStore.close();await ctx.fiber.dispose();server.closeAllConnections();await new Promise(r=>server.close(r));await rm(root,{recursive:true,force:true});
  }
 }
-const base={contractVersion:'session/v4',sessionRef:'s1'};
+const base={contractVersion:'session/v5',sessionRef:'s1'};
 async function call(r,op,q){const out=await r.ws.call(op,{...base,...q});assert.equal(out.error,null,JSON.stringify(out));return out.result;}
 // Downloads the user's image link through the real tool and confirms a brief whose media is non-empty.
 async function imageBrief(r,f){
@@ -131,16 +131,16 @@ test('ACTUAL three public peers: image proposal → real compile → durable Can
  const f=adapterFixture();await withRuntime(f,async(r,root)=>{
   const peers={painter:f.painter,brush:f.brush,canvas:f.canvas};
   assert.equal(W.evaluateWriteMethod('PER_CELL',{ports:peers}).available,true);
-  C.checkProtocolCompatibility(W.peerProtocolHandshake(f.painter),[C.protocolRequirement('painter-region/v2',W.WRITE_METHOD_PORTS.REGION.find(s=>s.field==='painterRegion').capabilities)]);
+  C.checkProtocolCompatibility(W.peerProtocolHandshake(f.painter),[C.protocolRequirement('painter-region/v3',W.WRITE_METHOD_PORTS.REGION.find(s=>s.field==='painterRegion').capabilities)]);
   for(const spec of W.WRITE_METHOD_PORTS.PER_CELL)C.checkProtocolCompatibility(W.peerProtocolHandshake(peers[spec.field]),[C.protocolRequirement(spec.wire,spec.capabilities,spec.minMinor??0)]);
   const {media,advance}=await imageBrief(r,f);const described=await r.ws.describeWriteTools('s1');assert.equal(described.tools[0].availability.available,true);assert.equal(described.tools[1].descriptor.method,'REGION');
   const context=await r.ws.readWriteProposalContext('PER_CELL',{...advance,requestId:'read-context'});
   const proposal=await r.ws.submitWriteProposal('PER_CELL',{...context,requestId:'proposal',proposal:clone(sample.request.proposal)});assert.equal(proposal.response.error,null,JSON.stringify(proposal));assert.deepEqual(proposal.response.result.build.operations,sample.response.result.build.operations);
   assert.ok(f.painterFacts.length>=2);assert.deepEqual(f.painterFacts[0].sourceContext.referenceBrief.media,[media]);
   const built=await call(r,'AdvanceCurrentBuild',advance);assert.equal(built.outcome,'VERIFIED');assert.equal(f.writes,1);assert.equal(f.records([[0,1,3]])[0].nodeName,'fixture:stone');
-  const inventory=await f.canvas.call('ListObjects',{contractVersion:'canvas/v6',sessionRef:'s1',requestId:'objects',worldRef:f.local.worldRef,expectedRevision:null,localContext:f.local});assert.equal(inventory.error,null);assert.equal(inventory.result.objects.length,1);
+  const inventory=await f.canvas.call('ListObjects',{contractVersion:'canvas/v7',sessionRef:'s1',requestId:'objects',worldRef:f.local.worldRef,expectedRevision:null,localContext:f.local});assert.equal(inventory.error,null);assert.equal(inventory.result.objects.length,1);
   if(process.env.HW_EVIDENCE_DIR){const fs=await import('node:fs/promises');await fs.cp(join(root,'canvas'),join(process.env.HW_EVIDENCE_DIR,'canvas-durable-before-undo'),{recursive:true});await fs.cp(join(root,'projection'),join(process.env.HW_EVIDENCE_DIR,'workshop-durable-before-undo'),{recursive:true});}
-  const object=inventory.result.objects[0];f.targetObject=clone(object);const history=await f.canvas.call('HistoryQuery',{contractVersion:'canvas/v6',sessionRef:'s1',requestId:'history',worldRef:f.local.worldRef,objectRef:object.objectRef,expectedHistoryRevision:null,localContext:f.local});assert.equal(history.error,null);assert.equal(history.result.headTransactionId,built.receipt.transactionId);
+  const object=inventory.result.objects[0];f.targetObject=clone(object);const history=await f.canvas.call('HistoryQuery',{contractVersion:'canvas/v7',sessionRef:'s1',requestId:'history',worldRef:f.local.worldRef,objectRef:object.objectRef,expectedHistoryRevision:null,localContext:f.local});assert.equal(history.error,null);assert.equal(history.result.headTransactionId,built.receipt.transactionId);
   const undo=await call(r,'UndoCurrentBuild',{requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:history.result.historyRevision});assert.equal(undo.status,'VERIFIED');const actualUndo=f.canvasCalls.find(x=>x.operation==='Undo').response.result;assert.equal(undo.afterHead.headTransactionId,actualUndo.transactionId);assert.notEqual(undo.afterHead.historyRevision,history.result.historyRevision);assert.equal(f.undoWrites,1);assert.equal(f.records([[0,1,3]])[0].nodeName,'air');assert.equal(f.modelCalls,0);
   if(process.env.HW_EVIDENCE_DIR){const fs=await import('node:fs/promises');await fs.cp(join(root,'canvas'),join(process.env.HW_EVIDENCE_DIR,'canvas-durable-after-undo'),{recursive:true});await fs.cp(join(root,'projection'),join(process.env.HW_EVIDENCE_DIR,'workshop-durable-after-undo'),{recursive:true});}
   console.log(JSON.stringify({evidence:'ACTUAL_THREE_PEER_NORMAL',contracts:C.contractHandshake,handshakes:Object.fromEntries(Object.entries(peers).map(([k,p])=>[k,W.peerProtocolHandshake(p)])),described,media,proposal:proposal.response,built,history:history.result,undo,adapterWrites:f.writes,adapterUndoWrites:f.undoWrites,worldAfterUndo:f.records([[0,1,3]]),modelCalls:f.modelCalls,boundary:'actual Workshop/Painter/Brush/Canvas; Adapter/world/native/Host facts FIXTURE'}));
@@ -152,11 +152,11 @@ test('ACTUAL public peer requirements: both descriptors and REGION capabilities;
  const brush=new B.BrushV3();
  // The public per-cell and region requirements stay in the two descriptors.
  for(const method of W.WRITE_METHODS){const d=W.describeWriteMethod(method,{ports:{}}).descriptor;C.validateType('WriteMethodDescriptor',d);assert.match(d.typicalScale,/not a limit/);assert.match(d.typicalScale,/never truncates/);}
- C.checkProtocolCompatibility(W.peerProtocolHandshake(brush),[C.protocolRequirement('BUILD/V4',['BUILD/V4:per-cell-compile']),C.protocolRequirement('region-build/v1',['region-build/v1:compile-mapblock-chunks'])]);
- C.checkProtocolCompatibility(V.canvasProtocolHandshake,[C.protocolRequirement('canvas-region/v2',W.WRITE_METHOD_PORTS.REGION.find(s=>s.field==='canvasRegion').capabilities)]);
+ C.checkProtocolCompatibility(W.peerProtocolHandshake(brush),[C.protocolRequirement('BUILD/V5',['BUILD/V5:per-cell-compile']),C.protocolRequirement('region-build/v2',['region-build/v2:compile-partition-chunks'])]);
+ C.checkProtocolCompatibility(V.canvasProtocolHandshake,[C.protocolRequirement('canvas-region/v3',W.WRITE_METHOD_PORTS.REGION.find(s=>s.field==='canvasRegion').capabilities)]);
  const hs=W.peerProtocolHandshake(brush);const altered=clone(hs);altered.protocols.find(p=>p.protocol==='BUILD').major=4;
- assert.throws(()=>C.checkProtocolCompatibility(altered,[C.protocolRequirement('BUILD/V4',['BUILD/V4:per-cell-compile'])]),e=>e.code==='UNSUPPORTED_VERSION');
- const missing=clone(hs);missing.capabilities=missing.capabilities.filter(c=>c!=='BUILD/V4:per-cell-compile');
- assert.throws(()=>C.checkProtocolCompatibility(missing,[C.protocolRequirement('BUILD/V4',['BUILD/V4:per-cell-compile'])]),e=>e.code==='CAPABILITY_UNAVAILABLE');
+ assert.throws(()=>C.checkProtocolCompatibility(altered,[C.protocolRequirement('BUILD/V5',['BUILD/V5:per-cell-compile'])]),e=>e.code==='UNSUPPORTED_VERSION');
+ const missing=clone(hs);missing.capabilities=missing.capabilities.filter(c=>c!=='BUILD/V5:per-cell-compile');
+ assert.throws(()=>C.checkProtocolCompatibility(missing,[C.protocolRequirement('BUILD/V5',['BUILD/V5:per-cell-compile'])]),e=>e.code==='CAPABILITY_UNAVAILABLE');
  console.log(JSON.stringify({evidence:'ACTUAL_PUBLIC_REQUIREMENTS',brush:hs,canvasRegion:V.canvasProtocolHandshake,boundary:'actual public declarations; modified negative handshakes synthetic, no peer business response replacement'}));
 });

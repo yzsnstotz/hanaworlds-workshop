@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdir, rm } from 'node:fs/promises';
 import { request, createServer } from 'node:http';
-import { startAskWeb, REAL_AUTH_KEY } from '../web/ask-server.mjs';
+import { startAskWeb, REAL_AUTH_KEY } from '../archive/workshop-01/web/ask-server.mjs';
 import { credentialKey } from '@deepseek-ai/dsh-credentials';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEklEQVQImWOo2HKnYssdBggFADdeCCGxfcWRAAAAAElFTkSuQmCC','base64');
 const sha=b=>createHash('sha256').update(b).digest('hex');

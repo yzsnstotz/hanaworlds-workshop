@@ -7,8 +7,6 @@ window.__ModuleLoader__.load({
     const React = require('react');
     const h = React.createElement;
     const PANEL_ID = 'hanaworlds-workshop';
-    let desktopInvoke;
-    try { desktopInvoke = require('dsh-tauri').invoke; } catch { /* shown in panel */ }
 
     function createWorkshopFlow({ invoke, legacyHistory, currentSessionRef, newId }) {
       const listeners = new Set();
@@ -40,7 +38,7 @@ window.__ModuleLoader__.load({
         const response = await invoke('hanaworlds_request', {
           operation: 'workshop', input: { sessionRef, operation,
             payload: { contractVersion: operation === 'InvokeAction' ?
-              'interaction-surface/v4' : 'session/v4', ...payload } },
+              'interaction-surface/v5' : 'session/v5', ...payload } },
         });
         if (!response || response.error || !response.result) {
           const code = response?.error?.code ?? 'INVALID_RESPONSE';
@@ -62,7 +60,7 @@ window.__ModuleLoader__.load({
       const bindingLost = error => /\b(TRUSTED_BINDING_REQUIRED|AUTHORIZATION_REVOKED)\b/
         .test(`${String(error?.code ?? '')} ${String(error?.message ?? error)}`);
       const context = async sessionRef => {
-        if (typeof invoke !== 'function') throw Error('桌面工作坊连接不可用。');
+        if (typeof invoke !== 'function') throw Error('桌面工作坊连接不可用：宿主没有提供 hanaworldsWorkshopTransport 服务。');
         const current = await invoke('hanaworlds_request', {
           operation: 'context', input: { sessionRef },
         });
@@ -106,7 +104,7 @@ window.__ModuleLoader__.load({
         return result;
       };
       async function boundSessions() {
-        if (typeof invoke !== 'function') throw Error('桌面工作坊连接不可用。');
+        if (typeof invoke !== 'function') throw Error('桌面工作坊连接不可用：宿主没有提供 hanaworldsWorkshopTransport 服务。');
         const listing = await invoke('hanaworlds_request', {
           operation: 'context', input: {},
         });
@@ -577,13 +575,13 @@ window.__ModuleLoader__.load({
     }
 
     function apply(ctx) {
-      // Electron supplies the same host-owned request boundary through its
-      // preload/client service. The host remains responsible for every live
-      // Core Session and local world association check; this renderer receives no refs.
-      const transport = ctx.get?.('hanaworldsWorkshopTransport') ??
-        window.hanaworldsWorkshopTransport;
+      // The desktop host provides the request boundary as the client service
+      // hanaworldsWorkshopTransport; there is no window global or Tauri fallback.
+      // The host remains responsible for every live Core Session and local world
+      // association check; this renderer receives no refs.
+      const transport = ctx.get('hanaworldsWorkshopTransport');
       const invoke = typeof transport?.invoke === 'function'
-        ? (command, args) => transport.invoke(command, args) : desktopInvoke;
+        ? (command, args) => transport.invoke(command, args) : null;
       // Session catalog has no "current" field. Its public mainView reference
       // source identifies the Session retained by the actual conversation owner.
       const selectedSession = () => {

@@ -12,34 +12,34 @@ import * as C from 'hanaworlds-contracts';
 const sample = JSON.parse(await readFile(new URL(import.meta.resolve('hanaworlds-contracts/fixtures/main'))));
 const {default: plugin} = await import(process.env.HW_WORKSHOP_PACKAGE_ENTRY ?? '../src/index.mjs');
 const clone = structuredClone, D = (k,v) => C.digestValue(k,v).sha256;
-const config = {profileVersion:'compilation-config/v2',backendProfileId:'static-local',worldeditRevision:'static-1',nodeWriteSemantics:'explicit-nodeName-param2-static-v2',overlapRule:'last-writer-wins',effectOrder:'numeric-x-y-z',compressionRule:'exact-final-effects-only'};
-const stateProfile={profileVersion:'state-profile/v2',nodeFields:['nodeName','param1','param2'],metadataMode:'exact',inventoryMode:'exact',timerMode:'exact',derivedLightMode:'recompute-with-readback'};
+const config = {profileVersion:'compilation-config/v3',writeBackend:{profileId:'static-local',revision:'static-1'},overlapRule:'last-writer-wins',effectOrder:'numeric-x-y-z',compressionRule:'exact-final-effects-only'};
+const stateProfile={profileVersion:'state-profile/v3',derivedFields:['light'],preservedFields:[],clearedFields:[]};
 // All peers and world data are FIXTURE; Workshop, Cordis, Core and domain persistence are real.
 function fixture() {
  const f={local:clone(sample.request.localContext),calls:[],writes:0,undoWrites:0,modelCalls:0,history:[],receipt:null,rolledBack:false};
  f.context=()=>({currentSession:'s1',activeWorldRef:f.local.worldRef,orderedSelectedObjectRefs:[],sessionRevision:'canvas-selection-1',selectionRevision:f.local.selectionRevision,localContext:clone(f.local)});
- f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:[],model:null,engineGuards:null};
- f.painter={contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-building-exterior-painter',protocols:[{protocol:'painter',major:5,minor:0}],capabilities:[],provenance:{packageName:'hanaworlds-building-exterior-painter',packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}},async call(op,q){assert.equal(op,'ValidateBuildProposal'); f.calls.push(op); C.validateBuildProposalRequest(q); C.validateBuildProposalContext(q,await f.readFacts(q));
+ f.capabilities={providerRef:'fixture-host',capabilityRevision:'cap-1',worldRef:f.local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,worldGeometry:{profileVersion:'world-geometry/v1',geometryProfiles:['voxel-grid/v1'],partition:{edge:[16,16,16]},postWriteLighting:'REQUIRED'},limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile,sessionDeleteSupported:false,imageMediaTypes:[],model:null,engineGuards:null};
+ f.painter={contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-building-exterior-painter',protocols:[{protocol:'painter',major:6,minor:0}],capabilities:[],provenance:{packageName:'hanaworlds-building-exterior-painter',packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}},async call(op,q){assert.equal(op,'ValidateBuildProposal'); f.calls.push(op); C.validateBuildProposalRequest(q); C.validateBuildProposalContext(q,await f.readFacts(q));
    const result=clone(sample.response.result); result.invocationId=q.invocationId;
-   return {contractVersion:'painter/v5',requestId:q.requestId,result,error:null};}};
+   return {contractVersion:'painter/v6',requestId:q.requestId,result,error:null};}};
  // K3: Workshop checks Brush by its public ProtocolHandshake (BUILD major 3 + per-cell capability).
- f.brush={contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-brush',protocols:[{protocol:'BUILD',major:4,minor:0}],capabilities:['BUILD/V4:per-cell-compile'],provenance:{packageName:'hanaworlds-brush',packageVersion:'fixture',sourceRevision:null,artifactDigest:null}},async compile(q){f.calls.push('BuildDocument'); C.validateBoundRequest('BUILD/V4','BuildDocument',q);
-   const effects=[{position:clone(q.build.operations[0].min),...q.build.materials[q.build.operations[0].materialRef]}];
-   const projection={contractVersion:'operations/v3',buildDigest:q.buildDigest,compilerRevision:q.compilerRevision,compilationConfigDigest:q.compilationConfigDigest,worldRef:q.worldRef,frameDigest:q.targetFacts.frameDigest,catalogueDigest:q.catalogueDigest,targetFactsDigest:q.targetFactsDigest,effects};
-   return {contractVersion:'BUILD/V4',requestId:q.requestId,result:{projection,operationDigest:D('operations',projection),readBounds:q.targetFacts.sampledBounds,writeBounds:q.build.declaredBounds},error:null};}};
+ f.brush={contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-brush',protocols:[{protocol:'BUILD',major:5,minor:0}],capabilities:['BUILD/V5:per-cell-compile'],provenance:{packageName:'hanaworlds-brush',packageVersion:'fixture',sourceRevision:null,artifactDigest:null}},async compile(q){f.calls.push('BuildDocument'); C.validateBoundRequest('BUILD/V5','BuildDocument',q);
+   const effects=[{geometryProfile:'voxel-grid/v1',position:clone(q.build.operations[0].min),...q.build.materials[q.build.operations[0].materialRef]}];
+   const projection={contractVersion:'operations/v4',buildDigest:q.buildDigest,compilerRevision:q.compilerRevision,compilationConfigDigest:q.compilationConfigDigest,worldRef:q.worldRef,frameDigest:q.targetFacts.frameDigest,catalogueDigest:q.catalogueDigest,targetFactsDigest:q.targetFactsDigest,effects};
+   return {contractVersion:'BUILD/V5',requestId:q.requestId,result:{projection,operationDigest:D('operations',projection),readBounds:q.targetFacts.sampledBounds,writeBounds:q.build.declaredBounds},error:null};}};
  const row=receipt=>({transactionId:receipt.transactionId,originTransactionId:null,affectedObjectRefs:['object-1'],operationDigest:receipt.operationDigest,beforeImageDigest:'d'.repeat(64),expectedAfterReadbackDigest:receipt.readbackDigest,receiptDigest:D('receipt',receipt),historyRevision:'history-1',status:'VERIFIED'});
- f.canvas={contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-canvas',protocols:[{protocol:'canvas',major:6,minor:0}],capabilities:[],provenance:{packageName:'hanaworlds-canvas',packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}},async call(op,q){f.calls.push(op); C.validateBoundRequest('canvas/v6',op,q);
-   const response=result=>({contractVersion:'canvas/v6',requestId:q.requestId,result,error:null,...(['ApplyRecoverableCommit','Undo','Redo','RecoverPendingUndo','ReadPendingUndoResult','InspectPlacementRegion'].includes(op)?{guardRefusal:null}:{})});
+ f.canvas={contractHandshake:C.contractHandshake,protocolHandshake:{profileVersion:'protocol-handshake/v1',component:'hanaworlds-canvas',protocols:[{protocol:'canvas',major:7,minor:0}],capabilities:[],provenance:{packageName:'hanaworlds-canvas',packageVersion:'FIXTURE',sourceRevision:null,artifactDigest:null}},async call(op,q){f.calls.push(op); C.validateBoundRequest('canvas/v7',op,q);
+   const response=result=>({contractVersion:'canvas/v7',requestId:q.requestId,result,error:null,...(['ApplyRecoverableCommit','Undo','Redo','RecoverPendingUndo','ReadPendingUndoResult','InspectPlacementRegion'].includes(op)?{guardRefusal:null}:{})});
    if(op==='ReadWorldSelectionContext')return response({sessionRef:q.sessionRef,worldRef:q.worldRef,inventory:{capabilityRevision:'cap-1',connections:[]},selection:{status:'BOUND',connectionRef:f.local.connectionRef,context:f.context()}});
    assert.deepEqual(clone(q.localContext),f.local);
    // Canvas envelope carrying an engine guard refusal (public relay fixture cases); nothing written.
-   if(f.refuse?.op===op)return {contractVersion:'canvas/v6',requestId:q.requestId,result:null,error:C.guardRefusalError(f.refuse.refusal,{preflight:!!f.refuse.preflight}),guardRefusal:clone(f.refuse.refusal),...(op==='InspectPlacementRegion'?{unavailableSettings:null}:{})};
+   if(f.refuse?.op===op)return {contractVersion:'canvas/v7',requestId:q.requestId,result:null,error:C.guardRefusalError(f.refuse.refusal,{preflight:!!f.refuse.preflight}),guardRefusal:clone(f.refuse.refusal),...(op==='InspectPlacementRegion'?{unavailableSettings:null}:{})};
    if(op==='InspectPlacementRegion')return {...response({outcome:'REGION_INSPECTED',inspection:clone(sample.request.regionInspection)}),unavailableSettings:null};
    if(op==='ListObjects')return response({worldRef:q.worldRef,registryRevision:'registry-1',objects:f.receipt&&!f.rolledBack?[{worldRef:q.worldRef,objectRef:'object-1',objectRevision:f.undone?'object-2':'object-1',displayName:'石块',nameRevision:'name-1',creationSequence:1,status:'READY'}]:[]});
-   if(op==='AnalyzeAffectedObjects')return response({contractVersion:'canvas/v6',worldRef:q.worldRef,worldRevision:q.expectedRevision,registryRevision:q.expectedRegistryRevision,selectionRevision:q.expectedSelectionRevision,operationDigest:q.operationDigest,orderedSelectedRefs:[],affectedObjectRefs:f.conflict?['existing-object']:[]});
+   if(op==='AnalyzeAffectedObjects')return response({contractVersion:'canvas/v7',worldRef:q.worldRef,worldRevision:q.expectedRevision,registryRevision:q.expectedRegistryRevision,selectionRevision:q.expectedSelectionRevision,operationDigest:q.operationDigest,orderedSelectedRefs:[],affectedObjectRefs:f.conflict?['existing-object']:[]});
    if(op==='ApplyRecoverableCommit'){
      f.writes++; f.applied=clone(q);
-     f.receipt={contractVersion:'canvas/v6',transactionId:q.transactionId,operationDigest:q.operationDigest,transactionPayloadDigest:'a'.repeat(64),status:f.rollback?'ROLLED_BACK':'VERIFIED',previousWorldRevision:q.expectedWorldRevision,observedWorldRevision:'world-after',readbackDigest:'c'.repeat(64),restoreStatus:f.rollback?'VERIFIED_RESTORED':'NOT_REQUIRED',error:null,localContext:clone(f.local),guardRefusal:null,applyFailure:null};
+     f.receipt={contractVersion:'canvas/v7',transactionId:q.transactionId,operationDigest:q.operationDigest,transactionPayloadDigest:'a'.repeat(64),status:f.rollback?'ROLLED_BACK':'VERIFIED',previousWorldRevision:q.expectedWorldRevision,observedWorldRevision:'world-after',readbackDigest:'c'.repeat(64),restoreStatus:f.rollback?'VERIFIED_RESTORED':'NOT_REQUIRED',error:null,localContext:clone(f.local),guardRefusal:null,applyFailure:null};
      if(f.rollback){ f.rolledBack=true; f.worldNodes=[]; } else {f.worldNodes=clone(q.operations.effects);f.history=[row(f.receipt)];}
      return response(f.receipt);
    }
@@ -63,17 +63,17 @@ async function mount(root,f) {
  return {ctx,workshop,async close(){await workshop.projectionStore.close();await ctx.fiber.dispose();}};
 }
 async function withRuntime(f,fn){const base=process.env.HW_RUNTIME_ROOT??new URL('../../local-world/runtime/',import.meta.url).pathname;await mkdir(base,{recursive:true});const root=await mkdtemp(join(base,'run-'));const r=await mount(root,f);try{await fn(r,root);}finally{await r.close();await rm(root,{recursive:true,force:true});}}
-const start={contractVersion:'session/v4',sessionRef:'s1',requestId:'start',expectedRevision:null};
+const start={contractVersion:'session/v5',sessionRef:'s1',requestId:'start',expectedRevision:null};
 async function call(r,op,q){const res=await r.workshop.call(op,q);assert.equal(res.error,null,JSON.stringify(res));return res.result;}
 async function ready(r,f){
  const writer=await r.ctx.sessionPersistence.create({version:SESSION_FORMAT_VERSION,id:'s1',createdAt:100,cwd:'/isolated/local-world',isSeeded:false});await writer.append([{type:'turn/start',seq:0,time:101,data:{turn:1}}]);await writer.close();
  const s=await call(r,'StartOrResumeSession',start);
- const switched=await call(r,'SwitchWorldContext',{contractVersion:'session/v4',sessionRef:'s1',requestId:'switch',expectedRevision:s.context.sessionRevision,worldRef:f.local.worldRef,selectionRevision:f.local.selectionRevision,localContext:f.local});
+ const switched=await call(r,'SwitchWorldContext',{contractVersion:'session/v5',sessionRef:'s1',requestId:'switch',expectedRevision:s.context.sessionRevision,worldRef:f.local.worldRef,selectionRevision:f.local.selectionRevision,localContext:f.local});
  const turn=await call(r,'AppendMultimodalTurn',{...start,requestId:'input',expectedRevision:switched.context.sessionRevision,turnRef:'turn-1',text:'建一块石头',media:[],controls:{purpose:'first building',dimensions:{width:1,depth:1,height:1,unit:'node'},entrancePortalRefs:[],styleText:null,siteRules:{requireEntranceConnectivity:false,entranceClearance:null,hazardPolicy:{forbidLiquid:true,maximumDamagePerSecond:0},optionalLightRule:null}},localContext:f.local});
  const current=await call(r,'StartOrResumeSession',start);
  const writer2=await r.ctx.sessionPersistence.open('s1','write');await writer2.append([{type:'user/message',seq:1,time:102,surfaceOp:'append',data:{id:'confirm',role:'user',source:{kind:'user'},content:[{type:'text',text:'确认'}]}}]);await writer2.close();
  await call(r,'AnswerClarification',{...start,requestId:'confirm',expectedRevision:current.context.sessionRevision,turnRef:'turn-1',clarificationId:turn.clarification.clarificationId,answer:'确认',localContext:f.local});
- const advance={contractVersion:'session/v4',sessionRef:'s1',requestId:'advance',worldRef:f.local.worldRef,expectedTurnRevision:turn.turnRevision,localContext:f.local};
+ const advance={contractVersion:'session/v5',sessionRef:'s1',requestId:'advance',worldRef:f.local.worldRef,expectedTurnRevision:turn.turnRevision,localContext:f.local};
  const context=await r.workshop.readBuildProposalContext({...advance,requestId:'read-context'});
  const proposal={...context,requestId:'proposal',proposal:clone(sample.request.proposal)};
  const submitted=await r.workshop.submitBuildProposal(proposal);assert.equal(submitted.error,null,JSON.stringify(submitted));
@@ -83,8 +83,8 @@ test('local text proposal → build → durable duplicate → original Undo uses
  const f=fixture();await withRuntime(f,async(r,root)=>{const {advance}=await ready(r,f);const built=await call(r,'AdvanceCurrentBuild',advance);assert.equal(built.outcome,'VERIFIED');assert.equal(f.writes,1);assert.equal(f.modelCalls,0);
  await r.close();const reopened=await mount(root,f);try{
  assert.deepEqual(await call(reopened,'AdvanceCurrentBuild',advance),built);assert.equal(f.writes,1);
- const undo={contractVersion:'session/v4',sessionRef:'s1',requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:'history-1'};
- const status=await call(reopened,'ReadCurrentUndoStatus',{contractVersion:'session/v4',sessionRef:'s1',requestId:'status',worldRef:f.local.worldRef,localContext:f.local});assert.equal(status.availability,'AVAILABLE');
+ const undo={contractVersion:'session/v5',sessionRef:'s1',requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:'history-1'};
+ const status=await call(reopened,'ReadCurrentUndoStatus',{contractVersion:'session/v5',sessionRef:'s1',requestId:'status',worldRef:f.local.worldRef,localContext:f.local});assert.equal(status.availability,'AVAILABLE');
  const result=await call(reopened,'UndoCurrentBuild',undo);assert.equal(result.status,'VERIFIED');assert.equal(f.undoRequest.historyTransactionId,built.receipt.transactionId);assert.equal(f.undoWrites,1);
  assert.deepEqual(await call(reopened,'UndoCurrentBuild',undo),result);assert.equal(f.undoWrites,1);
  }finally{await reopened.close();}});
@@ -102,7 +102,7 @@ test('Canvas whole rollback is retained as failure and never advertises Undo suc
  const f=fixture();f.rollback=true;await withRuntime(f,async r=>{const {advance}=await ready(r,f);
  const response=await r.workshop.call('AdvanceCurrentBuild',advance);assert.equal(response.error?.mutationState,'ROLLED_BACK');assert.equal(f.writes,1);assert.deepEqual(f.worldNodes,[]);
  assert.deepEqual(await r.workshop.call('AdvanceCurrentBuild',advance),response);assert.equal(f.writes,1);
- const status=await call(r,'ReadCurrentUndoStatus',{contractVersion:'session/v4',sessionRef:'s1',requestId:'rollback-status',worldRef:f.local.worldRef,localContext:f.local});assert.equal(status.availability,'NO_VERIFIED_BUILD');});
+ const status=await call(r,'ReadCurrentUndoStatus',{contractVersion:'session/v5',sessionRef:'s1',requestId:'rollback-status',worldRef:f.local.worldRef,localContext:f.local});assert.equal(status.availability,'NO_VERIFIED_BUILD');});
 });
 test('mismatched Canvas readback cannot publish VERIFIED or cause a duplicate write',async()=>{
  const f=fixture();f.badReadback=true;await withRuntime(f,async r=>{const {advance}=await ready(r,f);
@@ -117,14 +117,14 @@ test('Painter rejects invalid geometry before Brush or Canvas transaction',async
  const response=await r.workshop.submitBuildProposal(bad);assert.equal(response.error?.code,'BUILD_INVALID');assert.equal(f.calls.includes('BuildDocument'),false);assert.equal(f.writes,0);});
 });
 
-// contracts v1 rc.4: session/v4 Advance/Undo/RecoverPendingUndo carry guardRefusal (public relay fixture cases).
+// contracts v1 rc.4: session/v5 Advance/Undo/RecoverPendingUndo carry guardRefusal (public relay fixture cases).
 const relay=JSON.parse(await readFile(new URL(import.meta.resolve('hanaworlds-contracts/fixtures/skill-site-rules')))).engineGuards.relay.cases;
 // Relay is verbatim: the session response carries exactly Canvas's refusal and the error it explains.
 const relayed=(response,c)=>{assert.deepEqual(clone(response.guardRefusal),c.refusal);assert.deepEqual(clone(response.error),clone(C.guardRefusalError(c.refusal,{preflight:!!c.preflight})));};
 for(const c of relay.filter(c=>c.refusal.stage==='APPLY_COMPILED'))test(`rc.4 AdvanceCurrentBuild relays Canvas guard refusal to Host/skill unchanged: ${c.title}`,async()=>{
  const f=fixture();f.refuse={op:'ApplyRecoverableCommit',refusal:c.refusal,preflight:c.preflight};await withRuntime(f,async r=>{const {advance}=await ready(r,f);
   const response=await r.workshop.call('AdvanceCurrentBuild',advance);relayed(response,c);assert.equal(f.writes,0);
-  C.validateBoundResponse('session/v4','AdvanceCurrentBuild',advance,response);
+  C.validateBoundResponse('session/v5','AdvanceCurrentBuild',advance,response);
   assert.deepEqual(await r.workshop.call('AdvanceCurrentBuild',advance),response,'durable replay keeps the refusal');
  });
 });
@@ -132,20 +132,20 @@ test('rc.4 UndoCurrentBuild relays the engine-form Undo restore refusal unchange
  const c=relay.find(c=>c.refusal.stage==='RESTORE');const f=fixture();await withRuntime(f,async r=>{const {advance}=await ready(r,f);
   const built=await r.workshop.call('AdvanceCurrentBuild',advance);assert.equal(built.error,null);assert.equal(built.guardRefusal,null);
   f.refuse={op:'Undo',refusal:c.refusal,preflight:c.preflight};
-  const undo={contractVersion:'session/v4',sessionRef:'s1',requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:'history-1'};
-  const refused=await r.workshop.call('UndoCurrentBuild',undo);relayed(refused,c);assert.equal(f.undoWrites,0);C.validateBoundResponse('session/v4','UndoCurrentBuild',undo,refused);
+  const undo={contractVersion:'session/v5',sessionRef:'s1',requestId:'undo',worldRef:f.local.worldRef,localContext:f.local,expectedTurnRevision:advance.expectedTurnRevision,expectedHistoryRevision:'history-1'};
+  const refused=await r.workshop.call('UndoCurrentBuild',undo);relayed(refused,c);assert.equal(f.undoWrites,0);C.validateBoundResponse('session/v5','UndoCurrentBuild',undo,refused);
  });
 });
 test('rc.4 unrelated errors and the unsupported RecoverPendingUndo carry guardRefusal null; contract accepts them',async()=>{
  const f=fixture();f.conflict=true;await withRuntime(f,async r=>{const {advance}=await ready(r,f);
   const conflict=await r.workshop.call('AdvanceCurrentBuild',advance);assert.equal(conflict.error.code,'OTHER_OBJECTS_AFFECTED');assert.equal(conflict.guardRefusal,null);
-  C.validateBoundResponse('session/v4','AdvanceCurrentBuild',advance,conflict);
+  C.validateBoundResponse('session/v5','AdvanceCurrentBuild',advance,conflict);
   // Negative: a response that drops the key, or names a refusal its error does not explain, is refused by the contract.
-  const {guardRefusal:_,...missing}=conflict;assert.throws(()=>C.validateBoundResponse('session/v4','AdvanceCurrentBuild',advance,missing));
-  assert.throws(()=>C.validateBoundResponse('session/v4','AdvanceCurrentBuild',advance,{...conflict,guardRefusal:relay[2].refusal}));
+  const {guardRefusal:_,...missing}=conflict;assert.throws(()=>C.validateBoundResponse('session/v5','AdvanceCurrentBuild',advance,missing));
+  assert.throws(()=>C.validateBoundResponse('session/v5','AdvanceCurrentBuild',advance,{...conflict,guardRefusal:relay[2].refusal}));
   // Workshop has no pending-Undo recovery path: the named refusal still carries guardRefusal null in the v4 shape.
-  const recover={contractVersion:'session/v4',sessionRef:'s1',requestId:'recover',worldRef:f.local.worldRef,localContext:f.local};
+  const recover={contractVersion:'session/v5',sessionRef:'s1',requestId:'recover',worldRef:f.local.worldRef,localContext:f.local};
   const recovered=await r.workshop.call('RecoverPendingUndo',recover);assert.ok(recovered.error,'refused by name');assert.equal(recovered.guardRefusal,null);
-  C.validateBoundResponse('session/v4','RecoverPendingUndo',recover,recovered);
+  C.validateBoundResponse('session/v5','RecoverPendingUndo',recover,recovered);
  });
 });

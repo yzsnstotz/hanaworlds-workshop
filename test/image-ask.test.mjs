@@ -24,7 +24,7 @@ import Skills from '@deepseek-ai/dsh-skill';
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill';
 const {default:BuildingSkill}=await import(process.env.HW_WORKSHOP_BUILDING_SKILL_ENTRY??'../src/building-skill.mjs');
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
-import { FixtureVisionModel, PROVIDER, MODEL } from '../web/ask-server.mjs';
+import { FixtureVisionModel, PROVIDER, MODEL } from './fixture-vision-model.mjs';
 const {default:plugin,IMAGE_ASK_ALLOWED_TOOLS}=await import(process.env.HW_WORKSHOP_PACKAGE_ENTRY??'../src/index.mjs');
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEklEQVQImWOo2HKnYssdBggFADdeCCGxfcWRAAAAAElFTkSuQmCC','base64');
 const sha=b=>createHash('sha256').update(b).digest('hex');

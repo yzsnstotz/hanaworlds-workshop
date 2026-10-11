@@ -22,17 +22,17 @@ async function setup(fn){
  const ctx=new Context();const f={inspection:clone(fixture.inspections.view1),calls:[],painterRequests:[],applies:[],worldRevision:fixture.inspections.view1.targetFacts.worldRevision,responseCase:sample,recordedInspections:{}};let ws;
  try{
   await ctx.plugin(Jsonl,{root:root+'/core',compression:'none'}).await();await ctx.plugin(Storage).await();await ctx.plugin(StorageJson,{root:root+'/projection'}).await();await ctx.plugin(StorageDomain,{backend:'json'}).await();await ctx.plugin(SystemPrompt).await();await ctx.plugin(Tools).await();
-  ctx.provide('hanaworldsCapabilities',{providerRef:'fixture',capabilityRevision:'fixture',worldRef:local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile:{profileVersion:'state-profile/v2',nodeFields:['nodeName','param1','param2'],metadataMode:'exact',inventoryMode:'exact',timerMode:'exact',derivedLightMode:'recompute-with-readback'},sessionDeleteSupported:false,imageMediaTypes:['image/png'],model:null,engineGuards:null});
+  ctx.provide('hanaworldsCapabilities',{providerRef:'fixture',capabilityRevision:'fixture',worldRef:local.worldRef,engineBounds:sample.request.targetFacts.sampledBounds,worldGeometry:{profileVersion:'world-geometry/v1',geometryProfiles:['voxel-grid/v1'],partition:{edge:[16,16,16]},postWriteLighting:'REQUIRED'},limits:[],recoveryGuarantee:'RECOVERABLE_VERIFIED',stateProfile:{profileVersion:'state-profile/v3',derivedFields:['light'],preservedFields:[],clearedFields:[]},sessionDeleteSupported:false,imageMediaTypes:['image/png'],model:null,engineGuards:null});
   const selection=id=>({currentSession:id,activeWorldRef:local.worldRef,orderedSelectedObjectRefs:[],sessionRevision:'fixture-selection',selectionRevision:local.selectionRevision,localContext:clone(local)});
-  ctx.provide('hanaworldsCanvasV5',{contractHandshake:C.contractHandshake,protocolHandshake:handshake('fixture-canvas','canvas',6),async call(op,q){
-   C.validateBoundRequest('canvas/v6',op,q);f.calls.push({op,request:clone(q)});const ok=result=>({contractVersion:'canvas/v6',requestId:q.requestId,result,error:null,...(['ApplyRecoverableCommit','InspectPlacementRegion'].includes(op)?{guardRefusal:null}:{})});
+  ctx.provide('hanaworldsCanvasV5',{contractHandshake:C.contractHandshake,protocolHandshake:handshake('fixture-canvas','canvas',7),async call(op,q){
+   C.validateBoundRequest('canvas/v7',op,q);f.calls.push({op,request:clone(q)});const ok=result=>({contractVersion:'canvas/v7',requestId:q.requestId,result,error:null,...(['ApplyRecoverableCommit','InspectPlacementRegion'].includes(op)?{guardRefusal:null}:{})});
    if(op==='ReadWorldSelectionContext')return ok({sessionRef:q.sessionRef,worldRef:q.worldRef,inventory:{capabilityRevision:'fixture',connections:[]},selection:{status:'BOUND',connectionRef:local.connectionRef,context:selection(q.sessionRef)}});
    if(op==='InspectPlacementRegion'){f.recordedInspections[f.inspection.inspectionId]=clone(f.inspection);return {...ok({outcome:'REGION_INSPECTED',inspection:clone(f.inspection)}),unavailableSettings:null};}
    if(op==='ListObjects')return ok({worldRef:q.worldRef,registryRevision:'registry-1',objects:f.receipt?[{worldRef:q.worldRef,objectRef:'object-1',objectRevision:'object-1',displayName:'fixture',nameRevision:'name-1',creationSequence:1,status:'READY'}]:[]});
-   if(op==='AnalyzeAffectedObjects')return ok({contractVersion:'canvas/v6',worldRef:q.worldRef,worldRevision:f.worldRevision,registryRevision:q.expectedRegistryRevision,selectionRevision:q.expectedSelectionRevision,operationDigest:q.operationDigest,orderedSelectedRefs:[],affectedObjectRefs:[]});
+   if(op==='AnalyzeAffectedObjects')return ok({contractVersion:'canvas/v7',worldRef:q.worldRef,worldRevision:f.worldRevision,registryRevision:q.expectedRegistryRevision,selectionRevision:q.expectedSelectionRevision,operationDigest:q.operationDigest,orderedSelectedRefs:[],affectedObjectRefs:[]});
    if(op==='ApplyRecoverableCommit'){
     C.checkConfirmedPlacementApply(q,f.recordedInspections[q.regionInspectionBinding.inspectionId],f.worldRevision);f.applies.push(clone(q));
-    f.receipt={contractVersion:'canvas/v6',transactionId:q.transactionId,operationDigest:q.operationDigest,transactionPayloadDigest:'a'.repeat(64),status:'VERIFIED',previousWorldRevision:q.expectedWorldRevision,observedWorldRevision:'fixture-after',readbackDigest:'c'.repeat(64),restoreStatus:'NOT_REQUIRED',error:null,localContext:clone(local),guardRefusal:null,applyFailure:null};return ok(f.receipt);
+    f.receipt={contractVersion:'canvas/v7',transactionId:q.transactionId,operationDigest:q.operationDigest,transactionPayloadDigest:'a'.repeat(64),status:'VERIFIED',previousWorldRevision:q.expectedWorldRevision,observedWorldRevision:'fixture-after',readbackDigest:'c'.repeat(64),restoreStatus:'NOT_REQUIRED',error:null,localContext:clone(local),guardRefusal:null,applyFailure:null};return ok(f.receipt);
    }
    if(op==='Readback')return ok(f.receipt);
    if(op==='HistoryQuery'){const r=f.receipt;return ok({worldRef:q.worldRef,objectRef:q.objectRef,historyRevision:'history-1',headTransactionId:r.transactionId,entries:[{transactionId:r.transactionId,originTransactionId:null,affectedObjectRefs:['object-1'],operationDigest:r.operationDigest,beforeImageDigest:'d'.repeat(64),expectedAfterReadbackDigest:r.readbackDigest,receiptDigest:D('receipt',r),historyRevision:'history-1',status:'VERIFIED'}],undoAvailable:true,redoAvailable:false});}
@@ -40,21 +40,21 @@ async function setup(fn){
   }});
   ctx.provide('hanaworldsCatalogue',{read:async()=>clone(sample.request.catalogue)});
   const config=fixture.canvas.accept[0].submission.apply.operations;
-  const compilationConfig={profileVersion:'compilation-config/v2',backendProfileId:'static-local',worldeditRevision:'static-1',nodeWriteSemantics:'explicit-nodeName-param2-static-v2',overlapRule:'last-writer-wins',effectOrder:'numeric-x-y-z',compressionRule:'exact-final-effects-only'};
+  const compilationConfig={profileVersion:'compilation-config/v3',writeBackend:{profileId:'static-local',revision:'static-1'},overlapRule:'last-writer-wins',effectOrder:'numeric-x-y-z',compressionRule:'exact-final-effects-only'};
   ctx.provide('hanaworldsCompilerConfig',{read:async()=>({compilationConfig,compilerRevision:config.compilerRevision})});
-  ctx.provide('hanaworldsBrushV3',{contractHandshake:C.contractHandshake,protocolHandshake:handshake('fixture-brush','BUILD',4,['BUILD/V4:per-cell-compile']),async compile(q){
-   C.validateBoundRequest('BUILD/V4','BuildDocument',q);// Effect positions are the published fixture's validated COVERAGE positions, never repaired real geometry.
+  ctx.provide('hanaworldsBrushV3',{contractHandshake:C.contractHandshake,protocolHandshake:handshake('fixture-brush','BUILD',5,['BUILD/V5:per-cell-compile']),async compile(q){
+   C.validateBoundRequest('BUILD/V5','BuildDocument',q);// Effect positions are the published fixture's validated COVERAGE positions, never repaired real geometry.
    const positions=f.responseCase.response.result.build.witnesses.find(w=>w.predicate==='COVERAGE').facts.positions;
-   const material=Object.values(q.build.materials)[0];const projection={...clone(config),buildDigest:q.buildDigest,compilerRevision:q.compilerRevision,compilationConfigDigest:q.compilationConfigDigest,targetFactsDigest:q.targetFactsDigest,frameDigest:q.targetFacts.frameDigest,effects:positions.map(position=>({position:clone(position),...material}))};
-   C.validateExactEffects(q.build.operations,q.build.materials,projection.effects);return {contractVersion:'BUILD/V4',requestId:q.requestId,result:{projection,operationDigest:D('operations',projection),readBounds:q.targetFacts.sampledBounds,writeBounds:q.build.declaredBounds},error:null};
+   const material=Object.values(q.build.materials)[0];const projection={...clone(config),buildDigest:q.buildDigest,compilerRevision:q.compilerRevision,compilationConfigDigest:q.compilationConfigDigest,targetFactsDigest:q.targetFactsDigest,frameDigest:q.targetFacts.frameDigest,effects:positions.map(position=>({geometryProfile:q.build.geometryProfile,position:clone(position),...material}))};
+   C.validateExactEffects(q.build.operations,q.build.materials,projection.effects);return {contractVersion:'BUILD/V5',requestId:q.requestId,result:{projection,operationDigest:D('operations',projection),readBounds:q.targetFacts.sampledBounds,writeBounds:q.build.declaredBounds},error:null};
   }});
-  ctx.provide('hanaworldsPainterV2PictureBlocks',{contractHandshake:C.contractHandshake,protocolHandshake:handshake('fixture-painter','painter',5),async call(op,q){
-   assert.equal(op,'ValidateBuildProposal');C.validateBuildProposalRequest(q);const facts=await ws.readBuildProposalProviderFacts(q);C.validateBuildProposalContext(q,facts);f.painterRequests.push({request:clone(q),facts:clone(facts)});const result=clone(f.responseCase.response.result);result.invocationId=q.invocationId;return {contractVersion:'painter/v5',requestId:q.requestId,result,error:null};
+  ctx.provide('hanaworldsPainterV2PictureBlocks',{contractHandshake:C.contractHandshake,protocolHandshake:handshake('fixture-painter','painter',6),async call(op,q){
+   assert.equal(op,'ValidateBuildProposal');C.validateBuildProposalRequest(q);const facts=await ws.readBuildProposalProviderFacts(q);C.validateBuildProposalContext(q,facts);f.painterRequests.push({request:clone(q),facts:clone(facts)});const result=clone(f.responseCase.response.result);result.invocationId=q.invocationId;return {contractVersion:'painter/v6',requestId:q.requestId,result,error:null};
   }});
   await ctx.plugin(Workshop).await();ws=ctx.get('hanaworldsWorkshop');
   for(const id of ['s1','s2']){const w=await ctx.sessionPersistence.create(header(id));await w.append([{type:'turn/start',seq:0,time:99,data:{turn:1}}]);await w.close();}
   const append=async(id,event)=>{const w=await ctx.sessionPersistence.open(id,'write');try{const log=await w.read();await w.append([{...event,seq:log.events.length}]);}finally{await w.close();}};
-  const wire=async(op,fields,id='s1')=>ws.call(op,{contractVersion:'session/v4',sessionRef:id,...fields});
+  const wire=async(op,fields,id='s1')=>ws.call(op,{contractVersion:'session/v5',sessionRef:id,...fields});
   const bind=async(id='s1')=>{const a=await wire('StartOrResumeSession',{requestId:'start',expectedRevision:null},id);assert.equal(a.error,null,JSON.stringify(a));const b=await wire('SwitchWorldContext',{requestId:'switch',expectedRevision:a.result.context.sessionRevision,worldRef:local.worldRef,selectionRevision:local.selectionRevision,localContext:local},id);assert.equal(b.error,null,JSON.stringify(b));};
   const tool=async(args,id='s1')=>{const out=await ctx.tools.execute({name:'hanaworlds_context',callId:'context-'+Math.random(),arguments:args,signal:new AbortController().signal,agent:{ctx,session:{header:header(id)}}});return {...out,json:out.isError?null:JSON.parse(out.value.result),text:out.content.map(x=>x.text??'').join('')};};
   const requireTool=async(args,id='s1')=>{const a=await tool(args,id);assert.equal(a.isError,false,a.text);return a.json;};
@@ -68,7 +68,7 @@ async function proposeA(r){await r.bind();await r.append('s1',user('ask','请先
 async function confirm(r,id='yes'){await r.append('s1',user(id,'确认'));return r.requireTool({action:'confirm'});}
 
 test('structured A is publicly displayed, confirmed by a new human, retained across a new view and reaches exact callback/apply',async()=>setup(async r=>{
- assert.deepEqual(r.ws.protocolHandshake.protocols.map(p=>({...p})),[{protocol:'session',major:4,minor:0}]);
+ assert.deepEqual(r.ws.protocolHandshake.protocols.map(p=>({...p})),[{protocol:'session',major:5,minor:0}]);
  const {source,prepared}=await proposeA(r);
  assert.deepEqual(source.inspection,fixture.inspections.view1);assert.deepEqual(prepared.placement,fixture.placements.A);
  assert.ok(prepared.clarification.question.includes(JSON.stringify(fixture.placements.A.target)),'authoritative question shows the exact structured target');

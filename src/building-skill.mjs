@@ -61,7 +61,7 @@ For a reference image, call hanaworlds_image_material with its bound attachmentR
 matches the image's dominant colour against measured textures of the current world's verified materials
 without model calls and returns a legal-material hint for proposal materials. If it reports a missing
 capability or no measurable material, tell the user; never guess a colour or node from names.
-3. Design pure geometry: proposal is JSON {"decision":"BUILD","materials":{"wall":{"nodeName":"a node from the catalogue","param2":0}},"boxes":[{"min":[0,0,0],"max":[1,1,1],"materialRef":"wall"}]}.
+3. Design pure geometry: proposal is JSON {"decision":"BUILD","materials":{"wall":{"materialRef":"an opaque reference from the catalogue","orientation":0}},"boxes":[{"min":[0,0,0],"max":[1,1,1],"materialRef":"wall"}]}.
 This example describes the JSON shape, not a building template or a suggested size. Derive all geometry
 from the currently confirmed brief and its requested dimensions/siteRules; do not shrink dimensions,
 change clearance or add storeys/roof layers without a revised proposal and a new human confirmation.
@@ -104,15 +104,15 @@ bounding box or claim Undo from an optimistic message.
 No shell commands, direct world writes, other model calls, or alternate planner are part of this skill.`
 /** Region steps: same confirmed brief, then the region proposal tool instead of steps 2-3 of the cell path. */
 const regionSteps = `Region write (method REGION, tool hanaworlds_region_proposal), after the same prepare/confirm step 1:
-R1. Call hanaworlds_region_proposal action context. It returns proposalRef, the captured painter-region/v2
+R1. Call hanaworlds_region_proposal action context. It returns proposalRef, the captured painter-region/v3
 context (catalogue, brief, localContext) and worldFacts (for a world created here: game and flat mapgen,
 for example the ground level). Coordinates are absolute world node coordinates; there is no placement frame.
 R2. Call hanaworlds_region_proposal action submit with proposalRef and proposal JSON
-{"decision":"REGION","block":{"profileVersion":"region-voxels/v1","origin":[x,y,z],"size":[sx,sy,sz],
-"indexOrder":"X_FASTEST_THEN_Y_THEN_Z","palette":[{"nodeName":"air","param2":0},...],"runs":[[count,paletteIndex|null],...]}}.
-Index = (x-ox) + sx*((y-oy) + sy*(z-oz)). Palette entries are catalogue nodes sorted by nodeName then param2,
+{"decision":"REGION","block":{"profileVersion":"region-voxels/v2","geometryProfile":"voxel-grid/v1","origin":[x,y,z],"size":[sx,sy,sz],
+"indexOrder":"X_FASTEST_THEN_Y_THEN_Z","palette":[{"materialRef":"catalogue.emptyMaterialRef","orientation":0},...],"runs":[[count,paletteIndex|null],...]}}.
+Index = (x-ox) + sx*((y-oy) + sy*(z-oz)). Palette entries are catalogue nodes sorted by materialRef then orientation,
 unique and all used; runs are canonical (adjacent runs differ) and their counts sum to sx*sy*sz.
-Explicit {"nodeName":"air","param2":0} digs; null means unspecified: that cell is not written and keeps its node.
+Explicit {"materialRef":"catalogue.emptyMaterialRef","orientation":0} digs; null means unspecified: that cell is not written and keeps its node.
 Painter validates; respond to its errors instead of bypassing validation.
 The submit result includes effectSummary: what the validated block will write, per y layer in world
 coordinates (each node's count and x/z range, and the unspecified cells). Before advance, compare it with the
@@ -121,7 +121,7 @@ For a structured REGION position use the same real action placement / prepare / 
 in step 1. Workshop sends its confirmed binding; Canvas checks its own recorded source inspection and
 current world revision before writing. A changed source, stale revision or missing/changed binding is
 refusal: get a new real inspection, proposal and new human confirmation; never move or truncate the target.
-R3. Call hanaworlds_build action advance: Brush compiles mapblock chunks, Canvas writes one transaction and reads
+R3. Call hanaworlds_build action advance: Brush compiles chunks using the world-declared partition, Canvas writes one transaction and reads
 the whole region back. Only outcome VERIFIED is success; ROLLED_BACK, PENDING or errors are not.
 VERIFIED means Canvas wrote exactly the submitted block, not that the block matched the request: describe the
 result from effectSummary, never from your intention.

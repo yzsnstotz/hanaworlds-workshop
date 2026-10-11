@@ -1,7 +1,7 @@
 // Only rejection boundaries; no fixture event is used as live Core evidence.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as supply from '../web/c4-supply.mjs';
+import * as supply from '../archive/workshop-01/web/c4-supply.mjs';
 
 test('unregistered session cannot receive a purported user input', async () => {
  assert.equal(typeof supply.appendStartedUserInput, 'function', 'missing started-session user-input guard');

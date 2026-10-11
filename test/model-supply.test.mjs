@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as supply from '../web/model-supply.mjs';
+import * as supply from '../archive/workshop-01/web/model-supply.mjs';
 
 test('metadata supplier exists without constructing a model driver', () => {
  assert.equal(typeof supply.createModelMetadataSupply, 'function');

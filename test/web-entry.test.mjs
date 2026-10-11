@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import { request } from 'node:http';
-import { startWorkshopWeb } from '../web/server.mjs';
+import { startWorkshopWeb } from '../archive/workshop-01/web/server.mjs';
 test('new localhost entry exposes its fixture identity and refuses foreign origins or borrowed Sessions',async()=>{
  const service=await startWorkshopWeb({port:0,runRoot:new URL('../../runtime/web-check/',import.meta.url).pathname});
  try{

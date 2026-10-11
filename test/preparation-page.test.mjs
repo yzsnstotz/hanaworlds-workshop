@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, readdir, rm } from 'node:fs/promises';
-import { startAskWeb } from '../web/ask-server.mjs';
+import { startAskWeb } from '../archive/workshop-01/web/ask-server.mjs';
 
 test('preparation page mounts no credential/auth/real model service; only fixture can receive image bytes', async () => {
  const runRoot=process.env.HW_RUNTIME_ROOT;assert.ok(runRoot,'own isolated HW_RUNTIME_ROOT required');

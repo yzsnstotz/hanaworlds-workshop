@@ -22,7 +22,7 @@ export function registerContextTool(ctx,workshop) {
     requireEntranceConnectivity:{type:'boolean',required:true},
     entranceClearance:{required:true,oneOf:[{type:'null'},{type:'object',additionalProperties:false,description:'Design clearance of the entrance opening in whole nodes; a building value, not a body guarantee.',properties:{width:{type:'integer',required:true},height:{type:'integer',required:true},depth:{type:'integer',required:true},unit:{type:'string',enum:['node'],required:true}}}]},
     hazardPolicy:{type:'object',required:true,additionalProperties:false,properties:{forbidLiquid:{type:'boolean',required:true},maximumDamagePerSecond:{type:'number',required:true}}},
-    optionalLightRule:{required:true,oneOf:[{type:'null'},{type:'object',additionalProperties:false,properties:{minimumLight:{type:'integer',required:true},sourceRevision:{type:'string',required:true}}}]},
+    optionalLightRule:{required:true,oneOf:[{type:'null'},{type:'object',additionalProperties:false,properties:{minimumLight:{type:'number',required:true},sourceRevision:{type:'string',required:true}}}]},
    }},
   },output,
   isConcurrencySafe:()=>false,

@@ -11,9 +11,9 @@ const capsOf = wire => C.regionCapabilities.map(c => c.id).filter(id => id.start
 /** Per-cell requirements shared by descriptors, availability and each public call.
  * Current public contracts define no separate Painter/Canvas per-cell capability id.
  * Their wire major/minor must still be explicitly advertised; region claims do not substitute. */
-export const PER_CELL_BRUSH = Object.freeze({ wire: 'BUILD/V4', capabilities: Object.freeze(['BUILD/V4:per-cell-compile']) });
-export const PER_CELL_PAINTER = C.deepFreeze({wire:'painter/v5',minMinor:0,capabilities:[]});
-export const PER_CELL_CANVAS = C.deepFreeze({wire:'canvas/v6',minMinor:0,capabilities:[]});
+export const PER_CELL_BRUSH = Object.freeze({ wire: 'BUILD/V5', capabilities: Object.freeze(['BUILD/V5:per-cell-compile']) });
+export const PER_CELL_PAINTER = C.deepFreeze({wire:'painter/v6',minMinor:0,capabilities:[]});
+export const PER_CELL_CANVAS = C.deepFreeze({wire:'canvas/v7',minMinor:0,capabilities:[]});
 export const WRITE_METHOD_PORTS = C.deepFreeze({
  PER_CELL: [
   {field:'painter',service:'hanaworldsPainterV2PictureBlocks',label:'Painter',...PER_CELL_PAINTER},
@@ -21,9 +21,9 @@ export const WRITE_METHOD_PORTS = C.deepFreeze({
   { field: 'brush', service: 'hanaworldsBrushV3', label: 'Brush', wire: PER_CELL_BRUSH.wire, capabilities: [...PER_CELL_BRUSH.capabilities] },
  ],
  REGION: [
-  { field: 'painterRegion', service: 'hanaworldsPainterRegionV1', label: 'Painter', wire: 'painter-region/v2', capabilities: capsOf('painter-region/v2') },
-  { field: 'brushRegion', service: 'hanaworldsBrushRegionV1', label: 'Brush', wire: 'region-build/v1', capabilities: capsOf('region-build/v1') },
-  { field: 'canvasRegion', service: 'hanaworldsCanvasRegionV1', label: 'Canvas', wire: 'canvas-region/v2', capabilities: capsOf('canvas-region/v2') },
+  { field: 'painterRegion', service: 'hanaworldsPainterRegionV1', label: 'Painter', wire: 'painter-region/v3', capabilities: capsOf('painter-region/v3') },
+  { field: 'brushRegion', service: 'hanaworldsBrushRegionV1', label: 'Brush', wire: 'region-build/v2', capabilities: capsOf('region-build/v2') },
+  { field: 'canvasRegion', service: 'hanaworldsCanvasRegionV1', label: 'Canvas', wire: 'canvas-region/v3', capabilities: capsOf('canvas-region/v3') },
  ],
 });
 const scaleNote = 'Typical scale is guidance for the skill, not a limit: Workshop has no size threshold or setting, never truncates a proposal, changes its target or switches method.';
@@ -31,21 +31,21 @@ const BASE = C.deepFreeze({
  PER_CELL: {
   toolName: 'hanaworlds_proposal', inputType: 'BuildProposal',
   purpose: 'Fine edits of individual cells: a building, a door, a window row or a small correction, through the existing per-cell BUILD path.',
-  typicalScale: `A single cell up to a few hundred cells, usually inside one 16×16×16 mapblock. ${scaleNote}`,
+  typicalScale: `A single cell up to a few hundred cells, usually inside one world-declared partition. ${scaleNote}`,
   whenToUse: 'The change is small and each cell matters, or the user asks for precise detail; also to refine after a region write.',
   notFor: 'Large terrain fills or digging; a per-cell proposal only writes currently known-empty cells, so replacing or digging existing nodes needs REGION.',
-  input: 'BuildProposal {decision:"BUILD", materials:{alias:{nodeName,param2}}, boxes:[{min:[x,y,z],max:[x,y,z],materialRef}]} in the captured frame; a 1×1×1 box is one cell.',
+  input: 'BuildProposal {decision:"BUILD", geometryProfile, materials:{alias:{materialRef,orientation}}, boxes:[{min:[x,y,z],max:[x,y,z],materialRef}]} in the captured frame; a 1×1×1 box is one cell.',
  },
  REGION: {
   toolName: 'hanaworlds_region_proposal', inputType: 'RegionProposal',
   purpose: 'Large fill or dig in one Canvas transaction: flatten or raise terrain, fill a basin, carve a valley or clear a slab.',
-  typicalScale: `Hundreds to millions of cells across many 16×16×16 mapblocks, written per mapblock as one logical transaction with whole-region Undo. ${scaleNote}`,
+  typicalScale: `Hundreds to millions of cells across many world-declared partitions, written per partition as one logical transaction with whole-region Undo. ${scaleNote}`,
   whenToUse: 'The change covers a large volume, spans mapblocks, or must replace/dig existing terrain.',
   notFor: 'A few detail cells; use PER_CELL to refine afterwards.',
-  input: 'RegionProposal {decision:"REGION", block: region-voxels/v1 {origin (world node min corner), size, indexOrder X_FASTEST_THEN_Y_THEN_Z, palette of catalogue NodeSpecs, runs [count, paletteIndex|null]}}. Explicit {nodeName:"air",param2:0} digs; null means unspecified and is never air.',
+  input: 'RegionProposal {decision:"REGION", block: region-voxels/v2 {origin (world node min corner), size, indexOrder X_FASTEST_THEN_Y_THEN_Z, geometryProfile, palette of opaque catalogue materialRef/orientation entries, runs [count, paletteIndex|null]}}. Explicit catalogue.emptyMaterialRef digs; null means unspecified and is never air.',
  },
 });
-export const writeToolSkillGuidance = `Two write methods reach the same Painter → Brush → Canvas path. PER_CELL (${BASE.PER_CELL.toolName}) is for exact small edits; REGION (${BASE.REGION.toolName}) is for large fill or dig, where explicit air digs and unspecified cells stay unchanged. Choose by the current goal and its volume, combine them when useful (REGION first, then PER_CELL to refine) and improve the choice from results. The typical scales are guidance, not limits. If a method reports unmet needs, tell the user what is missing and offer the listed remedy; do not silently switch methods or shrink the target.`;
+export const writeToolSkillGuidance = `Two write methods reach the same Painter → Brush → Canvas path. PER_CELL (${BASE.PER_CELL.toolName}) is for exact small edits; REGION (${BASE.REGION.toolName}) is for large fill or dig, where explicit emptyMaterialRef digs and unspecified cells stay unchanged. Choose by the current goal and its volume, combine them when useful (REGION first, then PER_CELL to refine) and improve the choice from results. The typical scales are guidance, not limits. If a method reports unmet needs, tell the user what is missing and offer the listed remedy; do not silently switch methods or shrink the target.`;
 /** A peer's advertised handshakes, read from its public shape: a plain value
  * property, or the public methods `handshake()` / `protocolHandshake()` /
  * `status().contractHandshake|protocolHandshake` (e.g. BrushV3). The returned

@@ -7,7 +7,7 @@ import * as C from 'hanaworlds-contracts';
 import { verifyContracts } from '../scripts/verify-contracts.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const installed = dirname(fileURLToPath(import.meta.resolve('hanaworlds-contracts/package.json')));
-const spec = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^1.1.0';
+const spec = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#v2.0.0';
 
 async function scratch(t, name) {
   const base = process.env.HW_RUNTIME_ROOT;
@@ -27,7 +27,7 @@ async function withManifest(t, edit) {
   return temp;
 }
 
-test('contracts: Git semver range from the contracts source, resolved by the lock, no vendor or provenance copy', async () => {
+test('contracts: published Git release tag from the contracts source, resolved by the lock, no vendor or provenance copy', async () => {
   const pkg = JSON.parse(await readFile(join(root, 'package.json')));
   assert.equal(pkg.dependencies['hanaworlds-contracts'], spec);
   assert.ok(!pkg.files.some(f => f.startsWith('vendor/') || f === 'CONTRACTS-PROVENANCE.json'));
@@ -41,19 +41,19 @@ test('contracts: Git semver range from the contracts source, resolved by the loc
   assert.equal(C.checkContractsVersion(C.contractHandshake.contracts).result, 'CONTRACTS_MAJOR_MATCH');
 });
 
-test('contracts: a tag or commit pin instead of a range is rejected', async t => {
-  for (const pin of ['#v0.5.4', '#85687fc3811e4c8ee6e69410d46d8026e19d2c75', '#semver:0.5.4']) {
+test('contracts: a semver range or commit instead of a release tag is rejected', async t => {
+  for (const pin of ['#semver:^2.0.0', '#85687fc3811e4c8ee6e69410d46d8026e19d2c75', '#semver:0.5.4']) {
     const temp = await withManifest(t, (pkg, lock) => { pkg.dependencies['hanaworlds-contracts'] = lock.packages[''].dependencies['hanaworlds-contracts'] = `git+https://github.com/yzsnstotz/hanaworlds-contracts.git${pin}`; });
-    await assert.rejects(verifyContracts({projectRoot:temp}), /CONTRACT_RANGE_REQUIRED/, pin);
+    await assert.rejects(verifyContracts({projectRoot:temp}), /CONTRACT_RELEASE_TAG_REQUIRED/, pin);
   }
 });
 
-test('contracts: a declared range of another contracts major is rejected by the source predicate', async t => {
-  const temp = await withManifest(t, (pkg, lock) => { pkg.dependencies['hanaworlds-contracts'] = lock.packages[''].dependencies['hanaworlds-contracts'] = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#semver:^0.5.6'; });
-  await assert.rejects(verifyContracts({projectRoot:temp}), e => e.code === 'UNSUPPORTED_VERSION');
+test('contracts: a release tag differing from the installed version is rejected', async t => {
+  const temp = await withManifest(t, (pkg, lock) => { pkg.dependencies['hanaworlds-contracts'] = lock.packages[''].dependencies['hanaworlds-contracts'] = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#v1.1.0'; });
+  await assert.rejects(verifyContracts({projectRoot:temp}), /CONTRACT_TAG_VERSION_MISMATCH/);
 });
 
-test('contracts: a lock that does not match the declared range is rejected', async t => {
+test('contracts: a lock that does not match the declared tag is rejected', async t => {
   const temp = await withManifest(t, (pkg, lock) => { lock.packages[''].dependencies['hanaworlds-contracts'] = 'git+https://github.com/yzsnstotz/hanaworlds-contracts.git#v0.5.4'; });
   await assert.rejects(verifyContracts({projectRoot:temp}), /CONTRACT_LOCK_SPEC_MISMATCH/);
 });

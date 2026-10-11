@@ -33,12 +33,12 @@ export { exact, used };
 
 // New Session routes consume the generated public types directly.
 import type { ReadSessionIdentityRequest, ListSessionsRequest, SessionIdentity, SessionDirectory } from 'hanaworlds-contracts';
-const identityRequest: ReadSessionIdentityRequest = { contractVersion: 'session/v4', requestId: 'read', sessionRef: 's1' };
-const listRequest: ListSessionsRequest = { contractVersion: 'session/v4', requestId: 'list' };
+const identityRequest: ReadSessionIdentityRequest = { contractVersion: 'session/v5', requestId: 'read', sessionRef: 's1' };
+const listRequest: ListSessionsRequest = { contractVersion: 'session/v5', requestId: 'list' };
 const identity: SessionIdentity = { sessionRef: 's1', sessionRevision: 'rev-core-initial' };
 const directory: SessionDirectory = { directoryRevision: 'dir-1', sessions: [identity] };
-C.validateBoundRequest('session/v4', 'ReadSessionIdentity', identityRequest);
-C.validateBoundRequest('session/v4', 'ListSessions', listRequest);
+C.validateBoundRequest('session/v5', 'ReadSessionIdentity', identityRequest);
+C.validateBoundRequest('session/v5', 'ListSessions', listRequest);
 C.validateType('SessionDirectory', directory);
 const deletionGuard: typeof C.requireSessionDeleteSupported = C.requireSessionDeleteSupported;
 export { identityRequest, listRequest, directory, deletionGuard };

@@ -8,7 +8,7 @@ import { Context } from '@deepseek-ai/cordis';
 import Storage from '@deepseek-ai/dsh-storage';
 import * as StorageJson from '@deepseek-ai/dsh-storage-json';
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain';
-import { LegacyHistoryService, LegacyHistoryStore } from '../src/legacy-history.mjs';
+import { LegacyHistoryService, LegacyHistoryStore } from '../archive/workshop-01/src/legacy-history.mjs';
 
 const sha = value => createHash('sha256').update(value).digest('hex');
 const canonical = value => value === null || typeof value !== 'object'

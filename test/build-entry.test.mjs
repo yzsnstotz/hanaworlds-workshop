@@ -157,7 +157,7 @@ test('a published Shell choice advances the same turn without a caller supplied 
   const first = await f.workshop.call('AdvanceCurrentBuild', request());
   const frame = first.result.frame;
   const action = frame.actions.find(item => item.inputKinds.includes('SELECT_CHOICE'));
-  const projection = { contractVersion: 'interaction-surface/v2',
+  const projection = { contractVersion: 'interaction-surface/v5',
     sessionRef: 's1', turnRevision: frame.turnRevision,
     frameRef: frame.frameRef, frameRevision: frame.frameRevision,
     actionId: action.actionId, orderedTargetRefs: [],
