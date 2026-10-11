@@ -14,10 +14,9 @@ const { default: plugin } = await import(process.env.HW_WORKSHOP_PACKAGE_ENTRY ?
 const main = JSON.parse(await readFile(new URL(import.meta.resolve('hanaworlds-contracts/fixtures/main'))));
 const seam = JSON.parse(await readFile(new URL(import.meta.resolve('hanaworlds-contracts/fixtures/session-world'))));
 const capabilities = { providerRef: 'contracts-FIXTURE', capabilityRevision: 'cap-1',
-  worldRef: main.request.localContext.worldRef, engineBounds: main.request.targetFacts.sampledBounds,
+  worldRef: main.request.localContext.worldRef, worldGeometry: null, engineBounds: main.request.targetFacts.sampledBounds,
   limits: [], recoveryGuarantee: 'RECOVERABLE_VERIFIED',
-  stateProfile: { profileVersion: 'state-profile/v2', nodeFields: ['nodeName', 'param1', 'param2'],
-    metadataMode: 'exact', inventoryMode: 'exact', timerMode: 'exact', derivedLightMode: 'recompute-with-readback' },
+  stateProfile: null,
   sessionDeleteSupported: false, imageMediaTypes: [], model: null,engineGuards:null };
 const request = (operation, sessionRef = 's1') => operation === 'ListSessions'
   ? { contractVersion: 'session/v5', requestId: 'list' }
@@ -46,7 +45,7 @@ async function runtime(fn) {
     ctx.provide('hanaworldsCapabilities', structuredClone(capabilities));
     const canvas = { contractHandshake: C.contractHandshake,
       protocolHandshake: { profileVersion: 'protocol-handshake/v1', component: 'hanaworlds-canvas',
-        protocols: [{ protocol: 'canvas', major: 6, minor: 0 }], capabilities: [],
+        protocols: [{ protocol: 'canvas', major: 7, minor: 0 }], capabilities: [],
         provenance: { packageName: 'hanaworlds-canvas', packageVersion: 'contracts-FIXTURE', sourceRevision: null, artifactDigest: null } },
       async call(operation, body) {
         canvasCalls.push(operation);

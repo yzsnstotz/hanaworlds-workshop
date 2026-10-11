@@ -65,6 +65,18 @@ export class WorkshopV3 {
    protocols:[{protocol:'session',major:5,minor:0}],capabilities:[],
    provenance:{packageName:packageManifest.name,packageVersion:packageManifest.version,sourceRevision:null,artifactDigest:null}});
   this.locks=new Map(); }
+ /** Host-local observation only. Official rc.2 JSONL cannot certify whole-read
+  * currentness; never issue a guard from sampled revisions or caller claims. */
+ captureSessionReadGuard(_scope) {
+  return Object.freeze({protocol:'session-read-guard/v1',guard:null,
+   error:Object.freeze({code:'CAPABILITY_UNAVAILABLE'}),
+   missing:Object.freeze(['OFFICIAL_PERSISTENCE_SYNCHRONOUS_CURRENTNESS',
+    'OFFICIAL_PERSISTENCE_COMPLETE_MONOTONIC_INVALIDATION',
+    'COMMITTED_PROJECTION_SYNCHRONOUS_CURRENTNESS_AND_INVALIDATION'])});
+ }
+ /** This fixed provider has issued no guards. Foreign/fabricated/serialized
+  * tokens remain invalid, including after an ABA or provider replacement. */
+ isSessionReadGuardCurrent(_guard,_scope) { return false; }
  status() {
   return {component:packageManifest.name,version:packageManifest.version,
    contractHandshake:copy(this.contractHandshake),protocolHandshake:copy(this.protocolHandshake)};
