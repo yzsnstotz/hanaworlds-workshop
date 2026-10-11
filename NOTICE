@@ -156,3 +156,8 @@ Official @deepseek-ai/dsh-skill@0.2.0-rc.2 (runtime) and
 separately installed public npm packages from deepseek-ai/deepseek-harness,
 packages/skill/skill and packages/skill/tool-skill. Their implementations and
 licenses are not copied or bundled. Existing dependencies stay pinned.
+
+Q-42 read-guard observation: @deepseek-ai/dsh-session and
+@deepseek-ai/dsh-session-persistence-jsonl 0.2.0-rc.2 (MIT), official
+https://github.com/deepseek-ai/deepseek-harness. Used unchanged to audit live
+Session and persisted metadata guarantees; no upstream modification.

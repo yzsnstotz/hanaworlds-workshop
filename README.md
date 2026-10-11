@@ -120,3 +120,23 @@ persistence, an explicit Canvas fixture and no auth/model/world writer.
 `npm run typecheck:contracts` checks the exact public consumer types. These
 checks do not establish real image understanding, native world behavior,
 product UI readiness or owner acceptance.
+
+### Host-local stable Session reads (Q-42)
+
+The existing `hanaworldsWorkshop` Cordis service exposes synchronous
+`captureSessionReadGuard(scope)` and `isSessionReadGuardCurrent(guard, scope)`
+under `session-read-guard/v1`. This is an internal observation API, not a new
+JSON/HTTP operation. Official DSH 0.2.0-rc.2 JSONL does not provide synchronous
+currentness or complete invalidation for stored Sessions; committed projection
+reads also lack a synchronous observation boundary. Capture therefore returns
+`CAPABILITY_UNAVAILABLE` with named missing guarantees, and never issues a guard.
+No purported caller capability or token can enable it.
+
+Canvas stable settings reads must refuse that result. Once official guarantees
+exist, capture before preparation and, after the final await, jointly check
+Session, connection and Canvas local state in one no-await execution segment.
+A failed or invalidated read cannot retry or recapture. Existing asynchronous
+`ReadSessionIdentity`, settings UI and current-Session wire reads retain their
+snapshot behavior; this change does not claim whole-read stability for them.
+See the published contracts `docs/session-read-guard.md` and public
+`fixtures/session-read-guard` for types, boundaries and missing capabilities.
